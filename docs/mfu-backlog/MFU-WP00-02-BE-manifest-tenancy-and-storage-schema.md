@@ -314,6 +314,282 @@ During migration, use storage helpers to generate canonical keys. Add a compatib
 ## Dependencies and Prerequisites
 - Depends on: MFU‑WP00‑01‑IAC (repo scaffolding, env conventions)
 
+## Agent Execution Guide (Step-by-step)
+
+Follow these steps exactly. All paths are repo‑relative.
+
+1) Ensure directories exist
+
+- Create or verify:
+  - `docs/schemas/`
+  - `backend/lib/`
+  - `infra/`
+  - `tools/harness/`
+
+2) Materialize schemas from this doc
+
+- Create `docs/schemas/manifest.schema.json` with the Manifest Schema (v1.0.0) JSON block from this document, unmodified.
+- Create `docs/schemas/cut_plan.schema.json` with the Cut Plan Schema JSON block from this document, unmodified.
+
+3) Add types matching schemas
+
+- Create `backend/lib/types.ts`:
+```ts
+export type Env = 'dev' | 'stage' | 'prod';
+
+export interface ManifestInput {
+  sourceKey: string;
+  originalFilename: string;
+  bytes: number;
+  mimeType: string;
+  checksum?: string;
+  uploadedAt?: string;
+}
+
+export interface ManifestTranscript {
+  jsonKey?: string;
+  srtKey?: string;
+  language?: string;
+  model?: 'tiny' | 'base' | 'small' | 'medium' | 'large';
+  confidence?: number;
+  transcribedAt?: string;
+}
+
+export interface ManifestPlan {
+  key?: string;
+  schemaVersion?: string;
+  algorithm?: string;
+  totalCuts?: number;
+  plannedAt?: string;
+}
+
+export interface ManifestRender {
+  key: string;
+  type: 'preview' | 'final' | 'thumbnail';
+  codec: 'h264' | 'h265' | 'vp9';
+  durationSec?: number;
+  resolution?: string;
+  notes?: string;
+  renderedAt?: string;
+}
+
+export interface ManifestLog {
+  key?: string;
+  type?: 'pipeline' | 'error' | 'debug';
+  createdAt?: string;
+}
+
+export interface ManifestMetadata {
+  clientVersion?: string;
+  processingTimeMs?: number;
+  tags?: string[];
+}
+
+export interface Manifest {
+  schemaVersion: '1.0.0';
+  env: Env;
+  tenantId: string;
+  jobId: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
+  createdAt: string;
+  updatedAt: string;
+  sourceVideoKey?: string;
+  input?: ManifestInput;
+  audio?: {
+    key?: string;
+    codec?: 'mp3' | 'wav' | 'aac';
+    durationSec?: number;
+    bitrateKbps?: number;
+    sampleRate?: 16000 | 22050 | 44100 | 48000;
+    extractedAt?: string;
+  };
+  transcript?: ManifestTranscript;
+  plan?: ManifestPlan;
+  renders?: ManifestRender[];
+  logs?: ManifestLog[];
+  metadata?: ManifestMetadata;
+}
+```
+
+4) Implement tenant-aware storage helpers (Local mode)
+
+- Create `backend/lib/storage.ts`:
+```ts
+import fs from 'node:fs';
+import path from 'node:path';
+
+const ENV = (process.env.TALKAVOCADO_ENV || 'dev') as 'dev' | 'stage' | 'prod';
+const MEDIA_STORAGE_PATH = process.env.MEDIA_STORAGE_PATH || './storage';
+const ENABLE_LEGACY_MIRROR = String(process.env.ENABLE_LEGACY_MIRROR || 'false') === 'true';
+
+export function storageRoot() {
+  return path.resolve(MEDIA_STORAGE_PATH);
+}
+
+export function key(...parts: string[]) {
+  return parts.join('/').replace(/\\/g, '/');
+}
+
+export function keyFor(env: string, tenantId: string, jobId: string, ...rest: string[]) {
+  return key(env, tenantId, jobId, ...rest);
+}
+
+export function pathFor(k: string) {
+  return path.join(storageRoot(), k);
+}
+
+export function ensureDirForFile(filePath: string) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+}
+
+export function writeFileAtKey(k: string, data: Buffer | string) {
+  const p = pathFor(k);
+  ensureDirForFile(p);
+  fs.writeFileSync(p, data);
+  return p;
+}
+
+export function readFileAtKey(k: string) {
+  return fs.readFileSync(pathFor(k));
+}
+
+export function currentEnv() {
+  return ENV;
+}
+
+export function maybeMirrorLegacy(env: string, tenantId: string, jobId: string, logical: string, data: Buffer | string) {
+  if (!ENABLE_LEGACY_MIRROR) return;
+  if (logical.endsWith('/audio/' + jobId + '.mp3')) {
+    const legacy = key(env, tenantId, jobId, 'mp3', jobId + '.mp3');
+    writeFileAtKey(legacy, data);
+  }
+}
+```
+
+5) Implement manifest CRUD + Ajv validation
+
+- Create `backend/lib/manifest.ts`:
+```ts
+import fs from 'node:fs';
+import Ajv from 'ajv';
+import addFormats from 'ajv-formats';
+import path from 'node:path';
+import { Manifest } from './types';
+import { keyFor, pathFor, ensureDirForFile } from './storage';
+
+const schemaPath = path.resolve('docs/schemas/manifest.schema.json');
+const schema = JSON.parse(fs.readFileSync(schemaPath, 'utf-8'));
+const ajv = new Ajv({ allErrors: true, strict: false });
+addFormats(ajv);
+const validate = ajv.compile<Manifest>(schema);
+
+export function manifestKey(env: string, tenantId: string, jobId: string) {
+  return keyFor(env, tenantId, jobId, 'manifest.json');
+}
+
+export function loadManifest(env: string, tenantId: string, jobId: string): Manifest {
+  const p = pathFor(manifestKey(env, tenantId, jobId));
+  const obj = JSON.parse(fs.readFileSync(p, 'utf-8'));
+  if (!validate(obj)) {
+    const msg = ajv.errorsText(validate.errors || []);
+    throw new Error('Invalid manifest: ' + msg);
+  }
+  return obj;
+}
+
+export function saveManifest(env: string, tenantId: string, jobId: string, m: Manifest) {
+  const valid = validate(m);
+  if (!valid) {
+    const msg = ajv.errorsText(validate.errors || []);
+    throw new Error('Invalid manifest: ' + msg);
+  }
+  const p = pathFor(manifestKey(env, tenantId, jobId));
+  ensureDirForFile(p);
+  fs.writeFileSync(p, JSON.stringify(m, null, 2));
+  return p;
+}
+```
+
+6) DynamoDB table definition
+
+- Create `infra/dynamodb-jobs.json` using the “DynamoDB Jobs Table Design” JSON block from this document, unmodified.
+
+7) Document conventions
+
+- Create `docs/CONVENTIONS.md` summarizing:
+  - Envs: `dev|stage|prod`
+  - Canonical layout: `{env}/{tenantId}/{jobId}/...`
+  - Standardized folder names (e.g., `transcripts/`)
+  - Manifest versioning: `schemaVersion = "1.0.0"`
+  - Local vs S3 mode parity (S3 added in MFU‑WP00‑03)
+
+8) Add a minimal sample data generator
+
+- Create `tools/harness/generate-sample-job.js`:
+```js
+#!/usr/bin/env node
+const { writeFileSync, mkdirSync } = require('node:fs');
+const { join, dirname } = require('node:path');
+
+const ENV = process.env.TALKAVOCADO_ENV || 'dev';
+const ROOT = process.env.MEDIA_STORAGE_PATH || './storage';
+
+function p(...parts) { return join(ROOT, ...parts); }
+function ensure(file) { mkdirSync(dirname(file), { recursive: true }); }
+
+const tenantId = process.argv[2] || 'demo-tenant';
+const jobId = process.argv[3] || '00000000-0000-0000-0000-000000000000';
+
+const manifest = {
+  schemaVersion: '1.0.0',
+  env: ENV,
+  tenantId,
+  jobId,
+  status: 'pending',
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+};
+
+const mk = p(ENV, tenantId, jobId, 'manifest.json');
+ensure(mk);
+writeFileSync(mk, JSON.stringify(manifest, null, 2));
+console.log('Wrote manifest:', mk);
+```
+
+9) Unit tests (lightweight)
+
+- Add tests for:
+  - `keyFor`/`pathFor` round-trip
+  - `saveManifest` then `loadManifest` with valid data
+  - Invalid manifest fails validation
+- Use Node’s built-in `node:test` to avoid extra dependencies.
+
+10) Integration sanity check (local)
+
+- Set env vars: `TALKAVOCADO_ENV=dev`, `MEDIA_STORAGE_PATH=./storage`
+- Run the sample generator to create a job.
+- Write a small script to append a fake audio artifact and update manifest:
+  - `audio/{jobId}.mp3` written via storage helper
+  - Update `manifest.audio` and persist via `saveManifest`
+- Re‑load manifest and assert updated fields.
+
+11) Migration notes for handlers
+
+- For each handler (extraction, transcription, planner, renderer):
+  - Replace hard-coded paths with `keyFor` + `pathFor`.
+  - Update manifest via `saveManifest` after producing artifacts.
+  - Optional: if `ENABLE_LEGACY_MIRROR=true`, also write legacy keys during transition.
+
+12) Acceptance criteria closure
+
+- Check off items in “Acceptance Criteria” when:
+  - Schema files exist and validate
+  - `backend/lib/storage.ts`, `backend/lib/manifest.ts`, `backend/lib/types.ts` implemented
+  - `infra/dynamodb-jobs.json` created
+  - `docs/CONVENTIONS.md` written
+  - Unit/integration checks pass locally
+  - Sample job manifest generated successfully
+
 ## Test Plan
 - Unit: storage and manifest CRUD + validation error paths
 - Schema: validate known-good and known-bad manifests/cut plans
