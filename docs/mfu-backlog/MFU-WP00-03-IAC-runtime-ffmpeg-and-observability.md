@@ -1,9 +1,9 @@
 ---
 title: "MFU-WP00-03-IAC: Runtime FFmpeg and Observability"
 sidebar_label: "WP00-03: IAC FFmpeg & Obs"
-date: 2025-09-25
+date: 2025-09-30
 status: planned
-version: 1.2
+version: 1.0
 audience: [devops, backend-engineers]
 ---
 
@@ -13,8 +13,9 @@ audience: [devops, backend-engineers]
 
 - MFU ID: MFU-WP00-03-IAC
 - Title: Runtime FFmpeg and Observability
-- Date Created: 2025-09-25
-- Created By: TalkAvocado Team
+- Date Created: 2025-09-30
+- Date Last Updated:
+- Created By: Radha
 - Work Package: WP00 — Foundations (Phase 1)
 - Sprint: Phase 1 – Foundations
 
