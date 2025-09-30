@@ -1,7 +1,7 @@
 ---
 title: "MFU-WP00-02-BE: Manifest, Tenancy, and Storage Schema"
 sidebar_label: "WP00-02: BE Manifest & Storage"
-date: 2025-09-25
+date: 2025-09-30
 status: planned
 version: 1.0
 audience: [developers, backend-engineers]
@@ -13,8 +13,9 @@ audience: [developers, backend-engineers]
 
 - MFU ID: MFU-WP00-02-BE
 - Title: Manifest, Tenancy, and Storage Schema
-- Date Created: 2025-09-25
-- Created By: TalkAvocado Team
+- Date Created: 2025-09-30
+- Date Last Updated:
+- Created By: Radha
 - Work Package: WP00 — Foundations (Phase 1)
 - Sprint: Phase 1 – Foundations
 
