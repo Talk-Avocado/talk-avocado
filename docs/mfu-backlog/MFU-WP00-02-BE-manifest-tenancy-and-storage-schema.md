@@ -199,7 +199,7 @@ Key changes:
 
 ### Cut Plan Schema (Phase 1 compatible)
 
-Compat with current planner output (`start`/`end` as strings, `reason`, optional `confidence`). We’ll formalize numeric seconds and `type` in WP01 once planner/renderer are migrated.
+Includes `type` field to distinguish keep/cut segments. Compatible with current planner output (`start`/`end` as strings, `reason`, optional `confidence`).
 
 ```json
 {
@@ -216,10 +216,11 @@ Compat with current planner output (`start`/`end` as strings, `reason`, optional
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["start", "end"],
+        "required": ["start", "end", "type"],
         "properties": {
           "start": { "type": "string", "description": "SS.SS | mm:ss(.sss) | hh:mm:ss(.sss)" },
           "end": { "type": "string", "description": "SS.SS | mm:ss(.sss) | hh:mm:ss(.sss)" },
+          "type": { "type": "string", "enum": ["keep", "cut"], "description": "Segment type: keep for content to retain, cut for content to remove" },
           "reason": { "type": "string" },
           "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
         }
