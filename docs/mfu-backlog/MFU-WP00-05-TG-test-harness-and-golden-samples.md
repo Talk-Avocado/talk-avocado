@@ -1,9 +1,9 @@
 ---
 title: "MFU-WP00-05-TG: Test Harness and Golden Samples"
 sidebar_label: "WP00-05: TG Harness & Goldens"
-date: 2025-09-30
+date: 2025-10-01
 status: planned
-version: 1.1
+version: 1.0
 audience: [developers, qa]
 ---
 
@@ -13,7 +13,7 @@ audience: [developers, qa]
 
 - MFU ID: MFU-WP00-05-TG
 - Title: Test Harness and Golden Samples
-- Date Created: 2025-09-30
+- Date Created: 2025-10-01
 - Date Last Updated:
 - Created By: Radha
 - Work Package: WP00 — Foundations (Phase 1)
