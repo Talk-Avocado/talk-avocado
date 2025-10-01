@@ -616,3 +616,11 @@ console.log('Wrote manifest:', mk);
 - MFU‑WP00‑01‑IAC: foundations and env standards
 - MFU‑WP00‑03‑IAC: S3 bindings, runtime, and observability
 - MFU‑WP01‑01‑BE / ‑02‑BE: first adopters of manifest system
+
+## Implementation Tracking
+
+- Status: planned
+- Assigned To: Team
+- Start Date: 2025-10-01
+- Target Completion: +2 days
+- Actual Completion: TBC
