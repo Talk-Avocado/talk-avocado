@@ -173,6 +173,22 @@ Key changes:
       }
     },
 
+    "subtitles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["key", "type", "format"],
+        "properties": {
+          "key": { "type": "string" },
+          "type": { "type": "string", "enum": ["source", "final"] },
+          "format": { "type": "string", "enum": ["srt", "vtt"] },
+          "durationSec": { "type": "number", "minimum": 0 },
+          "wordCount": { "type": "integer", "minimum": 0 },
+          "generatedAt": { "type": "string", "format": "date-time" }
+        }
+      }
+    },
+
     "logs": {
       "type": "array",
       "items": {
@@ -289,13 +305,15 @@ During migration, use storage helpers to generate canonical keys. Add a compatib
 - `TranscribeWithWhisper/index.js` → write `transcripts/transcript.json` and optional `captions.source.srt`, update `manifest.transcript.*`
 - `SmartCutPlanner/index.js` → write `plan/cut_plan.json` (compat with current shape), update `manifest.plan.*`
 - `VideoRenderEngine/index.js` → read from `plan/cut_plan.json`, write `renders/preview.mp4` or `renders/final.mp4`, append to `manifest.renders[]`
+- `SubtitlesPostEdit/index.js` → write `subtitles/final.srt` and `subtitles/final.vtt`, append to `manifest.subtitles[]`
 
 ### Business Value
 - Shared manifest contract, tenant isolation by construction, discoverable artifacts, and readiness for cloud deployment without breaking local workflows.
+- **Subtitles Support**: Extended manifest schema now supports subtitle tracking for accessibility compliance and publishing workflows.
 
 ## Acceptance Criteria
 
-- [ ] `docs/schemas/manifest.schema.json` (v1.0.0) created and validated
+- [ ] `docs/schemas/manifest.schema.json` (v1.0.0) created and validated **with subtitles support**
 - [ ] `docs/schemas/cut_plan.schema.json` (Phase 1 compatible) created
 - [ ] `backend/lib/storage.ts` with path helpers (local mode implemented; S3 mode explicitly deferred)
 - [ ] `backend/lib/manifest.ts` with CRUD + Ajv validation and helpful error messages
@@ -375,6 +393,15 @@ export interface ManifestRender {
   renderedAt?: string;
 }
 
+export interface ManifestSubtitle {
+  key: string;
+  type: 'source' | 'final';
+  format: 'srt' | 'vtt';
+  durationSec?: number;
+  wordCount?: number;
+  generatedAt?: string;
+}
+
 export interface ManifestLog {
   key?: string;
   type?: 'pipeline' | 'error' | 'debug';
@@ -408,6 +435,7 @@ export interface Manifest {
   transcript?: ManifestTranscript;
   plan?: ManifestPlan;
   renders?: ManifestRender[];
+  subtitles?: ManifestSubtitle[];
   logs?: ManifestLog[];
   metadata?: ManifestMetadata;
 }
