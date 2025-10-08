@@ -58,8 +58,8 @@ show_menu() {
   echo ""
   echo "MFU Workflow:"
   echo "1) Create MFU branch"
-  echo "2) Commit MFU progress (with validation)"
-  echo "3) Fast commit MFU progress (skip validation)"
+  echo "2) Fast commit MFU progress (skip validation)"
+  echo "3) Commit MFU progress (with validation)"
   echo "4) Complete MFU (merge to dev)"
   echo "5) Release (merge dev→main + tag)"
   echo "6) Show MFU status"
@@ -83,8 +83,8 @@ show_menu() {
 main() {
   case $choice in
     1) create_mfu_branch ;;
-    2) commit_mfu_progress ;;
-    3) fast_commit_mfu_progress ;;
+    2) fast_commit_mfu_progress ;;
+    3) commit_mfu_progress ;;
     4) complete_mfu ;;
     5) merge_dev_to_main ;;
     6) show_mfu_status ;;
