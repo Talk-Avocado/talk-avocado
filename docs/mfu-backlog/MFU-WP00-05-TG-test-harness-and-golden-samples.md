@@ -26,9 +26,19 @@ Provide a curated media set with expected outputs (goldens) and a small e2e smok
 
 **Technical Scope**:
 
+### Decisions Adopted (Phase-1)
+
+- Harness lanes: `--lane cuts`, `--lane transitions`, `--lane edit` (cuts → transitions), and `--negative-tests` to assert cross-tenant access is blocked.
+- Event payloads sent by harness exactly match ASL Task inputs defined in `docs/CONVENTIONS.md`.
+- Golden tolerances and timeouts are read from `docs/uat/uat-config.json`.
+
 - Curate short media samples (mp4/mov)
 - Expected outputs: durations, basic transcripts, cut plans
-- CLI runner to execute pipeline on samples and compare key metrics
+- CLI runner to execute pipeline on samples and compare key metrics. Add lanes:
+  - `--lane cuts` (runs cuts only, produces `renders/base_cuts.mp4`)
+  - `--lane transitions` (runs transitions on top of cuts, produces `renders/with_transitions.mp4`)
+  - `--lane edit` (cuts → optional transitions)
+  - `--negative-tests` (assert cross-tenant access is blocked)
 
 **Business Value**  
 Gives fast feedback on regressions and validates MFUs end-to-end with minimal runtime.
@@ -71,6 +81,7 @@ storage/                      # Local root: {env}/{tenantId}/{jobId}/...
 ### Harness CLI Contract
 
 **Flags:**
+
 - `--env <dev|stage|prod>` — Target environment (default: `dev`)
 - `--tenant <tenantId>` — Tenant identifier (default: `t-local`)
 - `--job <jobId|auto>` — Job ID; `auto` generates a UUID (default: `auto`)
@@ -79,11 +90,13 @@ storage/                      # Local root: {env}/{tenantId}/{jobId}/...
 - `--strict` — Disable numeric tolerances; require exact matches (default: `false`)
 
 **Defaults:**
+
 - `--env dev --tenant t-local --job auto` (auto generates UUID)
 
 **Behavior:**
+
 - Seeds `./storage/{env}/{tenant}/{job}/input/` with the provided input
-- Invokes handlers in order (audio → transcription → plan → render)
+- Invokes handlers in order (audio → transcription → plan → cuts → [Choice] transitions → subtitles → branding)
 - Writes artifacts under canonical keys and updates manifest
 - If `--goldens` provided, runs `compare-goldens` and exits non-zero on mismatch
 - On handler error: logs error, updates manifest status to `failed`, and exits non-zero
@@ -192,18 +205,21 @@ Manifest subset example (only specified fields are compared):
 ## Dependencies and Prerequisites
 
 Hard dependencies (Phase 1 local-first):
+
 - MFU‑WP00‑01‑IAC (repo scaffolding, harness baseline, env conventions)  
-  See: https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-01-IAC-platform-bootstrap-and-ci.md
+  See: <https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-01-IAC-platform-bootstrap-and-ci.md>
 - MFU‑WP00‑02‑BE (manifest, tenancy, storage abstraction)  
-  See: https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-02-BE-manifest-tenancy-and-storage-schema.md
+  See: <https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-02-BE-manifest-tenancy-and-storage-schema.md>
 
 Recommended but not required to start:
+
 - MFU‑WP00‑03‑IAC (FFmpeg runtime and observability wrappers)  
-  See: https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-03-IAC-runtime-ffmpeg-and-observability.md
+  See: <https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-03-IAC-runtime-ffmpeg-and-observability.md>
 - MFU‑WP00‑04‑MW (orchestration skeleton) — for future wiring; harness can run locally without it  
-  See: https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-04-MW-orchestration-skeleton-and-job-status-api.md
+  See: <https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-04-MW-orchestration-skeleton-and-job-status-api.md>
 
 **Environment Variables** (extend `.env.example` from WP00-01):
+
 ```env
 # Test Harness Configuration (WP00-05)
 ENABLE_GOLDEN_COMPARISON=false
@@ -217,295 +233,295 @@ Follow these steps exactly. All paths are repo‑relative.
 
 1) Ensure directories exist
 
-- Create or verify:
-  - `tools/harness/`
-  - `docs/samples/`
-  - `podcast-automation/test-assets/raw/`
-  - `podcast-automation/test-assets/goldens/`
+    - Create or verify:
+      - `tools/harness/`
+      - `docs/samples/`
+      - `podcast-automation/test-assets/raw/`
+      - `podcast-automation/test-assets/goldens/`
 
 2) Implement non-interactive runner
 
-- Create `tools/harness/run-local-pipeline.js` that:
-  - Parses flags: `--env`, `--tenant`, `--job`, `--input`, `--goldens`, `--strict`
-  - Seeds input under storage via helpers from WP00‑02
-  - Invokes handlers in order using their module paths
-  - Updates manifest after each step
-  - Prints a concise summary
+    - Create `tools/harness/run-local-pipeline.js` that:
+      - Parses flags: `--env`, `--tenant`, `--job`, `--input`, `--goldens`, `--strict`
+      - Seeds input under storage via helpers from WP00‑02
+      - Invokes handlers in order using their module paths
+      - Updates manifest after each step
+      - Prints a concise summary
 
-**Implementation skeleton:**
+    **Implementation skeleton:**
 
-```javascript
-#!/usr/bin/env node
-// tools/harness/run-local-pipeline.js
-const { parseArgs } = require('node:util');
-const { readFileSync, copyFileSync } = require('node:fs');
-const { v4: uuidv4 } = require('uuid');
-const { keyFor, pathFor, writeFileAtKey, ensureDirForFile } = require('../../backend/lib/storage');
-const { saveManifest, loadManifest } = require('../../backend/lib/manifest');
+    ```javascript
+    #!/usr/bin/env node
+    // tools/harness/run-local-pipeline.js
+    const { parseArgs } = require('node:util');
+    const { readFileSync, copyFileSync } = require('node:fs');
+    const { v4: uuidv4 } = require('uuid');
+    const { keyFor, pathFor, writeFileAtKey, ensureDirForFile } = require('../../backend/lib/storage');
+    const { saveManifest, loadManifest } = require('../../backend/lib/manifest');
 
-async function main() {
-  // Parse CLI arguments
-  const { values } = parseArgs({
-    options: {
-      env: { type: 'string', default: 'dev' },
-      tenant: { type: 'string', default: 't-local' },
-      job: { type: 'string', default: 'auto' },
-      input: { type: 'string' },
-      goldens: { type: 'string' },
-      strict: { type: 'boolean', default: false }
+    async function main() {
+      // Parse CLI arguments
+      const { values } = parseArgs({
+        options: {
+          env: { type: 'string', default: 'dev' },
+          tenant: { type: 'string', default: 't-local' },
+          job: { type: 'string', default: 'auto' },
+          input: { type: 'string' },
+          goldens: { type: 'string' },
+          strict: { type: 'boolean', default: false }
+        }
+      });
+
+      if (!values.input) {
+        console.error('Error: --input is required');
+        process.exit(1);
+      }
+
+      const jobId = values.job === 'auto' ? uuidv4() : values.job;
+      const env = values.env;
+      const tenantId = values.tenant;
+
+      console.log(`[harness] Starting pipeline: env=${env}, tenant=${tenantId}, job=${jobId}`);
+
+      // 1. Seed input
+      const inputKey = keyFor(env, tenantId, jobId, 'input', require('path').basename(values.input));
+      const inputPath = pathFor(inputKey);
+      ensureDirForFile(inputPath);
+      copyFileSync(values.input, inputPath);
+      console.log(`[harness] Input seeded: ${inputKey}`);
+
+      // 2. Create initial manifest
+      const manifest = {
+        schemaVersion: '1.0.0',
+        env,
+        tenantId,
+        jobId,
+        status: 'pending',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        input: {
+          sourceKey: inputKey,
+          originalFilename: require('path').basename(values.input),
+          bytes: readFileSync(values.input).length,
+          mimeType: 'video/mp4'
+        }
+      };
+      saveManifest(env, tenantId, jobId, manifest);
+      console.log(`[harness] Manifest created`);
+
+      // 3. Invoke handlers in sequence
+      const handlers = [
+        { name: 'audio-extraction', path: '../../backend/services/audio-extraction/handler' },
+        { name: 'transcription', path: '../../backend/services/transcription/handler' },
+        { name: 'smart-cut-planner', path: '../../backend/services/smart-cut-planner/handler' },
+        { name: 'video-render-engine', path: '../../backend/services/video-render-engine/handler' }
+      ];
+
+      for (const handler of handlers) {
+        try {
+          console.log(`[harness] Running ${handler.name}...`);
+          const { handler: fn } = require(handler.path);
+          const event = { env, tenantId, jobId, inputPath };
+          const context = { awsRequestId: `local-${Date.now()}` };
+          await fn(event, context);
+          console.log(`[harness] ✓ ${handler.name} completed`);
+        } catch (error) {
+          console.error(`[harness] ✗ ${handler.name} failed:`, error.message);
+          // Update manifest status to failed
+          const m = loadManifest(env, tenantId, jobId);
+          m.status = 'failed';
+          m.updatedAt = new Date().toISOString();
+          saveManifest(env, tenantId, jobId, m);
+          process.exit(1);
+        }
+      }
+
+      // 4. Mark completed
+      const finalManifest = loadManifest(env, tenantId, jobId);
+      finalManifest.status = 'completed';
+      finalManifest.updatedAt = new Date().toISOString();
+      saveManifest(env, tenantId, jobId, finalManifest);
+
+      console.log(`[harness] Pipeline completed successfully`);
+
+      // 5. Compare goldens if provided
+      if (values.goldens) {
+        console.log(`[harness] Comparing against goldens: ${values.goldens}`);
+        const { compareGoldens } = require('./compare-goldens');
+        const passed = await compareGoldens({
+          actualPath: pathFor(keyFor(env, tenantId, jobId)),
+          goldensPath: values.goldens,
+          strict: values.strict
+        });
+        if (!passed) {
+          console.error('[harness] Golden comparison FAILED');
+          process.exit(1);
+        }
+        console.log('[harness] Golden comparison PASSED');
+      }
+
+      console.log(`[harness] Job complete: ${jobId}`);
     }
-  });
 
-  if (!values.input) {
-    console.error('Error: --input is required');
-    process.exit(1);
-  }
-
-  const jobId = values.job === 'auto' ? uuidv4() : values.job;
-  const env = values.env;
-  const tenantId = values.tenant;
-
-  console.log(`[harness] Starting pipeline: env=${env}, tenant=${tenantId}, job=${jobId}`);
-
-  // 1. Seed input
-  const inputKey = keyFor(env, tenantId, jobId, 'input', require('path').basename(values.input));
-  const inputPath = pathFor(inputKey);
-  ensureDirForFile(inputPath);
-  copyFileSync(values.input, inputPath);
-  console.log(`[harness] Input seeded: ${inputKey}`);
-
-  // 2. Create initial manifest
-  const manifest = {
-    schemaVersion: '1.0.0',
-    env,
-    tenantId,
-    jobId,
-    status: 'pending',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    input: {
-      sourceKey: inputKey,
-      originalFilename: require('path').basename(values.input),
-      bytes: readFileSync(values.input).length,
-      mimeType: 'video/mp4'
-    }
-  };
-  saveManifest(env, tenantId, jobId, manifest);
-  console.log(`[harness] Manifest created`);
-
-  // 3. Invoke handlers in sequence
-  const handlers = [
-    { name: 'audio-extraction', path: '../../backend/services/audio-extraction/handler' },
-    { name: 'transcription', path: '../../backend/services/transcription/handler' },
-    { name: 'smart-cut-planner', path: '../../backend/services/smart-cut-planner/handler' },
-    { name: 'video-render-engine', path: '../../backend/services/video-render-engine/handler' }
-  ];
-
-  for (const handler of handlers) {
-    try {
-      console.log(`[harness] Running ${handler.name}...`);
-      const { handler: fn } = require(handler.path);
-      const event = { env, tenantId, jobId, inputPath };
-      const context = { awsRequestId: `local-${Date.now()}` };
-      await fn(event, context);
-      console.log(`[harness] ✓ ${handler.name} completed`);
-    } catch (error) {
-      console.error(`[harness] ✗ ${handler.name} failed:`, error.message);
-      // Update manifest status to failed
-      const m = loadManifest(env, tenantId, jobId);
-      m.status = 'failed';
-      m.updatedAt = new Date().toISOString();
-      saveManifest(env, tenantId, jobId, m);
+    main().catch(err => {
+      console.error('[harness] Fatal error:', err);
       process.exit(1);
-    }
-  }
-
-  // 4. Mark completed
-  const finalManifest = loadManifest(env, tenantId, jobId);
-  finalManifest.status = 'completed';
-  finalManifest.updatedAt = new Date().toISOString();
-  saveManifest(env, tenantId, jobId, finalManifest);
-
-  console.log(`[harness] Pipeline completed successfully`);
-
-  // 5. Compare goldens if provided
-  if (values.goldens) {
-    console.log(`[harness] Comparing against goldens: ${values.goldens}`);
-    const { compareGoldens } = require('./compare-goldens');
-    const passed = await compareGoldens({
-      actualPath: pathFor(keyFor(env, tenantId, jobId)),
-      goldensPath: values.goldens,
-      strict: values.strict
     });
-    if (!passed) {
-      console.error('[harness] Golden comparison FAILED');
-      process.exit(1);
-    }
-    console.log('[harness] Golden comparison PASSED');
-  }
-
-  console.log(`[harness] Job complete: ${jobId}`);
-}
-
-main().catch(err => {
-  console.error('[harness] Fatal error:', err);
-  process.exit(1);
-});
-```
+    ```
 
 3) Implement goldens comparator
 
-- Create `tools/harness/compare-goldens.js` that:
-  - Loads actuals from storage and goldens from `podcast-automation/test-assets/goldens/<sample>/...`
-  - Compares metrics with tolerances; compares manifest subset and transcript preview
-  - Prints diffs and returns non-zero on mismatch
+    - Create `tools/harness/compare-goldens.js` that:
+      - Loads actuals from storage and goldens from `podcast-automation/test-assets/goldens/<sample>/...`
+      - Compares metrics with tolerances; compares manifest subset and transcript preview
+      - Prints diffs and returns non-zero on mismatch
 
-**Implementation skeleton:**
+    **Implementation skeleton:**
 
-```javascript
-// tools/harness/compare-goldens.js
-const { readFileSync, existsSync } = require('node:fs');
-const { join } = require('node:path');
+    ```javascript
+    // tools/harness/compare-goldens.js
+    const { readFileSync, existsSync } = require('node:fs');
+    const { join } = require('node:path');
 
-function loadJSON(path) {
-  if (!existsSync(path)) return null;
-  return JSON.parse(readFileSync(path, 'utf-8'));
-}
-
-function compareWithTolerance(actual, expected, tolerance, strict) {
-  if (strict || tolerance === undefined) {
-    return actual === expected;
-  }
-  return Math.abs(actual - expected) <= tolerance;
-}
-
-function compareMetrics(actualManifest, goldenMetrics, strict) {
-  const failures = [];
-
-  // Audio duration
-  if (goldenMetrics.audio) {
-    const actual = actualManifest.audio?.durationSec;
-    const expected = goldenMetrics.audio.durationSec;
-    const tolerance = strict ? 0 : (goldenMetrics.audio._tolerance || parseFloat(process.env.GOLDEN_TOLERANCE_SEC || '0.1'));
-    if (!compareWithTolerance(actual, expected, tolerance, strict)) {
-      failures.push(`audio.durationSec: expected ${expected} (±${tolerance}), got ${actual}`);
+    function loadJSON(path) {
+      if (!existsSync(path)) return null;
+      return JSON.parse(readFileSync(path, 'utf-8'));
     }
-  }
 
-  // Transcript word count (derive from actual transcript file)
-  // Plan cuts count
-  // Render duration
-  // ... similar logic for other metrics
-
-  return failures;
-}
-
-function compareManifestSubset(actual, golden) {
-  const failures = [];
-  
-  for (const [key, expectedValue] of Object.entries(golden)) {
-    // Skip jobId, timestamps
-    if (['jobId', 'createdAt', 'updatedAt'].includes(key)) continue;
-    
-    const actualValue = actual[key];
-    if (JSON.stringify(actualValue) !== JSON.stringify(expectedValue)) {
-      failures.push(`manifest.${key}: expected ${JSON.stringify(expectedValue)}, got ${JSON.stringify(actualValue)}`);
+    function compareWithTolerance(actual, expected, tolerance, strict) {
+      if (strict || tolerance === undefined) {
+        return actual === expected;
+      }
+      return Math.abs(actual - expected) <= tolerance;
     }
-  }
 
-  return failures;
-}
+    function compareMetrics(actualManifest, goldenMetrics, strict) {
+      const failures = [];
 
-async function compareGoldens({ actualPath, goldensPath, strict }) {
-  console.log('[compare] Loading actuals and goldens...');
+      // Audio duration
+      if (goldenMetrics.audio) {
+        const actual = actualManifest.audio?.durationSec;
+        const expected = goldenMetrics.audio.durationSec;
+        const tolerance = strict ? 0 : (goldenMetrics.audio._tolerance || parseFloat(process.env.GOLDEN_TOLERANCE_SEC || '0.1'));
+        if (!compareWithTolerance(actual, expected, tolerance, strict)) {
+          failures.push(`audio.durationSec: expected ${expected} (±${tolerance}), got ${actual}`);
+        }
+      }
 
-  const actualManifest = loadJSON(join(actualPath, 'manifest.json'));
-  const goldenManifest = loadJSON(join(goldensPath, 'manifest.json'));
-  const goldenMetrics = loadJSON(join(goldensPath, 'metrics.json'));
+      // Transcript word count (derive from actual transcript file)
+      // Plan cuts count
+      // Render duration
+      // ... similar logic for other metrics
 
-  if (!actualManifest) {
-    console.error('[compare] Actual manifest not found');
-    return false;
-  }
+      return failures;
+    }
 
-  let allFailures = [];
+    function compareManifestSubset(actual, golden) {
+      const failures = [];
+      
+      for (const [key, expectedValue] of Object.entries(golden)) {
+        // Skip jobId, timestamps
+        if (['jobId', 'createdAt', 'updatedAt'].includes(key)) continue;
+        
+        const actualValue = actual[key];
+        if (JSON.stringify(actualValue) !== JSON.stringify(expectedValue)) {
+          failures.push(`manifest.${key}: expected ${JSON.stringify(expectedValue)}, got ${JSON.stringify(actualValue)}`);
+        }
+      }
 
-  if (goldenMetrics) {
-    const metricFailures = compareMetrics(actualManifest, goldenMetrics, strict);
-    allFailures = allFailures.concat(metricFailures);
-  }
+      return failures;
+    }
 
-  if (goldenManifest) {
-    const manifestFailures = compareManifestSubset(actualManifest, goldenManifest);
-    allFailures = allFailures.concat(manifestFailures);
-  }
+    async function compareGoldens({ actualPath, goldensPath, strict }) {
+      console.log('[compare] Loading actuals and goldens...');
 
-  if (allFailures.length > 0) {
-    console.error('[compare] Mismatches found:');
-    allFailures.forEach(f => console.error(`  - ${f}`));
-    return false;
-  }
+      const actualManifest = loadJSON(join(actualPath, 'manifest.json'));
+      const goldenManifest = loadJSON(join(goldensPath, 'manifest.json'));
+      const goldenMetrics = loadJSON(join(goldensPath, 'metrics.json'));
 
-  console.log('[compare] All checks passed');
-  return true;
-}
+      if (!actualManifest) {
+        console.error('[compare] Actual manifest not found');
+        return false;
+      }
 
-module.exports = { compareGoldens };
-```
+      let allFailures = [];
+
+      if (goldenMetrics) {
+        const metricFailures = compareMetrics(actualManifest, goldenMetrics, strict);
+        allFailures = allFailures.concat(metricFailures);
+      }
+
+      if (goldenManifest) {
+        const manifestFailures = compareManifestSubset(actualManifest, goldenManifest);
+        allFailures = allFailures.concat(manifestFailures);
+      }
+
+      if (allFailures.length > 0) {
+        console.error('[compare] Mismatches found:');
+        allFailures.forEach(f => console.error(`  - ${f}`));
+        return false;
+      }
+
+      console.log('[compare] All checks passed');
+      return true;
+    }
+
+    module.exports = { compareGoldens };
+    ```
 
 4) Add sample goldens
 
-- Place one or two short inputs under `podcast-automation/test-assets/raw/`
-- Author corresponding goldens under `podcast-automation/test-assets/goldens/<sample>/`
-- Document guidance in `docs/samples/README.md`
+    - Place one or two short inputs under `podcast-automation/test-assets/raw/`
+    - Author corresponding goldens under `podcast-automation/test-assets/goldens/<sample>/`
+    - Document guidance in `docs/samples/README.md`
 
 5) Wire CLI
 
-- `run-local-pipeline.js` optionally calls `compare-goldens.js` when `--goldens` is provided
-- Ensure exit code reflects pass/fail
+    - `run-local-pipeline.js` optionally calls `compare-goldens.js` when `--goldens` is provided
+    - Ensure exit code reflects pass/fail
 
 6) Add CI integration
 
-- Update `.github/workflows/ci.yml` to add a test harness job:
+    - Update `.github/workflows/ci.yml` to add a test harness job:
 
-```yaml
-  harness:
-    runs-on: ubuntu-latest
-    needs: [node]  # Run after Node lane
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-      - name: Install deps
-        run: npm ci || npm install
-      - name: Run harness on golden sample
-        run: |
-          node tools/harness/run-local-pipeline.js \
-            --input podcast-automation/test-assets/raw/sample-short.mp4 \
-            --goldens podcast-automation/test-assets/goldens/sample-short \
-            --env dev
-      - name: Upload artifacts on failure
-        if: failure()
-        uses: actions/upload-artifact@v3
-        with:
-          name: harness-outputs
-          path: storage/
-```
+    ```yaml
+      harness:
+        runs-on: ubuntu-latest
+        needs: [node]  # Run after Node lane
+        steps:
+          - uses: actions/checkout@v4
+          - uses: actions/setup-node@v4
+            with:
+              node-version: '20'
+              cache: 'npm'
+          - name: Install deps
+            run: npm ci || npm install
+          - name: Run harness on golden sample
+            run: |
+              node tools/harness/run-local-pipeline.js \
+                --input podcast-automation/test-assets/raw/sample-short.mp4 \
+                --goldens podcast-automation/test-assets/goldens/sample-short \
+                --env dev
+          - name: Upload artifacts on failure
+            if: failure()
+            uses: actions/upload-artifact@v3
+            with:
+              name: harness-outputs
+              path: storage/
+    ```
 
-**Note**: For larger test assets, consider using Git LFS or downloading from a release artifact.
+    **Note**: For larger test assets, consider using Git LFS or downloading from a release artifact.
 
 7) Update environment example
 
-- Add to `.env.example`:
+    - Add to `.env.example`:
 
-```env
-# Test Harness Configuration (WP00-05)
-ENABLE_GOLDEN_COMPARISON=false
-GOLDEN_TOLERANCE_SEC=0.1
-GOLDEN_TOLERANCE_WORDCOUNT=5
-```
+    ```env
+    # Test Harness Configuration (WP00-05)
+    ENABLE_GOLDEN_COMPARISON=false
+    GOLDEN_TOLERANCE_SEC=0.1
+    GOLDEN_TOLERANCE_WORDCOUNT=5
+    ```
 
 ## Test Plan
 
@@ -529,6 +545,7 @@ GOLDEN_TOLERANCE_WORDCOUNT=5
 - Adding a new sample+goldens requires ≤ 10 minutes of authoring effort
 
 **Acceptance Test for Success Metrics:**
+
 - Run harness 50 consecutive times on unchanged golden sample
 - Count failures (expect 0)
 - Time 3 sample additions by new team member; average should be ≤ 10 minutes
@@ -549,13 +566,13 @@ See "Dependencies and Prerequisites" section above for full details.
 ## Related MFUs
 
 - MFU‑WP00‑01‑IAC: Platform Bootstrap and CI  
-  See: https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-01-IAC-platform-bootstrap-and-ci.md
+  See: <https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-01-IAC-platform-bootstrap-and-ci.md>
 - MFU‑WP00‑02‑BE: Manifest, Tenancy, and Storage Schema  
-  See: https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-02-BE-manifest-tenancy-and-storage-schema.md
+  See: <https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-02-BE-manifest-tenancy-and-storage-schema.md>
 - MFU‑WP00‑03‑IAC: Runtime FFmpeg and Observability  
-  See: https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-03-IAC-runtime-ffmpeg-and-observability.md
+  See: <https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-03-IAC-runtime-ffmpeg-and-observability.md>
 - MFU‑WP00‑04‑MW: Orchestration Skeleton and Job Status API  
-  See: https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-04-MW-orchestration-skeleton-and-job-status-api.md
+  See: <https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-04-MW-orchestration-skeleton-and-job-status-api.md>
 
 ## Implementation Tracking
 

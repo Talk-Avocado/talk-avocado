@@ -1,0 +1,109 @@
+{
+  "Comment": "TalkAvocado Phase-1 Pipeline",
+  "StartAt": "audio-extraction",
+  "States": {
+    "audio-extraction": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:REGION:ACCOUNT:function:audio-extraction",
+      "Next": "transcription",
+      "Retry": [{
+        "ErrorEquals": ["TRANSIENT_DEPENDENCY", "TIMEOUT"],
+        "IntervalSeconds": 2,
+        "MaxAttempts": 3,
+        "BackoffRate": 2.0
+      }],
+      "Catch": [{ "ErrorEquals": ["States.ALL"], "Next": "mark-failed" }]
+    },
+    "transcription": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:REGION:ACCOUNT:function:transcription",
+      "Next": "smart-cut-planner",
+      "Retry": [{
+        "ErrorEquals": ["TRANSIENT_DEPENDENCY", "TIMEOUT"],
+        "IntervalSeconds": 2,
+        "MaxAttempts": 3,
+        "BackoffRate": 2.0
+      }],
+      "Catch": [{ "ErrorEquals": ["States.ALL"], "Next": "mark-failed" }]
+    },
+    "smart-cut-planner": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:REGION:ACCOUNT:function:smart-cut-planner",
+      "Next": "video-cuts",
+      "Retry": [{
+        "ErrorEquals": ["TRANSIENT_DEPENDENCY", "TIMEOUT"],
+        "IntervalSeconds": 2,
+        "MaxAttempts": 3,
+        "BackoffRate": 2.0
+      }],
+      "Catch": [{ "ErrorEquals": ["States.ALL"], "Next": "mark-failed" }]
+    },
+    "video-cuts": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:REGION:ACCOUNT:function:video-cuts",
+      "Next": "transitions-choice",
+      "Retry": [{
+        "ErrorEquals": ["TRANSIENT_DEPENDENCY", "TIMEOUT"],
+        "IntervalSeconds": 2,
+        "MaxAttempts": 3,
+        "BackoffRate": 2.0
+      }],
+      "Catch": [{ "ErrorEquals": ["States.ALL"], "Next": "mark-failed" }]
+    },
+    "transitions-choice": {
+      "Type": "Choice",
+      "Choices": [
+        { "Variable": "$.applyTransitions", "BooleanEquals": true, "Next": "video-transitions" }
+      ],
+      "Default": "subtitles-post-edit"
+    },
+    "video-transitions": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:REGION:ACCOUNT:function:video-transitions",
+      "Next": "subtitles-post-edit",
+      "Retry": [{
+        "ErrorEquals": ["TRANSIENT_DEPENDENCY", "TIMEOUT"],
+        "IntervalSeconds": 2,
+        "MaxAttempts": 3,
+        "BackoffRate": 2.0
+      }],
+      "Catch": [{ "ErrorEquals": ["States.ALL"], "Next": "mark-failed" }]
+    },
+    "subtitles-post-edit": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:REGION:ACCOUNT:function:subtitles-post-edit",
+      "Next": "branding-layer",
+      "Retry": [{
+        "ErrorEquals": ["TRANSIENT_DEPENDENCY", "TIMEOUT"],
+        "IntervalSeconds": 2,
+        "MaxAttempts": 3,
+        "BackoffRate": 2.0
+      }],
+      "Catch": [{ "ErrorEquals": ["States.ALL"], "Next": "mark-failed" }]
+    },
+    "branding-layer": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:REGION:ACCOUNT:function:branding-layer",
+      "Next": "mark-complete",
+      "Retry": [{
+        "ErrorEquals": ["TRANSIENT_DEPENDENCY", "TIMEOUT"],
+        "IntervalSeconds": 2,
+        "MaxAttempts": 3,
+        "BackoffRate": 2.0
+      }],
+      "Catch": [{ "ErrorEquals": ["States.ALL"], "Next": "mark-failed" }]
+    },
+    "mark-complete": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:REGION:ACCOUNT:function:mark-complete",
+      "End": true
+    },
+    "mark-failed": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:REGION:ACCOUNT:function:mark-failed",
+      "End": true
+    }
+  }
+}
+
+
