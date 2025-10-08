@@ -24,7 +24,14 @@ audience: [backend-engineers]
 **Functional Description**  
 Re-time subtitles to match the final edited video timeline, accounting for cuts and transitions. Takes original transcript timestamps and maps them to the post-edit timeline, removing subtitles for cut segments and adjusting timing for kept segments. Outputs `subtitles/final.srt` and `subtitles/final.vtt` with frame-accurate timing. Updates manifest with subtitle metadata and processing details.
 
-**Technical Scope**
+**Technical Scope**:
+
+### Decisions Adopted (Phase-1)
+
+- Produces `subtitles/final.srt` (and optionally `.vtt`) as authoritative subtitle outputs for burn-in and downstream consumers.
+- Reads from `renders/base_cuts.mp4` or `renders/with_transitions.mp4` for validation; tolerances: cue boundary ≤33 ms; no overlaps; monotonic times.
+- Manifest writes validated; updates `media.subtitles` pointers and `steps.subtitles.status`; structured logs with correlation fields.
+- Orchestrated under AWS Step Functions (Standard); handler event matches ASL Task input.
 
 - Inputs:
   - `transcripts/transcript.json` with original word/segment timestamps
@@ -102,6 +109,7 @@ tools/
 
 - Create new `backend/services/subtitles-post-edit/` service.
 - **REQUIRED**: Extend manifest schema in WP00-02 to include subtitles support:
+
   ```json
   "subtitles": {
     "type": "array",
@@ -119,6 +127,7 @@ tools/
     }
   }
   ```
+
 - Implement `backend/services/subtitles-post-edit/timing-logic.js`:
   - `mapTimestamps(transcript, cutPlan)` → returns adjusted transcript
   - `removeCutSegments(transcript, cutPlan)` → filters out cut regions
@@ -171,6 +180,7 @@ tools/
 **Note**: This MFU requires extending the manifest schema from WP00-02 to include a `subtitles[]` array field. The current manifest schema does not include subtitles support.
 
 **Environment Variables** (extend `.env.example`):
+
 ```env
 # Subtitles Post-Edit (WP01-06)
 SUBTITLES_TARGET_FPS=30
@@ -185,349 +195,358 @@ SUBTITLES_INCLUDE_TIMING_MAP=false
 Follow these steps exactly. All paths are repo‑relative.
 
 1) Ensure directories exist
-- Create or verify:
-  - `backend/services/subtitles-post-edit/`
+
+    - Create or verify:
+      - `backend/services/subtitles-post-edit/`
 
 2) Implement timing logic module
-- Create `backend/services/subtitles-post-edit/timing-logic.js` with:
-  - `removeCutSegments(transcript, cutPlan)` → filters out cut regions
-  - `adjustTiming(transcript, cutPlan)` → adjusts timestamps for kept segments
-  - `validateFrameAccuracy(timestamps, targetFps)` → checks ±1 frame tolerance
 
-```javascript
-// backend/services/subtitles-post-edit/timing-logic.js
-class SubtitleError extends Error {
-  constructor(message, type, details = {}) {
-    super(message);
-    this.name = 'SubtitleError';
-    this.type = type;
-    this.details = details;
-  }
-}
+    - Create `backend/services/subtitles-post-edit/timing-logic.js` with:
+      - `removeCutSegments(transcript, cutPlan)` → filters out cut regions
+      - `adjustTiming(transcript, cutPlan)` → adjusts timestamps for kept segments
+      - `validateFrameAccuracy(timestamps, targetFps)` → checks ±1 frame tolerance
 
-const ERROR_TYPES = {
-  INVALID_TRANSCRIPT: 'INVALID_TRANSCRIPT',
-  INVALID_PLAN: 'INVALID_PLAN',
-  TIMING_MISMATCH: 'TIMING_MISMATCH',
-  FRAME_ACCURACY: 'FRAME_ACCURACY'
-};
+    ```javascript
+    // backend/services/subtitles-post-edit/timing-logic.js
+    class SubtitleError extends Error {
+      constructor(message, type, details = {}) {
+        super(message);
+        this.name = 'SubtitleError';
+        this.type = type;
+        this.details = details;
+      }
+    }
 
-function toFrameTime(seconds, fps) {
-  return Math.round(seconds * fps) / fps;
-}
+    const ERROR_TYPES = {
+      INVALID_TRANSCRIPT: 'INVALID_TRANSCRIPT',
+      INVALID_PLAN: 'INVALID_PLAN',
+      TIMING_MISMATCH: 'TIMING_MISMATCH',
+      FRAME_ACCURACY: 'FRAME_ACCURACY'
+    };
 
-function removeCutSegments(transcript, cutPlan) {
-  if (!transcript.segments || !Array.isArray(transcript.segments)) {
-    throw new SubtitleError('Invalid transcript: missing segments', ERROR_TYPES.INVALID_TRANSCRIPT);
-  }
-  
-  if (!cutPlan.cuts || !Array.isArray(cutPlan.cuts)) {
-    throw new SubtitleError('Invalid cut plan: missing cuts', ERROR_TYPES.INVALID_PLAN);
-  }
+    function toFrameTime(seconds, fps) {
+      return Math.round(seconds * fps) / fps;
+    }
 
-  const cutSegments = cutPlan.cuts.filter(c => c.type === 'cut');
-  
-  return {
-    ...transcript,
-    segments: transcript.segments.filter(segment => {
-      const start = Number(segment.start);
-      const end = Number(segment.end);
+    function removeCutSegments(transcript, cutPlan) {
+      if (!transcript.segments || !Array.isArray(transcript.segments)) {
+        throw new SubtitleError('Invalid transcript: missing segments', ERROR_TYPES.INVALID_TRANSCRIPT);
+      }
       
-      // Check if this segment overlaps with any cut region
-      return !cutSegments.some(cut => {
-        const cutStart = Number(cut.start);
-        const cutEnd = Number(cut.end);
-        return (start < cutEnd && end > cutStart);
-      });
-    })
-  };
-}
+      if (!cutPlan.cuts || !Array.isArray(cutPlan.cuts)) {
+        throw new SubtitleError('Invalid cut plan: missing cuts', ERROR_TYPES.INVALID_PLAN);
+      }
 
-function adjustTiming(transcript, cutPlan) {
-  const keepSegments = cutPlan.cuts.filter(c => c.type === 'keep');
-  const adjustedSegments = [];
-  
-  let timeOffset = 0;
-  
-  for (const segment of transcript.segments) {
-    const originalStart = Number(segment.start);
-    const originalEnd = Number(segment.end);
-    
-    // Find which keep segment this transcript segment belongs to
-    const keepSegment = keepSegments.find(k => 
-      originalStart >= Number(k.start) && originalEnd <= Number(k.end)
-    );
-    
-    if (!keepSegment) {
-      // This segment was cut - skip it
-      continue;
+      const cutSegments = cutPlan.cuts.filter(c => c.type === 'cut');
+      
+      return {
+        ...transcript,
+        segments: transcript.segments.filter(segment => {
+          const start = Number(segment.start);
+          const end = Number(segment.end);
+          
+          // Check if this segment overlaps with any cut region
+          return !cutSegments.some(cut => {
+            const cutStart = Number(cut.start);
+            const cutEnd = Number(cut.end);
+            return (start < cutEnd && end > cutStart);
+          });
+        })
+      };
     }
-    
-    // Calculate timing adjustments
-    const cutStart = Number(keepSegment.start);
-    const adjustedStart = toFrameTime(originalStart - cutStart + timeOffset, 30);
-    const adjustedEnd = toFrameTime(originalEnd - cutStart + timeOffset, 30);
-    
-    adjustedSegments.push({
-      ...segment,
-      start: adjustedStart,
-      end: adjustedEnd,
-      originalStart,
-      originalEnd
-    });
-    
-    // Update time offset for next segment
-    timeOffset += (Number(keepSegment.end) - Number(keepSegment.start));
-  }
-  
-  return {
-    ...transcript,
-    segments: adjustedSegments,
-    originalDuration: transcript.segments[transcript.segments.length - 1]?.end || 0,
-    finalDuration: timeOffset
-  };
-}
 
-function validateFrameAccuracy(transcript, targetFps) {
-  const frameTolerance = 1 / targetFps; // ±1 frame in seconds
-  
-  for (const segment of transcript.segments) {
-    const startError = Math.abs(segment.start - toFrameTime(segment.start, targetFps));
-    const endError = Math.abs(segment.end - toFrameTime(segment.end, targetFps));
-    
-    if (startError > frameTolerance || endError > frameTolerance) {
-      throw new SubtitleError(
-        `Frame accuracy exceeded: start=${startError}s, end=${endError}s (tolerance=${frameTolerance}s)`,
-        ERROR_TYPES.FRAME_ACCURACY,
-        { segment, startError, endError, frameTolerance }
-      );
+    function adjustTiming(transcript, cutPlan) {
+      const keepSegments = cutPlan.cuts.filter(c => c.type === 'keep');
+      const adjustedSegments = [];
+      
+      let timeOffset = 0;
+      
+      for (const segment of transcript.segments) {
+        const originalStart = Number(segment.start);
+        const originalEnd = Number(segment.end);
+        
+        // Find which keep segment this transcript segment belongs to
+        const keepSegment = keepSegments.find(k => 
+          originalStart >= Number(k.start) && originalEnd <= Number(k.end)
+        );
+        
+        if (!keepSegment) {
+          // This segment was cut - skip it
+          continue;
+        }
+        
+        // Calculate timing adjustments
+        const cutStart = Number(keepSegment.start);
+        const adjustedStart = toFrameTime(originalStart - cutStart + timeOffset, 30);
+        const adjustedEnd = toFrameTime(originalEnd - cutStart + timeOffset, 30);
+        
+        adjustedSegments.push({
+          ...segment,
+          start: adjustedStart,
+          end: adjustedEnd,
+          originalStart,
+          originalEnd
+        });
+        
+        // Update time offset for next segment
+        timeOffset += (Number(keepSegment.end) - Number(keepSegment.start));
+      }
+      
+      return {
+        ...transcript,
+        segments: adjustedSegments,
+        originalDuration: transcript.segments[transcript.segments.length - 1]?.end || 0,
+        finalDuration: timeOffset
+      };
     }
-  }
-}
 
-module.exports = {
-  removeCutSegments,
-  adjustTiming,
-  validateFrameAccuracy,
-  SubtitleError,
-  ERROR_TYPES
-};
-```
+    function validateFrameAccuracy(transcript, targetFps) {
+      const frameTolerance = 1 / targetFps; // ±1 frame in seconds
+      
+      for (const segment of transcript.segments) {
+        const startError = Math.abs(segment.start - toFrameTime(segment.start, targetFps));
+        const endError = Math.abs(segment.end - toFrameTime(segment.end, targetFps));
+        
+        if (startError > frameTolerance || endError > frameTolerance) {
+          throw new SubtitleError(
+            `Frame accuracy exceeded: start=${startError}s, end=${endError}s (tolerance=${frameTolerance}s)`,
+            ERROR_TYPES.FRAME_ACCURACY,
+            { segment, startError, endError, frameTolerance }
+          );
+        }
+      }
+    }
+
+    module.exports = {
+      removeCutSegments,
+      adjustTiming,
+      validateFrameAccuracy,
+      SubtitleError,
+      ERROR_TYPES
+    };
+    ```
 
 3) Implement format generators
-- Create `backend/services/subtitles-post-edit/format-generators.js` with:
-  - `generateSRT(transcript)` → returns SRT format string
-  - `generateVTT(transcript)` → returns WebVTT format string
 
-```javascript
-// backend/services/subtitles-post-edit/format-generators.js
-function formatTimestamp(seconds) {
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = Math.floor(seconds % 60);
-  const ms = Math.floor((seconds % 1) * 1000);
-  
-  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')},${ms.toString().padStart(3, '0')}`;
-}
+    - Create `backend/services/subtitles-post-edit/format-generators.js` with:
+      - `generateSRT(transcript)` → returns SRT format string
+      - `generateVTT(transcript)` → returns WebVTT format string
 
-function formatVTTTimestamp(seconds) {
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = Math.floor(seconds % 60);
-  const ms = Math.floor((seconds % 1) * 1000);
-  
-  return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(3, '0')}`;
-}
+    ```javascript
+    // backend/services/subtitles-post-edit/format-generators.js
+    function formatTimestamp(seconds) {
+      const hours = Math.floor(seconds / 3600);
+      const minutes = Math.floor((seconds % 3600) / 60);
+      const secs = Math.floor(seconds % 60);
+      const ms = Math.floor((seconds % 1) * 1000);
+      
+      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')},${ms.toString().padStart(3, '0')}`;
+    }
 
-function generateSRT(transcript) {
-  const lines = [];
-  let index = 1;
-  
-  for (const segment of transcript.segments) {
-    if (!segment.text || segment.text.trim() === '') continue;
-    
-    const startTime = formatTimestamp(Number(segment.start));
-    const endTime = formatTimestamp(Number(segment.end));
-    
-    lines.push(`${index}`);
-    lines.push(`${startTime} --> ${endTime}`);
-    lines.push(segment.text.trim());
-    lines.push(''); // Empty line between subtitles
-    
-    index++;
-  }
-  
-  return lines.join('\n');
-}
+    function formatVTTTimestamp(seconds) {
+      const hours = Math.floor(seconds / 3600);
+      const minutes = Math.floor((seconds % 3600) / 60);
+      const secs = Math.floor(seconds % 60);
+      const ms = Math.floor((seconds % 1) * 1000);
+      
+      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(3, '0')}`;
+    }
 
-function generateVTT(transcript) {
-  const lines = ['WEBVTT', ''];
-  
-  for (const segment of transcript.segments) {
-    if (!segment.text || segment.text.trim() === '') continue;
-    
-    const startTime = formatVTTTimestamp(Number(segment.start));
-    const endTime = formatVTTTimestamp(Number(segment.end));
-    
-    lines.push(`${startTime} --> ${endTime}`);
-    lines.push(segment.text.trim());
-    lines.push(''); // Empty line between subtitles
-  }
-  
-  return lines.join('\n');
-}
+    function generateSRT(transcript) {
+      const lines = [];
+      let index = 1;
+      
+      for (const segment of transcript.segments) {
+        if (!segment.text || segment.text.trim() === '') continue;
+        
+        const startTime = formatTimestamp(Number(segment.start));
+        const endTime = formatTimestamp(Number(segment.end));
+        
+        lines.push(`${index}`);
+        lines.push(`${startTime} --> ${endTime}`);
+        lines.push(segment.text.trim());
+        lines.push(''); // Empty line between subtitles
+        
+        index++;
+      }
+      
+      return lines.join('\n');
+    }
 
-module.exports = {
-  generateSRT,
-  generateVTT,
-  formatTimestamp,
-  formatVTTTimestamp
-};
-```
+    function generateVTT(transcript) {
+      const lines = ['WEBVTT', ''];
+      
+      for (const segment of transcript.segments) {
+        if (!segment.text || segment.text.trim() === '') continue;
+        
+        const startTime = formatVTTTimestamp(Number(segment.start));
+        const endTime = formatVTTTimestamp(Number(segment.end));
+        
+        lines.push(`${startTime} --> ${endTime}`);
+        lines.push(segment.text.trim());
+        lines.push(''); // Empty line between subtitles
+      }
+      
+      return lines.join('\n');
+    }
+
+    module.exports = {
+      generateSRT,
+      generateVTT,
+      formatTimestamp,
+      formatVTTTimestamp
+    };
+    ```
 
 4) Implement handler
-- Create `backend/services/subtitles-post-edit/handler.js` that:
-  - Loads transcript, plan, and validates render exists
-  - Calls timing logic to map timestamps
-  - Generates SRT and VTT files
-  - Validates timing accuracy
-  - Updates manifest with subtitle metadata
 
-```javascript
-// backend/services/subtitles-post-edit/handler.js
-const { initObservability } = require('../../lib/init-observability');
-const { keyFor, pathFor, writeFileAtKey } = require('../../lib/storage');
-const { loadManifest, saveManifest } = require('../../lib/manifest');
-const { removeCutSegments, adjustTiming, validateFrameAccuracy, SubtitleError, ERROR_TYPES } = require('./timing-logic');
-const { generateSRT, generateVTT } = require('./format-generators');
-const fs = require('node:fs');
+    - Create `backend/services/subtitles-post-edit/handler.js` that:
+      - Loads transcript, plan, and validates render exists
+      - Calls timing logic to map timestamps
+      - Generates SRT and VTT files
+      - Validates timing accuracy
+      - Updates manifest with subtitle metadata
 
-exports.handler = async (event, context) => {
-  const { env, tenantId, jobId } = event;
-  const correlationId = event.correlationId || context.awsRequestId;
-  const { logger, metrics } = initObservability({
-    serviceName: 'SubtitlesPostEdit',
-    correlationId, tenantId, jobId, step: 'subtitles-post-edit',
-  });
+    ```javascript
+    // backend/services/subtitles-post-edit/handler.js
+    const { initObservability } = require('../../lib/init-observability');
+    const { keyFor, pathFor, writeFileAtKey } = require('../../lib/storage');
+    const { loadManifest, saveManifest } = require('../../lib/manifest');
+    const { removeCutSegments, adjustTiming, validateFrameAccuracy, SubtitleError, ERROR_TYPES } = require('./timing-logic');
+    const { generateSRT, generateVTT } = require('./format-generators');
+    const fs = require('node:fs');
 
-  const transcriptKey = event.transcriptKey || keyFor(env, tenantId, jobId, 'transcripts', 'transcript.json');
-  const planKey = event.planKey || keyFor(env, tenantId, jobId, 'plan', 'cut_plan.json');
-  const renderKey = event.renderKey || keyFor(env, tenantId, jobId, 'renders', 'base_cuts.mp4');
-  
-  const targetFps = Number(event.targetFps || process.env.SUBTITLES_TARGET_FPS || 30);
-
-  try {
-    // Load and validate inputs
-    const transcriptPath = pathFor(transcriptKey);
-    const planPath = pathFor(planKey);
-    const renderPath = pathFor(renderKey);
-    
-    if (!fs.existsSync(transcriptPath)) {
-      throw new SubtitleError(`Transcript not found: ${transcriptKey}`, ERROR_TYPES.INVALID_TRANSCRIPT);
-    }
-    if (!fs.existsSync(planPath)) {
-      throw new SubtitleError(`Cut plan not found: ${planKey}`, ERROR_TYPES.INVALID_PLAN);
-    }
-    if (!fs.existsSync(renderPath)) {
-      throw new SubtitleError(`Render not found: ${renderKey}`, ERROR_TYPES.INVALID_PLAN);
-    }
-    
-    const transcript = JSON.parse(fs.readFileSync(transcriptPath, 'utf-8'));
-    const cutPlan = JSON.parse(fs.readFileSync(planPath, 'utf-8'));
-    
-    // Process transcript: remove cuts and adjust timing
-    const filteredTranscript = removeCutSegments(transcript, cutPlan);
-    const adjustedTranscript = adjustTiming(filteredTranscript, cutPlan);
-    
-    // Validate frame accuracy
-    validateFrameAccuracy(adjustedTranscript, targetFps);
-    
-    // Generate subtitle files
-    const srtContent = generateSRT(adjustedTranscript);
-    const vttContent = generateVTT(adjustedTranscript);
-    
-    // Write files
-    const srtKey = keyFor(env, tenantId, jobId, 'subtitles', 'final.srt');
-    const vttKey = keyFor(env, tenantId, jobId, 'subtitles', 'final.vtt');
-    
-    writeFileAtKey(srtKey, srtContent);
-    writeFileAtKey(vttKey, vttContent);
-    
-    // Update manifest
-    const manifest = loadManifest(env, tenantId, jobId);
-    manifest.subtitles = manifest.subtitles || [];
-    manifest.subtitles.push({
-      key: srtKey,
-      type: 'final',
-      format: 'srt',
-      durationSec: adjustedTranscript.finalDuration,
-      wordCount: adjustedTranscript.segments.reduce((count, seg) => count + (seg.text?.split(' ').length || 0), 0),
-      generatedAt: new Date().toISOString()
-    });
-    manifest.subtitles.push({
-      key: vttKey,
-      type: 'final',
-      format: 'vtt',
-      durationSec: adjustedTranscript.finalDuration,
-      wordCount: adjustedTranscript.segments.reduce((count, seg) => count + (seg.text?.split(' ').length || 0), 0),
-      generatedAt: new Date().toISOString()
-    });
-    
-    manifest.updatedAt = new Date().toISOString();
-    manifest.logs = manifest.logs || [];
-    manifest.logs.push({
-      type: 'info',
-      message: `Subtitles generated: ${adjustedTranscript.segments.length} segments, ${adjustedTranscript.finalDuration.toFixed(2)}s duration`,
-      createdAt: new Date().toISOString()
-    });
-    
-    saveManifest(env, tenantId, jobId, manifest);
-    
-    metrics.addMetric('SubtitlesGenerated', 'Count', 1);
-    metrics.addMetric('SubtitlesSegments', 'Count', adjustedTranscript.segments.length);
-    metrics.addMetric('SubtitlesDurationSec', 'Milliseconds', adjustedTranscript.finalDuration * 1000);
-    logger.info('Subtitles generated', { srtKey, vttKey, segments: adjustedTranscript.segments.length });
-    
-    return { ok: true, srtKey, vttKey, correlationId };
-  } catch (err) {
-    logger.error('Subtitle generation failed', { error: err.message, type: err.type });
-    metrics.addMetric('SubtitlesError', 'Count', 1);
-    metrics.addMetric(`SubtitlesError_${err.type || 'UNKNOWN'}`, 'Count', 1);
-    
-    try {
-      const manifest = loadManifest(env, tenantId, jobId);
-      manifest.status = 'failed';
-      manifest.updatedAt = new Date().toISOString();
-      manifest.logs = manifest.logs || [];
-      manifest.logs.push({
-        type: 'error',
-        message: `Subtitle generation failed: ${err.message}`,
-        createdAt: new Date().toISOString()
+    exports.handler = async (event, context) => {
+      const { env, tenantId, jobId } = event;
+      const correlationId = event.correlationId || context.awsRequestId;
+      const { logger, metrics } = initObservability({
+        serviceName: 'SubtitlesPostEdit',
+        correlationId, tenantId, jobId, step: 'subtitles-post-edit',
       });
-      saveManifest(env, tenantId, jobId, manifest);
-    } catch {}
-    
-    throw err;
-  }
-};
-```
+
+      const transcriptKey = event.transcriptKey || keyFor(env, tenantId, jobId, 'transcripts', 'transcript.json');
+      const planKey = event.planKey || keyFor(env, tenantId, jobId, 'plan', 'cut_plan.json');
+      const renderKey = event.renderKey || keyFor(env, tenantId, jobId, 'renders', 'base_cuts.mp4');
+      
+      const targetFps = Number(event.targetFps || process.env.SUBTITLES_TARGET_FPS || 30);
+
+      try {
+        // Load and validate inputs
+        const transcriptPath = pathFor(transcriptKey);
+        const planPath = pathFor(planKey);
+        const renderPath = pathFor(renderKey);
+        
+        if (!fs.existsSync(transcriptPath)) {
+          throw new SubtitleError(`Transcript not found: ${transcriptKey}`, ERROR_TYPES.INVALID_TRANSCRIPT);
+        }
+        if (!fs.existsSync(planPath)) {
+          throw new SubtitleError(`Cut plan not found: ${planKey}`, ERROR_TYPES.INVALID_PLAN);
+        }
+        if (!fs.existsSync(renderPath)) {
+          throw new SubtitleError(`Render not found: ${renderKey}`, ERROR_TYPES.INVALID_PLAN);
+        }
+        
+        const transcript = JSON.parse(fs.readFileSync(transcriptPath, 'utf-8'));
+        const cutPlan = JSON.parse(fs.readFileSync(planPath, 'utf-8'));
+        
+        // Process transcript: remove cuts and adjust timing
+        const filteredTranscript = removeCutSegments(transcript, cutPlan);
+        const adjustedTranscript = adjustTiming(filteredTranscript, cutPlan);
+        
+        // Validate frame accuracy
+        validateFrameAccuracy(adjustedTranscript, targetFps);
+        
+        // Generate subtitle files
+        const srtContent = generateSRT(adjustedTranscript);
+        const vttContent = generateVTT(adjustedTranscript);
+        
+        // Write files
+        const srtKey = keyFor(env, tenantId, jobId, 'subtitles', 'final.srt');
+        const vttKey = keyFor(env, tenantId, jobId, 'subtitles', 'final.vtt');
+        
+        writeFileAtKey(srtKey, srtContent);
+        writeFileAtKey(vttKey, vttContent);
+        
+        // Update manifest
+        const manifest = loadManifest(env, tenantId, jobId);
+        manifest.subtitles = manifest.subtitles || [];
+        manifest.subtitles.push({
+          key: srtKey,
+          type: 'final',
+          format: 'srt',
+          durationSec: adjustedTranscript.finalDuration,
+          wordCount: adjustedTranscript.segments.reduce((count, seg) => count + (seg.text?.split(' ').length || 0), 0),
+          generatedAt: new Date().toISOString()
+        });
+        manifest.subtitles.push({
+          key: vttKey,
+          type: 'final',
+          format: 'vtt',
+          durationSec: adjustedTranscript.finalDuration,
+          wordCount: adjustedTranscript.segments.reduce((count, seg) => count + (seg.text?.split(' ').length || 0), 0),
+          generatedAt: new Date().toISOString()
+        });
+        
+        manifest.updatedAt = new Date().toISOString();
+        manifest.logs = manifest.logs || [];
+        manifest.logs.push({
+          type: 'info',
+          message: `Subtitles generated: ${adjustedTranscript.segments.length} segments, ${adjustedTranscript.finalDuration.toFixed(2)}s duration`,
+          createdAt: new Date().toISOString()
+        });
+        
+        saveManifest(env, tenantId, jobId, manifest);
+        
+        metrics.addMetric('SubtitlesGenerated', 'Count', 1);
+        metrics.addMetric('SubtitlesSegments', 'Count', adjustedTranscript.segments.length);
+        metrics.addMetric('SubtitlesDurationSec', 'Milliseconds', adjustedTranscript.finalDuration * 1000);
+        logger.info('Subtitles generated', { srtKey, vttKey, segments: adjustedTranscript.segments.length });
+        
+        return { ok: true, srtKey, vttKey, correlationId };
+      } catch (err) {
+        logger.error('Subtitle generation failed', { error: err.message, type: err.type });
+        metrics.addMetric('SubtitlesError', 'Count', 1);
+        metrics.addMetric(`SubtitlesError_${err.type || 'UNKNOWN'}`, 'Count', 1);
+        
+        try {
+          const manifest = loadManifest(env, tenantId, jobId);
+          manifest.status = 'failed';
+          manifest.updatedAt = new Date().toISOString();
+          manifest.logs = manifest.logs || [];
+          manifest.logs.push({
+            type: 'error',
+            message: `Subtitle generation failed: ${err.message}`,
+            createdAt: new Date().toISOString()
+          });
+          saveManifest(env, tenantId, jobId, manifest);
+        } catch {}
+        
+        throw err;
+      }
+    };
+    ```
 
 5) Wire into local harness (WP00-05)
-- Add a flag or lane to run subtitles post-edit after cuts (and optionally after transitions), using same job context.
+
+    - Add a flag or lane to run subtitles post-edit after cuts (and optionally after transitions), using same job context.
 
 6) Validate manifest updates
-- Ensure `manifest.subtitles[]` entries include timing metadata and `updatedAt`
+
+    - Ensure `manifest.subtitles[]` entries include timing metadata and `updatedAt`
 
 7) Logging and metrics
-- Confirm logs contain `correlationId`, `tenantId`, `jobId`, `step`
-- Metrics: `SubtitlesGenerated`, `SubtitlesSegments`, `SubtitlesDurationSec`, `SubtitlesError_*`
+
+    - Confirm logs contain `correlationId`, `tenantId`, `jobId`, `step`
+    - Metrics: `SubtitlesGenerated`, `SubtitlesSegments`, `SubtitlesDurationSec`, `SubtitlesError_*`
 
 8) Idempotency
-- Re-run with same job; output overwritten safely; manifest updated
+
+    - Re-run with same job; output overwritten safely; manifest updated
 
 ## Test Plan
 
 ### Local
+
 - Run harness on a short input with transcript and cuts:
   - Expect `subtitles/final.srt` and `subtitles/final.vtt`
   - Validate timing alignment with final video (±1 frame)
@@ -542,6 +561,7 @@ exports.handler = async (event, context) => {
   - Run same job twice; outputs overwritten; manifest updated deterministically
 
 ### CI (optional if harness lane exists)
+
 - Add tiny sample transcript and render; run subtitles lane; assert:
   - SRT and VTT files exist with valid format
   - Timing aligns with render within ±1 frame
@@ -591,15 +611,15 @@ subtitles-test:
 ## Dependencies
 
 - MFU‑WP01‑02‑BE: Transcription  
-  See: https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP01-02-BE-transcription.md
+  See: <https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP01-02-BE-transcription.md>
 - MFU‑WP01‑04‑BE: Video Engine Cuts  
-  See: https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP01-04-BE-video-engine-cuts.md
+  See: <https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP01-04-BE-video-engine-cuts.md>
 - MFU‑WP00‑02‑BE: Manifest, Tenancy, and Storage Schema  
-  See: https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-02-BE-manifest-tenancy-and-storage-schema.md
+  See: <https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-02-BE-manifest-tenancy-and-storage-schema.md>
 - MFU‑WP00‑03‑IAC: Runtime FFmpeg and Observability  
-  See: https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-03-IAC-runtime-ffmpeg-and-observability.md
+  See: <https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-03-IAC-runtime-ffmpeg-and-observability.md>
 - MFU‑WP00‑05‑TG: Test Harness and Golden Samples  
-  See: https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-05-TG-test-harness-and-golden-samples.md
+  See: <https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-05-TG-test-harness-and-golden-samples.md>
 
 ## Risks / Open Questions
 
@@ -614,11 +634,11 @@ subtitles-test:
 ## Related MFUs
 
 - MFU‑WP01‑02‑BE: Transcription  
-  See: https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP01-02-BE-transcription.md
+  See: <https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP01-02-BE-transcription.md>
 - MFU‑WP01‑04‑BE: Video Engine Cuts  
-  See: https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP01-04-BE-video-engine-cuts.md
+  See: <https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP01-04-BE-video-engine-cuts.md>
 - MFU‑WP01‑05‑BE: Video Engine Transitions  
-  See: https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP01-05-BE-video-engine-transitions.md
+  See: <https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP01-05-BE-video-engine-transitions.md>
 
 ## Implementation Tracking
 

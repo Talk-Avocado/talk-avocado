@@ -26,9 +26,18 @@ Provide an orchestration skeleton (AWS Step Functions preferred; EventBridge + S
 
 **Technical Scope**:
 
+### Decisions Adopted (Phase-1)
+
+- Orchestrator is AWS Step Functions (Standard) with per-task Retry for transient errors only and Catch → `mark-failed` to update manifest.
+- Rendering split: `video-cuts` then optional `video-transitions` via Choice; then `subtitles-post-edit`, `branding-layer`, `mark-complete`.
+- Execution context carries `{tenantId, jobId, correlationId}` as tags/inputs; harness events match ASL Task inputs.
+- Manifest writes validated on every task; each task sets `steps.<stage>.status` and updates `job.updatedAt`.
+
 - API: `POST /jobs` (create `jobId`, create DynamoDB record, write initial manifest under `./storage/{env}/{tenantId}/{jobId}/manifest.json`)
 - API: `GET /jobs/{jobId}` (return job status and artifact pointers derived from manifest)
-- Orchestration: state machine skeleton that updates status through PENDING → PROCESSING → COMPLETED; integrates with handlers in later MFUs
+- Orchestration: AWS Step Functions (Standard) with tasks:
+  `audio-extraction` → `transcription` → `smart-cut-planner` → `video-cuts` → (Choice: transitions?) → `video-transitions` → `subtitles-post-edit` → `branding-layer` → `mark-complete`.
+  Each task retries only on `TRANSIENT_DEPENDENCY` and `TIMEOUT`. `Catch` routes to `mark-failed` which writes manifest status/logs.
 - Correlation: propagate `correlationId`, `tenantId`, `jobId` across API → orchestration → handlers
 - Local-first: all I/O via `backend/lib/storage.ts` and `backend/lib/manifest.ts`; S3/IAM deferred
 
@@ -59,6 +68,7 @@ storage/                      # local root for keys {env}/{tenantId}/{jobId}/...
 
 - POST `/jobs`
   - Request (JSON):
+
     ```json
     {
       "tenantId": "demo-tenant",
@@ -69,7 +79,9 @@ storage/                      # local root for keys {env}/{tenantId}/{jobId}/...
       }
     }
     ```
+
   - Response 201:
+
     ```json
     {
       "jobId": "<uuid>",
@@ -79,10 +91,12 @@ storage/                      # local root for keys {env}/{tenantId}/{jobId}/...
       "manifestKey": "dev/demo-tenant/<uuid>/manifest.json"
     }
     ```
+
   - Side effects: creates Jobs item in DynamoDB with `tenantId` + `jobSort`, writes initial `manifest.json`, optionally starts state machine (configurable)
 
 - GET `/jobs/{jobId}?tenantId=...`
   - Response 200:
+
     ```json
     {
       "jobId": "<uuid>",
@@ -100,6 +114,7 @@ storage/                      # local root for keys {env}/{tenantId}/{jobId}/...
       "updatedAt": "2025-09-25T12:34:56Z"
     }
     ```
+
   - Error 404: not found (jobId not found for provided tenantId)
 
 ### Migration Notes (use existing handlers)
@@ -113,20 +128,23 @@ storage/                      # local root for keys {env}/{tenantId}/{jobId}/...
 - Implement `backend/api/jobs/createJob.ts` to create `jobId`, write initial manifest at `{env}/{tenantId}/{jobId}/manifest.json`, create DynamoDB record, and (optionally) start the state machine.
 - Implement `backend/api/jobs/getJob.ts` to read job status from DynamoDB + derive artifact pointers from manifest.
 
-### State Machine Skeleton (ASL - high level)
+### State Machine (ASL - Phase-1)
 
 ```json
 {
-  "Comment": "TalkAvocado Pipeline (Phase 1 skeleton)",
-  "StartAt": "MarkProcessing",
+  "Comment": "TalkAvocado Phase-1 Pipeline",
+  "StartAt": "audio-extraction",
   "States": {
-    "MarkProcessing": { "Type": "Task", "Resource": "arn:aws:lambda:...:markProcessing", "Next": "NoopOrSteps" },
-    "NoopOrSteps": {
-      "Type": "Pass",
-      "Result": { "message": "stubbed in Phase 1" },
-      "Next": "MarkCompleted"
-    },
-    "MarkCompleted": { "Type": "Task", "Resource": "arn:aws:lambda:...:markCompleted", "End": true }
+    "audio-extraction": { "Type": "Task", "Resource": "arn:aws:lambda:...:audio-extraction", "Next": "transcription" },
+    "transcription": { "Type": "Task", "Resource": "arn:aws:lambda:...:transcription", "Next": "smart-cut-planner" },
+    "smart-cut-planner": { "Type": "Task", "Resource": "arn:aws:lambda:...:smart-cut-planner", "Next": "video-cuts" },
+    "video-cuts": { "Type": "Task", "Resource": "arn:aws:lambda:...:video-cuts", "Next": "transitions-choice" },
+    "transitions-choice": { "Type": "Choice", "Choices": [{ "Variable": "$.applyTransitions", "BooleanEquals": true, "Next": "video-transitions" }], "Default": "subtitles-post-edit" },
+    "video-transitions": { "Type": "Task", "Resource": "arn:aws:lambda:...:video-transitions", "Next": "subtitles-post-edit" },
+    "subtitles-post-edit": { "Type": "Task", "Resource": "arn:aws:lambda:...:subtitles-post-edit", "Next": "branding-layer" },
+    "branding-layer": { "Type": "Task", "Resource": "arn:aws:lambda:...:branding-layer", "Next": "mark-complete" },
+    "mark-complete": { "Type": "Task", "Resource": "arn:aws:lambda:...:mark-complete", "End": true },
+    "mark-failed": { "Type": "Task", "Resource": "arn:aws:lambda:...:mark-failed", "End": true }
   }
 }
 ```
@@ -159,11 +177,11 @@ Provides the unified entry point and control-plane for all pipeline MFUs.
 
 - Hard dependencies:
   - MFU‑WP00‑01‑IAC (repo scaffolding, harness, CI)  
-    See: https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-01-IAC-platform-bootstrap-and-ci.md
+    See: <https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-01-IAC-platform-bootstrap-and-ci.md>
   - MFU‑WP00‑02‑BE (manifest, tenancy, storage abstraction)  
-    See: https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-02-BE-manifest-tenancy-and-storage-schema.md
+    See: <https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-02-BE-manifest-tenancy-and-storage-schema.md>
   - MFU‑WP00‑03‑IAC (observability wrappers)  
-    See: https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-03-IAC-runtime-ffmpeg-and-observability.md
+    See: <https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-03-IAC-runtime-ffmpeg-and-observability.md>
 
 ## Agent Execution Guide (Step-by-step)
 
@@ -171,43 +189,43 @@ Follow these steps exactly. All paths are repo‑relative.
 
 1) Ensure directories exist
 
-- Create or verify:
-  - `backend/api/jobs/`
-  - `backend/lib/` (from WP00‑02 and WP00‑03)
-  - `orchestration/state-machines/`
-  - `infra/`
+    - Create or verify:
+      - `backend/api/jobs/`
+      - `backend/lib/` (from WP00‑02 and WP00‑03)
+      - `orchestration/state-machines/`
+      - `infra/`
 
 2) Implement API handlers
 
-- `backend/api/jobs/createJob.ts`:
-  - Validate body: `tenantId` (required), optional `input` metadata
-  - Generate `jobId` (UUID); compute keys via `keyFor(env, tenantId, jobId, ...)`
-  - Create initial manifest object (schema v1.0.0) and persist via `saveManifest`
-  - Create DynamoDB record using tenant-scoped PK/SK (`talkavocado-{env}-jobs` from WP00‑02)
-  - Start state machine (config flag `START_ON_CREATE=true|false`)
-  - Return 201 with `jobId`, `tenantId`, `status`, `manifestKey`
+    - `backend/api/jobs/createJob.ts`:
+      - Validate body: `tenantId` (required), optional `input` metadata
+      - Generate `jobId` (UUID); compute keys via `keyFor(env, tenantId, jobId, ...)`
+      - Create initial manifest object (schema v1.0.0) and persist via `saveManifest`
+      - Create DynamoDB record using tenant-scoped PK/SK (`talkavocado-{env}-jobs` from WP00‑02)
+      - Start state machine (config flag `START_ON_CREATE=true|false`)
+      - Return 201 with `jobId`, `tenantId`, `status`, `manifestKey`
 
-- `backend/api/jobs/getJob.ts`:
-  - Validate `tenantId` param for isolation
-  - Read item from DynamoDB (by tenant + jobId)
-  - Load manifest; derive artifact pointers (`audio`, `transcript`, `plan`, `renders[]`)
-  - Return 200 with `status`, pointers, and `updatedAt`
+    - `backend/api/jobs/getJob.ts`:
+      - Validate `tenantId` param for isolation
+      - Read item from DynamoDB (by tenant + jobId)
+      - Load manifest; derive artifact pointers (`audio`, `transcript`, `plan`, `renders[]`)
+      - Return 200 with `status`, pointers, and `updatedAt`
 
 3) Create state machine skeleton
 
-- Author `orchestration/state-machines/pipeline.asl.json` with MarkProcessing → Noop → MarkCompleted
-- Implement tiny Lambda tasks `markProcessing`, `markCompleted` that only update DynamoDB + manifest
+    - Author `orchestration/state-machines/pipeline.asl.json` with MarkProcessing → Noop → MarkCompleted
+    - Implement tiny Lambda tasks `markProcessing`, `markCompleted` that only update DynamoDB + manifest
 
 4) Wire observability
 
-- Use Powertools wrappers (`backend/lib/*` from WP00‑03) for structured logs and metrics; include `correlationId`, `tenantId`, `jobId`
+    - Use Powertools wrappers (`backend/lib/*` from WP00‑03) for structured logs and metrics; include `correlationId`, `tenantId`, `jobId`
 
 5) Local smoke test
 
-- With env: `TALKAVOCADO_ENV=dev`, `MEDIA_STORAGE_PATH=./storage`
-- Invoke `createJob` locally; confirm manifest at `./storage/dev/{tenant}/{job}/manifest.json`
-- If `START_ON_CREATE=true`, run state machine locally (or simulate by invoking mark* Lambdas)
-- Invoke `getJob`; ensure artifact pointers reflect manifest
+    - With env: `TALKAVOCADO_ENV=dev`, `MEDIA_STORAGE_PATH=./storage`
+    - Invoke `createJob` locally; confirm manifest at `./storage/dev/{tenant}/{job}/manifest.json`
+    - If `START_ON_CREATE=true`, run state machine locally (or simulate by invoking mark* Lambdas)
+    - Invoke `getJob`; ensure artifact pointers reflect manifest
 
 ## Test Plan
 
@@ -224,8 +242,8 @@ Follow these steps exactly. All paths are repo‑relative.
 
 - Job creation latency < 500ms P95
 - Orchestration reliability 99.9% over test runs
- - 100% requests include `correlationId`, `tenantId`, `jobId` in logs
- - 0 cross-tenant leakage (verified via negative tests)
+- 100% requests include `correlationId`, `tenantId`, `jobId` in logs
+- 0 cross-tenant leakage (verified via negative tests)
 
 ## Implementation Tracking
 
@@ -245,8 +263,8 @@ Follow these steps exactly. All paths are repo‑relative.
 ## Related MFUs
 
 - MFU‑WP00‑01‑IAC: Platform Bootstrap and CI  
-  See: https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-01-IAC-platform-bootstrap-and-ci.md
+  See: <https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-01-IAC-platform-bootstrap-and-ci.md>
 - MFU‑WP00‑02‑BE: Manifest, Tenancy, and Storage Schema  
-  See: https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-02-BE-manifest-tenancy-and-storage-schema.md
+  See: <https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-02-BE-manifest-tenancy-and-storage-schema.md>
 - MFU‑WP00‑03‑IAC: Runtime FFmpeg and Observability  
-  See: https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-03-IAC-runtime-ffmpeg-and-observability.md
+  See: <https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-03-IAC-runtime-ffmpeg-and-observability.md>
