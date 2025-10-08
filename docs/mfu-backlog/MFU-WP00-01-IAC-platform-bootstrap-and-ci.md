@@ -104,6 +104,19 @@ Enables repeatable development, fast onboarding (Radha), and reliable PR quality
 - [ ] Existing `podcast-automation` step handlers placed under `backend/services/*/handler.js` with unchanged `exports.handler`
 - [ ] Harness CLI `tools/harness/run-local-pipeline.js` can run end-to-end locally without prompts
 
+## Pre‑Dev Checklist
+
+| Task                                                      | Owner     | Status                          |
+| --------------------------------------------------------- | --------- | ------------------------------- |
+| Commit `docs/CONVENTIONS.md`                              | Tech Lead | ☐ (generate from Cursor thread) |
+| Commit `docs/uat/uat-config.json`                         | QA Lead   | ☐                               |
+| Create `.github/workflows/ci.yml` with harness + UAT jobs | DevOps    | ☐                               |
+| Provision ECR for FFmpeg container & test build           | DevOps    | ☐                               |
+| Generate schema validation npm script                      | Backend   | ☐                               |
+| Verify Secrets Manager entries for JWT signing, KMS keys  | Security  | ☐                               |
+| Confirm negative multi-tenant tests in harness run green  | QA        | ☐                               |
+| Tag ADRs 001–005 as “Accepted” in repo                    | Tech Lead | ✅                               |
+
 ## Complexity Assessment
 
 - Complexity: Low
