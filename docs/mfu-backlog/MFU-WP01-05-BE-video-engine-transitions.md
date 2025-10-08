@@ -24,7 +24,14 @@ audience: [backend-engineers]
 **Functional Description**  
 Apply visual and audio transitions between keep segments to improve polish and watchability. Default transition is crossfade with a configurable duration, producing `renders/with_transitions.mp4`. Updates manifest with transition metadata and render entry. Behavior is deterministic given the same plan, source, and parameters.
 
-**Technical Scope**
+**Technical Scope**:
+
+### Decisions Adopted (Phase-1)
+
+- Input from `renders/base_cuts.mp4`; output at `renders/with_transitions.mp4`; branding consumes output if step chosen.
+- Orchestrated by AWS Step Functions (Standard) with Choice for optional transitions.
+- Default crossfade 500 ms; tolerances: frame ±1, A/V sync drift ≤50 ms.
+- Manifest writes validated; update `steps.transitions.status` and `job.updatedAt`; structured logs.
 
 - Inputs:
   - `plan/cut_plan.json` with `cuts[]` timeline (keep/cut segments)
@@ -82,14 +89,19 @@ tools/
 ### Handler Contract
 
 - Event (from orchestrator or local harness):
-  - `env: "dev" | "stage" | "prod"`
-  - `tenantId: string`
-  - `jobId: string`
-  - `planKey?: string` (default `{env}/{tenantId}/{jobId}/plan/cut_plan.json`)
-  - `sourceVideoKey?: string` (default from manifest or `input/{original}`)
-  - `transitions?: { type?: "crossfade", durationMs?: number, audioFadeMs?: number }`
-  - `targetFps?: number` (optional override)
-  - `correlationId?: string`
+
+```json
+{
+  "env": "dev|stage|prod",
+  "tenantId": "string",
+  "jobId": "string",
+  "inputKey": "renders/base_cuts.mp4",
+  "transitionPlanKey": "plan/transition_plan.json",
+  "outputKey": "renders/with_transitions.mp4",
+  "correlationId": "string"
+}
+```
+
 - Behavior:
   - Load manifest; resolve `planKey` and `sourceVideoKey`
   - Validate plan against `docs/schemas/cut_plan.schema.json`
@@ -150,6 +162,7 @@ tools/
   - MFU‑WP00‑05‑TG (harness/goldens integration)
 
 **Environment Variables** (extend `.env.example`):
+
 ```env
 # Video Transitions (WP01-05)
 TRANSITIONS_ENABLED=true
@@ -167,182 +180,190 @@ FFPROBE_PATH=                     # From WP00-03; optional if ffprobe on PATH
 Follow these steps exactly. All paths are repo‑relative.
 
 1) Ensure directories exist
-- Create or verify:
-  - `backend/services/video-render-engine/`
+
+    - Create or verify:
+      - `backend/services/video-render-engine/`
 
 2) Implement transitions logic module
-- Create `backend/services/video-render-engine/transitions-logic.js` with:
-  - `buildTrimNodes(keeps)` → returns filtergraph trim nodes `[vN]`, `[aN]`
-  - `buildCrossfadeChain(keeps, opts)` → pairwise `xfade`/`acrossfade` folding into `[vout]`, `[aout]`
-  - `buildTransitionGraph(keeps, opts)` → combine trims + chain into final graph + output labels
-  - `runTransitions(sourcePath, outputPath, opts)` → execute ffmpeg with graph and encoding params
-- Notes:
-  - Use `xfade=transition=crossfade:duration={d}:offset={t}` for video
-  - Use `[aA][aB]acrossfade=d={d} [aOut]` for audio
-  - `offset` for join `i` equals cumulative duration of prior segments minus transition overlap
 
-```javascript
-// backend/services/video-render-engine/transitions-logic.js
-const { execFile } = require('node:child_process');
+    - Create `backend/services/video-render-engine/transitions-logic.js` with:
+      - `buildTrimNodes(keeps)` → returns filtergraph trim nodes `[vN]`, `[aN]`
+      - `buildCrossfadeChain(keeps, opts)` → pairwise `xfade`/`acrossfade` folding into `[vout]`, `[aout]`
+      - `buildTransitionGraph(keeps, opts)` → combine trims + chain into final graph + output labels
+      - `runTransitions(sourcePath, outputPath, opts)` → execute ffmpeg with graph and encoding params
+    - Notes:
+      - Use `xfade=transition=crossfade:duration={d}:offset={t}` for video
+      - Use `[aA][aB]acrossfade=d={d} [aOut]` for audio
+      - `offset` for join `i` equals cumulative duration of prior segments minus transition overlap
 
-class TransitionError extends Error {
-  constructor(message, type, details = {}) {
-    super(message);
-    this.name = 'TransitionError';
-    this.type = type;
-    this.details = details;
-  }
-}
+    ```javascript
+    // backend/services/video-render-engine/transitions-logic.js
+    const { execFile } = require('node:child_process');
 
-const ERROR_TYPES = {
-  INVALID_KEEPS: 'INVALID_KEEPS',
-  INVALID_DURATION: 'INVALID_DURATION',
-  FFMPEG_EXECUTION: 'FFMPEG_EXECUTION'
-};
+    class TransitionError extends Error {
+      constructor(message, type, details = {}) {
+        super(message);
+        this.name = 'TransitionError';
+        this.type = type;
+        this.details = details;
+      }
+    }
 
-function execAsync(cmd, args, opts = {}) {
-  return new Promise((resolve, reject) => {
-    execFile(cmd, args, { maxBuffer: 50 * 1024 * 1024, ...opts }, (err, stdout, stderr) => {
-      if (err) { err.stdout = stdout; err.stderr = stderr; return reject(err); }
-      resolve({ stdout, stderr });
-    });
-  });
-}
+    const ERROR_TYPES = {
+      INVALID_KEEPS: 'INVALID_KEEPS',
+      INVALID_DURATION: 'INVALID_DURATION',
+      FFMPEG_EXECUTION: 'FFMPEG_EXECUTION'
+    };
 
-function toSSFF(s) { return Number(s).toFixed(2); }
+    function execAsync(cmd, args, opts = {}) {
+      return new Promise((resolve, reject) => {
+        execFile(cmd, args, { maxBuffer: 50 * 1024 * 1024, ...opts }, (err, stdout, stderr) => {
+          if (err) { err.stdout = stdout; err.stderr = stderr; return reject(err); }
+          resolve({ stdout, stderr });
+        });
+      });
+    }
 
-function buildTrimNodes(keeps) {
-  if (!Array.isArray(keeps) || keeps.length === 0) {
-    throw new TransitionError('Invalid keeps array: must be non-empty array', ERROR_TYPES.INVALID_KEEPS, { keeps });
-  }
-  const parts = [];
-  for (let i = 0; i < keeps.length; i++) {
-    const s = toSSFF(keeps[i].start);
-    const e = toSSFF(keeps[i].end);
-    parts.push(`[0:v]trim=start=${s}:end=${e},setpts=PTS-STARTPTS[v${i}]`);
-    parts.push(`[0:a]atrim=start=${s}:end=${e},asetpts=PTS-STARTPTS[a${i}]`);
-  }
-  return parts;
-}
+    function toSSFF(s) { return Number(s).toFixed(2); }
 
-function buildCrossfadeChain(keeps, opts = {}) {
-  const n = keeps.length;
-  if (n === 0) return { chain: [], vOut: null, aOut: null };
-  if (n === 1) return { chain: [], vOut: '[v0]', aOut: '[a0]' };
+    function buildTrimNodes(keeps) {
+      if (!Array.isArray(keeps) || keeps.length === 0) {
+        throw new TransitionError('Invalid keeps array: must be non-empty array', ERROR_TYPES.INVALID_KEEPS, { keeps });
+      }
+      const parts = [];
+      for (let i = 0; i < keeps.length; i++) {
+        const s = toSSFF(keeps[i].start);
+        const e = toSSFF(keeps[i].end);
+        parts.push(`[0:v]trim=start=${s}:end=${e},setpts=PTS-STARTPTS[v${i}]`);
+        parts.push(`[0:a]atrim=start=${s}:end=${e},asetpts=PTS-STARTPTS[a${i}]`);
+      }
+      return parts;
+    }
 
-  const durationMs = Number(opts.durationMs || 300);
-  if (!(durationMs > 0 && durationMs <= 5000)) {
-    throw new TransitionError(`Invalid transition duration: ${durationMs}ms (must be 1-5000ms)`, ERROR_TYPES.INVALID_DURATION, { durationMs });
-  }
-  const d = durationMs / 1000;
+    function buildCrossfadeChain(keeps, opts = {}) {
+      const n = keeps.length;
+      if (n === 0) return { chain: [], vOut: null, aOut: null };
+      if (n === 1) return { chain: [], vOut: '[v0]', aOut: '[a0]' };
 
-  const audioFadeMs = Number(opts.audioFadeMs || durationMs);
-  const audioD = audioFadeMs / 1000;
+      const durationMs = Number(opts.durationMs || 300);
+      if (!(durationMs > 0 && durationMs <= 5000)) {
+        throw new TransitionError(`Invalid transition duration: ${durationMs}ms (must be 1-5000ms)`, ERROR_TYPES.INVALID_DURATION, { durationMs });
+      }
+      const d = durationMs / 1000;
 
-  const chain = [];
-  let curV = '[v0]';
-  let curA = '[a0]';
+      const audioFadeMs = Number(opts.audioFadeMs || durationMs);
+      const audioD = audioFadeMs / 1000;
 
-  // Cumulative offset: total emitted timeline length so far (accounting for overlaps)
-  let offset = keeps[0].end - keeps[0].start;
+      const chain = [];
+      let curV = '[v0]';
+      let curA = '[a0]';
 
-  for (let i = 1; i < n; i++) {
-    const nextV = `[v${i}]`;
-    const nextA = `[a${i}]`;
-    const vOut = `[vx${i}]`;
-    const aOut = `[ax${i}]`;
+      // Cumulative offset: total emitted timeline length so far (accounting for overlaps)
+      let offset = keeps[0].end - keeps[0].start;
 
-    const fadeOffset = offset - d;
+      for (let i = 1; i < n; i++) {
+        const nextV = `[v${i}]`;
+        const nextA = `[a${i}]`;
+        const vOut = `[vx${i}]`;
+        const aOut = `[ax${i}]`;
 
-    // Video xfade (label outputs explicitly)
-    chain.push(`${curV}${nextV}xfade=transition=crossfade:duration=${d.toFixed(2)}:offset=${fadeOffset.toFixed(2)} ${vOut}`);
+        const fadeOffset = offset - d;
 
-    // Audio acrossfade with two inputs and labeled output
-    chain.push(`${curA}${nextA}acrossfade=d=${audioD.toFixed(2)} ${aOut}`);
+        // Video xfade (label outputs explicitly)
+        chain.push(`${curV}${nextV}xfade=transition=crossfade:duration=${d.toFixed(2)}:offset=${fadeOffset.toFixed(2)} ${vOut}`);
 
-    offset += (keeps[i].end - keeps[i].start) - d;
-    curV = vOut;
-    curA = aOut;
-  }
+        // Audio acrossfade with two inputs and labeled output
+        chain.push(`${curA}${nextA}acrossfade=d=${audioD.toFixed(2)} ${aOut}`);
 
-  return { chain, vOut: curV, aOut: curA };
-}
+        offset += (keeps[i].end - keeps[i].start) - d;
+        curV = vOut;
+        curA = aOut;
+      }
 
-function buildTransitionGraph(keeps, opts = {}) {
-  const trim = buildTrimNodes(keeps);
-  const { chain, vOut, aOut } = buildCrossfadeChain(keeps, opts);
-  const filtergraph = [...trim, ...chain].join(';');
-  return { filtergraph, vOut, aOut };
-}
+      return { chain, vOut: curV, aOut: curA };
+    }
 
-async function runTransitions(sourcePath, outputPath, opts = {}) {
-  const codec = 'libx264';
-  const preset = process.env.RENDER_PRESET || 'fast';
-  const crf = String(process.env.RENDER_CRF ?? '20');
-  const fps = String(opts.fps || process.env.RENDER_FPS || '30');
-  const aCodec = process.env.RENDER_AUDIO_CODEC || 'aac';
-  const aBitrate = process.env.RENDER_AUDIO_BITRATE || '192k';
-  const threads = String(process.env.RENDER_THREADS || '2');
+    function buildTransitionGraph(keeps, opts = {}) {
+      const trim = buildTrimNodes(keeps);
+      const { chain, vOut, aOut } = buildCrossfadeChain(keeps, opts);
+      const filtergraph = [...trim, ...chain].join(';');
+      return { filtergraph, vOut, aOut };
+    }
 
-  try {
-    const { filtergraph, vOut, aOut } = buildTransitionGraph(opts.keeps, {
-      durationMs: opts.durationMs,
-      audioFadeMs: opts.audioFadeMs
-    });
+    async function runTransitions(sourcePath, outputPath, opts = {}) {
+      const codec = 'libx264';
+      const preset = process.env.RENDER_PRESET || 'fast';
+      const crf = String(process.env.RENDER_CRF ?? '20');
+      const fps = String(opts.fps || process.env.RENDER_FPS || '30');
+      const aCodec = process.env.RENDER_AUDIO_CODEC || 'aac';
+      const aBitrate = process.env.RENDER_AUDIO_BITRATE || '192k';
+      const threads = String(process.env.RENDER_THREADS || '2');
 
-    const args = [
-      '-y',
-      '-i', sourcePath,
-      '-filter_complex', filtergraph,
-      '-map', vOut || '[v0]',
-      '-map', aOut || '[a0]',
-      '-r', fps,
-      '-c:v', codec,
-      '-preset', preset,
-      '-crf', crf,
-      '-c:a', aCodec,
-      '-b:a', aBitrate,
-      '-threads', threads,
-      outputPath,
-    ];
+      try {
+        const { filtergraph, vOut, aOut } = buildTransitionGraph(opts.keeps, {
+          durationMs: opts.durationMs,
+          audioFadeMs: opts.audioFadeMs
+        });
 
-    await execAsync(process.env.FFMPEG_PATH || 'ffmpeg', args);
-  } catch (err) {
-    throw new TransitionError(`FFmpeg execution failed: ${err.message}`, ERROR_TYPES.FFMPEG_EXECUTION, {
-      sourcePath,
-      outputPath,
-      ffmpegError: err.message,
-      stderr: err.stderr
-    });
-  }
-}
+        const args = [
+          '-y',
+          '-i', sourcePath,
+          '-filter_complex', filtergraph,
+          '-map', vOut || '[v0]',
+          '-map', aOut || '[a0]',
+          '-r', fps,
+          '-c:v', codec,
+          '-preset', preset,
+          '-crf', crf,
+          '-c:a', aCodec,
+          '-b:a', aBitrate,
+          '-threads', threads,
+          outputPath,
+        ];
 
-module.exports = { runTransitions, buildTransitionGraph, TransitionError, ERROR_TYPES };
-```
+        await execAsync(process.env.FFMPEG_PATH || 'ffmpeg', args);
+      } catch (err) {
+        throw new TransitionError(`FFmpeg execution failed: ${err.message}`, ERROR_TYPES.FFMPEG_EXECUTION, {
+          sourcePath,
+          outputPath,
+          ffmpegError: err.message,
+          stderr: err.stderr
+        });
+      }
+    }
+
+    module.exports = { runTransitions, buildTransitionGraph, TransitionError, ERROR_TYPES };
+    ```
 
 3) Update handler
-- In `backend/services/video-render-engine/handler.js` add a new branch to produce `with_transitions.mp4` when `event.transitions` or `TRANSITIONS_ENABLED=true`:
-  - Derive keep segments from plan (reuse from WP01‑04)
-  - Call `runTransitions(sourcePath, outputPath, { keeps, durationMs, audioFadeMs, fps })`
-  - Probe output; validate duration vs expected (±1 frame)
-  - Save render entry with transition metadata and update manifest
+
+    - In `backend/services/video-render-engine/handler.js` add a new branch to produce `with_transitions.mp4` when `event.transitions` or `TRANSITIONS_ENABLED=true`:
+      - Derive keep segments from plan (reuse from WP01‑04)
+      - Call `runTransitions(sourcePath, outputPath, { keeps, durationMs, audioFadeMs, fps })`
+      - Probe output; validate duration vs expected (±1 frame)
+      - Save render entry with transition metadata and update manifest
 
 4) Wire into local harness (WP00‑05)
-- Add a flag or lane to run transitions after planning (and optionally after base cuts), using same source plan.
+
+    - Add a flag or lane to run transitions after planning (and optionally after base cuts), using same source plan.
 
 5) Validate manifest updates
-- Ensure `manifest.renders[]` entry includes transition details and `updatedAt`
+
+    - Ensure `manifest.renders[]` entry includes transition details and `updatedAt`
 
 6) Logging and metrics
-- Confirm logs contain `correlationId`, `tenantId`, `jobId`, `step`
-- Metrics: `RenderTransitionsSuccess`, `RenderTransitionsError_*`, `TransitionsJoins`, `TransitionsDurationDeltaMs`
+
+    - Confirm logs contain `correlationId`, `tenantId`, `jobId`, `step`
+    - Metrics: `RenderTransitionsSuccess`, `RenderTransitionsError_*`, `TransitionsJoins`, `TransitionsDurationDeltaMs`
 
 7) Idempotency
-- Re-run with same job; output overwritten safely; manifest updated
+
+    - Re-run with same job; output overwritten safely; manifest updated
 
 ## Test Plan
 
 ### Local
+
 - Run harness on a short input with a known `cut_plan.json` (≥2 keep segments):
   - Expect `renders/with_transitions.mp4`
   - Validate duration within ±1 frame of `sum(keeps) - joins * durationSec`
@@ -359,6 +380,7 @@ module.exports = { runTransitions, buildTransitionGraph, TransitionError, ERROR_
   - Run same job twice; outputs overwritten; manifest updated deterministically
 
 ### CI (optional if harness lane exists)
+
 - Add tiny sample plan and video; run transitions lane; assert:
   - Output exists; duration delta matches within ±1 frame
   - Manifest render entry contains transition metadata
@@ -410,13 +432,13 @@ transitions-test:
 ## Dependencies
 
 - MFU‑WP01‑04‑BE: Video Render Engine  
-  See: https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP01-04-BE-video-engine-cuts.md
+  See: <https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP01-04-BE-video-engine-cuts.md>
 - MFU‑WP00‑02‑BE: Manifest, Tenancy, and Storage Schema  
-  See: https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-02-BE-manifest-tenancy-and-storage-schema.md
+  See: <https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-02-BE-manifest-tenancy-and-storage-schema.md>
 - MFU‑WP00‑03‑IAC: Runtime FFmpeg and Observability  
-  See: https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-03-IAC-runtime-ffmpeg-and-observability.md
+  See: <https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-03-IAC-runtime-ffmpeg-and-observability.md>
 - MFU‑WP00‑05‑TG: Test Harness and Golden Samples  
-  See: https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-05-TG-test-harness-and-golden-samples.md
+  See: <https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-05-TG-test-harness-and-golden-samples.md>
 
 ## Risks / Open Questions
 
@@ -429,9 +451,9 @@ transitions-test:
 ## Related MFUs
 
 - MFU‑WP01‑03‑BE: Smart Cut Planner  
-  See: https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP01-03-BE-smart-cut-planner.md
+  See: <https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP01-03-BE-smart-cut-planner.md>
 - MFU‑WP01‑04‑BE: Video Render Engine  
-  See: https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP01-04-BE-video-engine-cuts.md
+  See: <https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP01-04-BE-video-engine-cuts.md>
 
 ## Implementation Tracking
 
