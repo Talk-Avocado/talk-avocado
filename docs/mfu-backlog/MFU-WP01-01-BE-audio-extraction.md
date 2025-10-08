@@ -24,7 +24,15 @@ audience: [backend-engineers]
 **Functional Description**  
 Extract audio (mp3) from an uploaded video and update the job manifest with audio metadata (codec, duration, bitrate, sample rate). Outputs are tenant-scoped and compatible with local-first storage, enabling downstream transcription.
 
-**Technical Scope**
+**Technical Scope**:
+
+### Decisions Adopted (Phase-1)
+
+- Writes `media.sourceKey` in manifest when normalizing source video; structured logs include correlation fields.
+- Tenant paths follow `{env}/{tenantId}/{jobId}/…`; IAM/DDB isolation per ADR-004.
+- Error taxonomy standardized; metrics emitted for success and errors; retries only for transient errors.
+- Orchestrated under AWS Step Functions (Standard); event shape matches ASL Task input.
+
 - Inputs: `.mp4`, `.mov` under `input/`
 - Output: `audio/{jobId}.mp3`
 - ffprobe-based metadata capture:
@@ -119,6 +127,7 @@ tools/
   - MFU‑WP00‑05‑TG (harness/goldens integration)
 
 **Environment Variables** (extend `.env.example`):
+
 ```env
 # Audio Extraction (WP01-01)
 AUDIO_OUTPUT_CODEC=mp3
@@ -132,222 +141,229 @@ FFMPEG_PATH=                    # From WP00-03; optional if ffmpeg on PATH
 Follow these steps exactly. All paths are repo‑relative.
 
 1) Ensure directories exist
-- Create or verify:
-  - `backend/services/audio-extraction/`
+
+    - Create or verify:
+      - `backend/services/audio-extraction/`
 
 2) Implement handler
-- Create `backend/services/audio-extraction/handler.js`:
 
-```javascript
-// backend/services/audio-extraction/handler.js
-const { initObservability } = require('../../lib/init-observability');
-const { keyFor, pathFor, writeFileAtKey } = require('../../lib/storage');
-const { loadManifest, saveManifest } = require('../../lib/manifest');
-const { FFmpegRuntime } = require('../../lib/ffmpeg-runtime');
-const { execFileSync } = require('node:child_process');
-const { existsSync, readFileSync } = require('node:fs');
-const { basename } = require('node:path');
+    - Create `backend/services/audio-extraction/handler.js`:
 
-// Error types for better error handling
-class AudioExtractionError extends Error {
-  constructor(message, type, details = {}) {
-    super(message);
-    this.name = 'AudioExtractionError';
-    this.type = type;
-    this.details = details;
-  }
-}
+    ```javascript
+    // backend/services/audio-extraction/handler.js
+    const { initObservability } = require('../../lib/init-observability');
+    const { keyFor, pathFor, writeFileAtKey } = require('../../lib/storage');
+    const { loadManifest, saveManifest } = require('../../lib/manifest');
+    const { FFmpegRuntime } = require('../../lib/ffmpeg-runtime');
+    const { execFileSync } = require('node:child_process');
+    const { existsSync, readFileSync } = require('node:fs');
+    const { basename } = require('node:path');
 
-const ERROR_TYPES = {
-  INPUT_NOT_FOUND: 'INPUT_NOT_FOUND',
-  INPUT_INVALID: 'INPUT_INVALID',
-  FFMPEG_EXECUTION: 'FFMPEG_EXECUTION',
-  FFPROBE_FAILED: 'FFPROBE_FAILED',
-  MANIFEST_UPDATE: 'MANIFEST_UPDATE',
-  STORAGE_ERROR: 'STORAGE_ERROR'
-};
-
-exports.handler = async (event, context) => {
-  const { env, tenantId, jobId, inputKey } = event;
-  const correlationId = event.correlationId || context.awsRequestId;
-
-  const { logger, metrics, tracer } = initObservability({
-    serviceName: 'AudioExtraction',
-    correlationId,
-    tenantId,
-    jobId,
-    step: 'audio-extraction',
-  });
-
-  const ffmpeg = new FFmpegRuntime(logger, metrics, tracer);
-
-  try {
-    // Validate input exists
-    const inputPath = pathFor(inputKey);
-    if (!existsSync(inputPath)) {
-      throw new AudioExtractionError(
-        `Input not found: ${inputKey}`,
-        ERROR_TYPES.INPUT_NOT_FOUND,
-        { inputKey, inputPath }
-      );
+    // Error types for better error handling
+    class AudioExtractionError extends Error {
+      constructor(message, type, details = {}) {
+        super(message);
+        this.name = 'AudioExtractionError';
+        this.type = type;
+        this.details = details;
+      }
     }
 
-    // Validate input file type
-    const inputExt = inputPath.toLowerCase().split('.').pop();
-    if (!['mp4', 'mov'].includes(inputExt)) {
-      throw new AudioExtractionError(
-        `Unsupported input format: ${inputExt}. Expected mp4 or mov`,
-        ERROR_TYPES.INPUT_INVALID,
-        { inputExt, supportedFormats: ['mp4', 'mov'] }
-      );
-    }
+    const ERROR_TYPES = {
+      INPUT_NOT_FOUND: 'INPUT_NOT_FOUND',
+      INPUT_INVALID: 'INPUT_INVALID',
+      FFMPEG_EXECUTION: 'FFMPEG_EXECUTION',
+      FFPROBE_FAILED: 'FFPROBE_FAILED',
+      MANIFEST_UPDATE: 'MANIFEST_UPDATE',
+      STORAGE_ERROR: 'STORAGE_ERROR'
+    };
 
-    const outputKey = keyFor(env, tenantId, jobId, 'audio', `${jobId}.mp3`);
-    const outputPath = pathFor(outputKey);
+    exports.handler = async (event, context) => {
+      const { env, tenantId, jobId, inputKey } = event;
+      const correlationId = event.correlationId || context.awsRequestId;
 
-    const bitrate = process.env.AUDIO_BITRATE || '192k';
-    const sampleRate = String(process.env.AUDIO_SAMPLE_RATE || '44100');
-
-    // Extract audio (mp3)
-    try {
-      await ffmpeg.executeCommand([
-        'ffmpeg', '-y',
-        '-i', inputPath,
-        '-vn', '-acodec', 'libmp3lame',
-        '-b:a', bitrate,
-        '-ar', sampleRate,
-        outputPath,
-      ], 'AudioExtraction');
-    } catch (ffmpegErr) {
-      throw new AudioExtractionError(
-        `FFmpeg execution failed: ${ffmpegErr.message}`,
-        ERROR_TYPES.FFMPEG_EXECUTION,
-        { 
-          inputPath, 
-          outputPath, 
-          bitrate, 
-          sampleRate,
-          ffmpegError: ffmpegErr.message 
-        }
-      );
-    }
-
-    // Probe output with error handling
-    let probe;
-    try {
-      const probeJson = execFileSync(
-        process.env.FFPROBE_PATH || 'ffprobe',
-        ['-v', 'quiet', '-print_format', 'json', '-show_format', '-show_streams', outputPath],
-        { encoding: 'utf8' }
-      );
-      probe = JSON.parse(probeJson);
-    } catch (probeErr) {
-      throw new AudioExtractionError(
-        `ffprobe failed: ${probeErr.message}`,
-        ERROR_TYPES.FFPROBE_FAILED,
-        { outputPath, probeError: probeErr.message }
-      );
-    }
-
-    const aStream = (probe.streams || []).find(s => s.codec_type === 'audio') || {};
-    const durationSec = Number(probe.format?.duration || aStream.duration || 0);
-    const bitrateKbps = Math.round(Number(probe.format?.bit_rate || 0) / 1000);
-    const sampleRateHz = Number(aStream.sample_rate || sampleRate);
-    const codec = (aStream.codec_name || 'mp3').toLowerCase();
-
-    // Update manifest with error handling
-    try {
-      const manifest = loadManifest(env, tenantId, jobId);
-      manifest.audio = manifest.audio || {};
-      manifest.audio.key = outputKey;
-      manifest.audio.codec = 'mp3'; // Fixed: removed redundant ternary
-      manifest.audio.durationSec = durationSec;
-      manifest.audio.bitrateKbps = Number.isFinite(bitrateKbps) ? bitrateKbps : undefined;
-      manifest.audio.sampleRate = Number(sampleRateHz);
-      manifest.audio.extractedAt = new Date().toISOString();
-      manifest.updatedAt = new Date().toISOString();
-      saveManifest(env, tenantId, jobId, manifest);
-    } catch (manifestErr) {
-      throw new AudioExtractionError(
-        `Manifest update failed: ${manifestErr.message}`,
-        ERROR_TYPES.MANIFEST_UPDATE,
-        { 
-          env, 
-          tenantId, 
-          jobId, 
-          outputKey,
-          manifestError: manifestErr.message 
-        }
-      );
-    }
-
-    logger.info('Audio extraction completed', {
-      input: basename(inputPath),
-      output: outputKey,
-      durationSec,
-      bitrateKbps,
-      sampleRate: sampleRateHz
-    });
-    metrics.addMetric('AudioExtractionSuccess', 'Count', 1);
-    metrics.publishStoredMetrics();
-
-    return { ok: true, outputKey, correlationId };
-  } catch (err) {
-    // Enhanced error handling with specific error types
-    const errorType = err.type || 'UNKNOWN_ERROR';
-    const errorDetails = err.details || {};
-    
-    logger.error('Audio extraction failed', { 
-      error: err.message,
-      errorType,
-      errorDetails,
-      inputKey: event.inputKey,
-      tenantId,
-      jobId
-    });
-    
-    metrics.addMetric('AudioExtractionError', 'Count', 1);
-    metrics.addMetric(`AudioExtractionError_${errorType}`, 'Count', 1);
-    metrics.publishStoredMetrics();
-    
-    // Update manifest status on failure if possible
-    try {
-      const manifest = loadManifest(env, tenantId, jobId);
-      manifest.status = 'failed';
-      manifest.updatedAt = new Date().toISOString();
-      if (!manifest.logs) manifest.logs = [];
-      manifest.logs.push({
-        type: 'error',
-        message: `Audio extraction failed: ${err.message}`,
-        errorType,
-        createdAt: new Date().toISOString()
+      const { logger, metrics, tracer } = initObservability({
+        serviceName: 'AudioExtraction',
+        correlationId,
+        tenantId,
+        jobId,
+        step: 'audio-extraction',
       });
-      saveManifest(env, tenantId, jobId, manifest);
-    } catch (manifestErr) {
-      logger.error('Failed to update manifest with error status', { manifestError: manifestErr.message });
-    }
-    
-    throw err;
-  }
-};
-```
+
+      const ffmpeg = new FFmpegRuntime(logger, metrics, tracer);
+
+      try {
+        // Validate input exists
+        const inputPath = pathFor(inputKey);
+        if (!existsSync(inputPath)) {
+          throw new AudioExtractionError(
+            `Input not found: ${inputKey}`,
+            ERROR_TYPES.INPUT_NOT_FOUND,
+            { inputKey, inputPath }
+          );
+        }
+
+        // Validate input file type
+        const inputExt = inputPath.toLowerCase().split('.').pop();
+        if (!['mp4', 'mov'].includes(inputExt)) {
+          throw new AudioExtractionError(
+            `Unsupported input format: ${inputExt}. Expected mp4 or mov`,
+            ERROR_TYPES.INPUT_INVALID,
+            { inputExt, supportedFormats: ['mp4', 'mov'] }
+          );
+        }
+
+        const outputKey = keyFor(env, tenantId, jobId, 'audio', `${jobId}.mp3`);
+        const outputPath = pathFor(outputKey);
+
+        const bitrate = process.env.AUDIO_BITRATE || '192k';
+        const sampleRate = String(process.env.AUDIO_SAMPLE_RATE || '44100');
+
+        // Extract audio (mp3)
+        try {
+          await ffmpeg.executeCommand([
+            'ffmpeg', '-y',
+            '-i', inputPath,
+            '-vn', '-acodec', 'libmp3lame',
+            '-b:a', bitrate,
+            '-ar', sampleRate,
+            outputPath,
+          ], 'AudioExtraction');
+        } catch (ffmpegErr) {
+          throw new AudioExtractionError(
+            `FFmpeg execution failed: ${ffmpegErr.message}`,
+            ERROR_TYPES.FFMPEG_EXECUTION,
+            { 
+              inputPath, 
+              outputPath, 
+              bitrate, 
+              sampleRate,
+              ffmpegError: ffmpegErr.message 
+            }
+          );
+        }
+
+        // Probe output with error handling
+        let probe;
+        try {
+          const probeJson = execFileSync(
+            process.env.FFPROBE_PATH || 'ffprobe',
+            ['-v', 'quiet', '-print_format', 'json', '-show_format', '-show_streams', outputPath],
+            { encoding: 'utf8' }
+          );
+          probe = JSON.parse(probeJson);
+        } catch (probeErr) {
+          throw new AudioExtractionError(
+            `ffprobe failed: ${probeErr.message}`,
+            ERROR_TYPES.FFPROBE_FAILED,
+            { outputPath, probeError: probeErr.message }
+          );
+        }
+
+        const aStream = (probe.streams || []).find(s => s.codec_type === 'audio') || {};
+        const durationSec = Number(probe.format?.duration || aStream.duration || 0);
+        const bitrateKbps = Math.round(Number(probe.format?.bit_rate || 0) / 1000);
+        const sampleRateHz = Number(aStream.sample_rate || sampleRate);
+        const codec = (aStream.codec_name || 'mp3').toLowerCase();
+
+        // Update manifest with error handling
+        try {
+          const manifest = loadManifest(env, tenantId, jobId);
+          manifest.audio = manifest.audio || {};
+          manifest.audio.key = outputKey;
+          manifest.audio.codec = 'mp3'; // Fixed: removed redundant ternary
+          manifest.audio.durationSec = durationSec;
+          manifest.audio.bitrateKbps = Number.isFinite(bitrateKbps) ? bitrateKbps : undefined;
+          manifest.audio.sampleRate = Number(sampleRateHz);
+          manifest.audio.extractedAt = new Date().toISOString();
+          manifest.updatedAt = new Date().toISOString();
+          saveManifest(env, tenantId, jobId, manifest);
+        } catch (manifestErr) {
+          throw new AudioExtractionError(
+            `Manifest update failed: ${manifestErr.message}`,
+            ERROR_TYPES.MANIFEST_UPDATE,
+            { 
+              env, 
+              tenantId, 
+              jobId, 
+              outputKey,
+              manifestError: manifestErr.message 
+            }
+          );
+        }
+
+        logger.info('Audio extraction completed', {
+          input: basename(inputPath),
+          output: outputKey,
+          durationSec,
+          bitrateKbps,
+          sampleRate: sampleRateHz
+        });
+        metrics.addMetric('AudioExtractionSuccess', 'Count', 1);
+        metrics.publishStoredMetrics();
+
+        return { ok: true, outputKey, correlationId };
+      } catch (err) {
+        // Enhanced error handling with specific error types
+        const errorType = err.type || 'UNKNOWN_ERROR';
+        const errorDetails = err.details || {};
+        
+        logger.error('Audio extraction failed', { 
+          error: err.message,
+          errorType,
+          errorDetails,
+          inputKey: event.inputKey,
+          tenantId,
+          jobId
+        });
+        
+        metrics.addMetric('AudioExtractionError', 'Count', 1);
+        metrics.addMetric(`AudioExtractionError_${errorType}`, 'Count', 1);
+        metrics.publishStoredMetrics();
+        
+        // Update manifest status on failure if possible
+        try {
+          const manifest = loadManifest(env, tenantId, jobId);
+          manifest.status = 'failed';
+          manifest.updatedAt = new Date().toISOString();
+          if (!manifest.logs) manifest.logs = [];
+          manifest.logs.push({
+            type: 'error',
+            message: `Audio extraction failed: ${err.message}`,
+            errorType,
+            createdAt: new Date().toISOString()
+          });
+          saveManifest(env, tenantId, jobId, manifest);
+        } catch (manifestErr) {
+          logger.error('Failed to update manifest with error status', { manifestError: manifestErr.message });
+        }
+        
+        throw err;
+      }
+    };
+    ```
 
 3) Wire into local harness (WP00‑05)
-- `tools/harness/run-local-pipeline.js` already calls `backend/services/audio-extraction/handler.js`
+
+    - `tools/harness/run-local-pipeline.js` already calls `backend/services/audio-extraction/handler.js`
 
 4) Validate manifest updates
-- Ensure `manifest.audio.*` fields align with WP00‑02 schema
+
+    - Ensure `manifest.audio.*` fields align with WP00‑02 schema
 
 5) Logging and metrics
-- Confirm logs contain `correlationId`, `tenantId`, `jobId`, `step`
-- Confirm EMF metrics published
+
+    - Confirm logs contain `correlationId`, `tenantId`, `jobId`, `step`
+    - Confirm EMF metrics published
 
 6) Idempotency check
-- Re-run with same job; output overwritten safely; manifest updated
+
+    - Re-run with same job; output overwritten safely; manifest updated
 
 ## Test Plan
 
 ### Local
+
 - Run harness on a short `.mov` and `.mp4`:
   - Expect `audio/{jobId}.mp3` present
   - Verify `durationSec` within ±0.1s vs ffprobe
@@ -356,6 +372,7 @@ exports.handler = async (event, context) => {
 - Repeat runs for same `{jobId}`: no errors; output overwritten
 
 ### CI (optional if harness lane exists)
+
 - Add a tiny sample input
 - Run extraction via harness; assert manifest fields and file presence
 
@@ -369,11 +386,11 @@ exports.handler = async (event, context) => {
 ## Dependencies
 
 - MFU‑WP00‑02‑BE: Manifest, Tenancy, and Storage Schema  
-  See: https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-02-BE-manifest-tenancy-and-storage-schema.md
+  See: <https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-02-BE-manifest-tenancy-and-storage-schema.md>
 - MFU‑WP00‑03‑IAC: Runtime FFmpeg and Observability  
-  See: https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-03-IAC-runtime-ffmpeg-and-observability.md
+  See: <https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-03-IAC-runtime-ffmpeg-and-observability.md>
 - MFU‑WP00‑05‑TG: Test Harness and Golden Samples  
-  See: https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-05-TG-test-harness-and-golden-samples.md
+  See: <https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-05-TG-test-harness-and-golden-samples.md>
 
 ## Risks / Open Questions
 
@@ -385,7 +402,7 @@ exports.handler = async (event, context) => {
 ## Related MFUs
 
 - MFU‑WP01‑02‑BE: Transcription  
-  See: https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP01-02-BE-transcription.md
+  See: <https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP01-02-BE-transcription.md>
 
 ## Implementation Tracking
 

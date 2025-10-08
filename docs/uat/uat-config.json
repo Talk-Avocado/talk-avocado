@@ -1,0 +1,8 @@
+{
+  "video": { "maxSyncDriftMs": 50, "maxDurationDeltaMs": 100, "maxFrameDelta": 1 },
+  "subtitles": { "maxCueBoundaryErrorMs": 33, "noOverlaps": true },
+  "transcription": { "maxWordCountDelta": 5 },
+  "timeouts": { "cutsMs": 480000, "transitionsMs": 600000, "brandingMs": 360000, "subtitlesMs": 240000 }
+}
+
+

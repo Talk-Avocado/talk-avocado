@@ -26,6 +26,12 @@ Provide FFmpeg in a Lambda-compatible runtime (container image preferred; layer 
 
 **Technical Scope**:
 
+- Decisions Adopted (Phase-1):
+  - Prefer container image runtime for FFmpeg; layers deferred.
+  - Standard log fields and EMF metric dimensions per `docs/CONVENTIONS.md`.
+  - Timeouts/ephemeral storage defaults per guardrails in `docs/uat/uat-config.json` (cuts 8m, transitions 10m, branding 6m, subtitles 4m; `/tmp` up to 10GB for heavy steps).
+  - Error taxonomy standardized; retries only for transient errors.
+
 - Lambda container image (default) with `ffmpeg`/`ffprobe` and required codecs
   - Lambda layer explicitly deferred; focus on image-first approach
 - Lambda runtime configuration presets:
@@ -119,10 +125,11 @@ The runtime must support operations used in existing services:
 - Use local filesystem storage helpers from WP00-02 for all I/O; S3 migration happens in WP01.
 
 References:
+
 - WP00‑01: Platform Bootstrap and CI — repository structure, harness, and logging stubs (upgrade here).  
-  See: https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-01-IAC-platform-bootstrap-and-ci.md
+  See: <https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-01-IAC-platform-bootstrap-and-ci.md>
 - WP00-02: Manifest, Tenancy, and Storage Schema — storage abstraction and tenant-aware paths.  
-  See: https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-02-BE-manifest-tenancy-and-storage-schema.md
+  See: <https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-02-BE-manifest-tenancy-and-storage-schema.md>
 
 **Business Value**  
 Unblocks all media processing MFUs with a scalable, observable runtime and reduces drift by standardizing logging/metrics/tracing across services.
@@ -173,22 +180,26 @@ Unblocks all media processing MFUs with a scalable, observable runtime and reduc
 ## Dependencies and Prerequisites
 
 **Hard Dependencies:**
+
 - MFU-WP00-01-IAC (Platform Bootstrap and CI) — project structure, harness, environment, CI/CD  
-  See: https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-01-IAC-platform-bootstrap-and-ci.md
+  See: <https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-01-IAC-platform-bootstrap-and-ci.md>
 - MFU-WP00-02-BE (Manifest, Tenancy, and Storage Schema) — storage abstraction for tenant-aware paths and manifest utilities  
-  See: https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-02-BE-manifest-tenancy-and-storage-schema.md
+  See: <https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-02-BE-manifest-tenancy-and-storage-schema.md>
 
 **Clarifications:**
+
 - S3 storage bindings are **deferred** to WP01 cloud deployment phase; Phase 1 uses local filesystem
 - `backend/lib/logging.ts` will be **upgraded** from WP00-01's stub to Powertools wrapper
 - `tools/harness/run-local-pipeline.js` will be **enhanced** to support docker run for local container validation
 - DynamoDB Jobs table (designed in WP00-02) not deployed until orchestration (WP00-04)
 
 **Infrastructure Prerequisites:**
+
 - AWS: Lambda, CloudWatch, SQS, X‑Ray, ECR
 - IAM roles with CloudWatch, X‑Ray, SQS access
 
 **Development Environment:**
+
 - Docker (for image build and local execution)
 - Node.js 18+ for function code
 - AWS CLI configured
@@ -199,6 +210,7 @@ Unblocks all media processing MFUs with a scalable, observable runtime and reduc
   - `aws-xray-sdk-core` ^3.x
 
 **Environment Variables** (extend `.env.example` from WP00-01):
+
 ```env
 # FFmpeg Runtime and Observability (WP00-03)
 FFMPEG_PATH=
@@ -209,6 +221,7 @@ ENABLE_XRAY=false
 ```
 
 **Integration Points:**
+
 - `backend/lib/storage.ts` (from WP00-02) for tenant-aware file I/O
 - `backend/lib/manifest.ts` (from WP00-02) for job state updates
 - `backend/services/*` handlers updated to use observability wrappers
@@ -223,254 +236,260 @@ Follow these steps exactly. All paths are repo‑relative.
 
 0) **Install Dependencies**
 
-Add Powertools and X-Ray dependencies:
+    Add Powertools and X-Ray dependencies:
 
-```bash
-# At repo root or in backend/package.json
-npm install --save \
-  @aws-lambda-powertools/logger \
-  @aws-lambda-powertools/metrics \
-  @aws-lambda-powertools/tracer \
-  aws-xray-sdk-core
-```
+    ```bash
+    # At repo root or in backend/package.json
+    npm install --save \
+      @aws-lambda-powertools/logger \
+      @aws-lambda-powertools/metrics \
+      @aws-lambda-powertools/tracer \
+      aws-xray-sdk-core
+    ```
 
-Update `.env.example`:
+    Update `.env.example`:
 
-```bash
-cat >> .env.example <<'EOF'
+    ```bash
+    cat >> .env.example <<'EOF'
 
-# FFmpeg Runtime and Observability (WP00-03)
-FFMPEG_PATH=
-POWERTOOLS_SERVICE_NAME=TalkAvocado/MediaProcessing
-POWERTOOLS_METRICS_NAMESPACE=TalkAvocado
-AWS_XRAY_DAEMON_ADDRESS=localhost:2000
-ENABLE_XRAY=false
-EOF
-```
+    # FFmpeg Runtime and Observability (WP00-03)
+    FFMPEG_PATH=
+    POWERTOOLS_SERVICE_NAME=TalkAvocado/MediaProcessing
+    POWERTOOLS_METRICS_NAMESPACE=TalkAvocado
+    AWS_XRAY_DAEMON_ADDRESS=localhost:2000
+    ENABLE_XRAY=false
+    EOF
+    ```
 
 1) Create directories
 
-```bash
-mkdir -p infrastructure/lambda/images/ffmpeg-runtime
-mkdir -p infrastructure/lambda/functions/ffmpeg-test
-mkdir -p infrastructure/cloudwatch/{dashboards,alarms}
-mkdir -p backend/lib
-mkdir -p test-assets/fixtures
-```
+    ```bash
+    mkdir -p infrastructure/lambda/images/ffmpeg-runtime
+    mkdir -p infrastructure/lambda/functions/ffmpeg-test
+    mkdir -p infrastructure/cloudwatch/{dashboards,alarms}
+    mkdir -p backend/lib
+    mkdir -p test-assets/fixtures
+    ```
 
 2) Build container image (default)  
-Create `infrastructure/lambda/images/ffmpeg-runtime/Dockerfile`:
+    Create `infrastructure/lambda/images/ffmpeg-runtime/Dockerfile`:
 
-```Dockerfile
-# Multi-stage: build or fetch static ffmpeg, then copy into Lambda base
-FROM public.ecr.aws/lambda/nodejs:20 AS base
+    ```Dockerfile
+    # Multi-stage: build or fetch static ffmpeg, then copy into Lambda base
+    FROM public.ecr.aws/lambda/nodejs:20 AS base
 
-# Copy prebuilt static ffmpeg/ffprobe (or build in a preceding stage)
-# Example uses a pinned tarball; verify SHA256 in build.sh
-WORKDIR /opt/bin
-# Place ffmpeg and ffprobe here during build.sh
+    # Copy prebuilt static ffmpeg/ffprobe (or build in a preceding stage)
+    # Example uses a pinned tarball; verify SHA256 in build.sh
+    WORKDIR /opt/bin
+    # Place ffmpeg and ffprobe here during build.sh
 
-FROM public.ecr.aws/lambda/nodejs:20
-# Copy ffmpeg/ffprobe into PATH
-COPY --from=base /opt/bin/ffmpeg /opt/bin/ffmpeg
-COPY --from=base /opt/bin/ffprobe /opt/bin/ffprobe
-ENV PATH="/opt/bin:${PATH}"
-# Optionally, copy node_modules if needed, otherwise functions bring their own
-CMD ["index.handler"]
-```
+    FROM public.ecr.aws/lambda/nodejs:20
+    # Copy ffmpeg/ffprobe into PATH
+    COPY --from=base /opt/bin/ffmpeg /opt/bin/ffmpeg
+    COPY --from=base /opt/bin/ffprobe /opt/bin/ffprobe
+    ENV PATH="/opt/bin:${PATH}"
+    # Optionally, copy node_modules if needed, otherwise functions bring their own
+    CMD ["index.handler"]
+    ```
 
-Create `infrastructure/lambda/images/ffmpeg-runtime/build.sh`:
+    Create `infrastructure/lambda/images/ffmpeg-runtime/build.sh`:
 
-```bash
-#!/usr/bin/env bash
-set -euo pipefail
+    ```bash
+    #!/usr/bin/env bash
+    set -euo pipefail
 
-IMG_NAME="${IMG_NAME:-ffmpeg-runtime}"
-ECR_URI="${ECR_URI:?Set ECR_URI, e.g., 123456789012.dkr.ecr.us-east-1.amazonaws.com}"
-FFMPEG_URL="https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz"
-FFMPEG_SHA256="${FFMPEG_SHA256:-}" # optional pin
+    IMG_NAME="${IMG_NAME:-ffmpeg-runtime}"
+    ECR_URI="${ECR_URI:?Set ECR_URI, e.g., 123456789012.dkr.ecr.us-east-1.amazonaws.com}"
+    FFMPEG_URL="https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz"
+    FFMPEG_SHA256="${FFMPEG_SHA256:-}" # optional pin
 
-tmpdir="$(mktemp -d)"
-pushd "$tmpdir" >/dev/null
+    tmpdir="$(mktemp -d)"
+    pushd "$tmpdir" >/dev/null
 
-echo "Downloading pinned ffmpeg..."
-curl -sSL -o ffmpeg.tar.xz "$FFMPEG_URL"
-if [ -n "${FFMPEG_SHA256}" ]; then
-  echo "${FFMPEG_SHA256}  ffmpeg.tar.xz" | sha256sum -c -
-fi
-tar -xf ffmpeg.tar.xz --strip-components=1
+    echo "Downloading pinned ffmpeg..."
+    curl -sSL -o ffmpeg.tar.xz "$FFMPEG_URL"
+    if [ -n "${FFMPEG_SHA256}" ]; then
+      echo "${FFMPEG_SHA256}  ffmpeg.tar.xz" | sha256sum -c -
+    fi
+    tar -xf ffmpeg.tar.xz --strip-components=1
 
-mkdir -p ./bin
-cp ffmpeg ffprobe ./bin/
-chmod +x ./bin/ffmpeg ./bin/ffprobe
+    mkdir -p ./bin
+    cp ffmpeg ffprobe ./bin/
+    chmod +x ./bin/ffmpeg ./bin/ffprobe
 
-# Build using the bin/ as a stage context
-cp -r ./bin "$(git rev-parse --show-toplevel)/infrastructure/lambda/images/ffmpeg-runtime/"
-popd >/dev/null
-rm -rf "$tmpdir"
+    # Build using the bin/ as a stage context
+    cp -r ./bin "$(git rev-parse --show-toplevel)/infrastructure/lambda/images/ffmpeg-runtime/"
+    popd >/dev/null
+    rm -rf "$tmpdir"
 
-echo "Building image..."
-docker build -t "$IMG_NAME:latest" infrastructure/lambda/images/ffmpeg-runtime
+    echo "Building image..."
+    docker build -t "$IMG_NAME:latest" infrastructure/lambda/images/ffmpeg-runtime
 
-echo "Login to ECR and push..."
-aws ecr get-login-password | docker login --username AWS --password-stdin "$ECR_URI"
-docker tag "$IMG_NAME:latest" "$ECR_URI/$IMG_NAME:latest"
-docker push "$ECR_URI/$IMG_NAME:latest"
-```
+    echo "Login to ECR and push..."
+    aws ecr get-login-password | docker login --username AWS --password-stdin "$ECR_URI"
+    docker tag "$IMG_NAME:latest" "$ECR_URI/$IMG_NAME:latest"
+    docker push "$ECR_URI/$IMG_NAME:latest"
+    ```
 
 3) Create FFmpeg validation function  
-Create `infrastructure/lambda/functions/ffmpeg-test/handler.js` to run probes and sample ops.
+    Create `infrastructure/lambda/functions/ffmpeg-test/handler.js` to run probes and sample ops.
 
-Also create expected output fixtures for validation:
+    Also create expected output fixtures for validation:
 
-```bash
-# Create fixture files for FFmpeg validation
-cat > test-assets/fixtures/ffmpeg-version.json <<'EOF'
-{
-  "version": "ffmpeg version",
-  "configuration": [],
-  "note": "Expected to contain libx264, libmp3lame, libopus codecs"
-}
-EOF
-
-cat > test-assets/fixtures/probe-sample.json <<'EOF'
-{
-  "format": {
-    "format_name": "string",
-    "duration": "number",
-    "size": "number",
-    "bit_rate": "number"
-  },
-  "streams": [
+    ```bash
+    # Create fixture files for FFmpeg validation
+    cat > test-assets/fixtures/ffmpeg-version.json <<'EOF'
     {
-      "codec_type": "video|audio",
-      "codec_name": "string",
-      "width": "number (video)",
-      "height": "number (video)",
-      "sample_rate": "number (audio)"
+      "version": "ffmpeg version",
+      "configuration": [],
+      "note": "Expected to contain libx264, libmp3lame, libopus codecs"
     }
-  ]
-}
-EOF
+    EOF
 
-cat > test-assets/fixtures/runtime-validation.json <<'EOF'
-{
-  "ffmpegAvailable": true,
-  "ffprobeAvailable": true,
-  "requiredCodecs": ["libx264", "libmp3lame", "libopus"],
-  "codecsPresent": [],
-  "validationPassed": true
-}
-EOF
-```
+    cat > test-assets/fixtures/probe-sample.json <<'EOF'
+    {
+      "format": {
+        "format_name": "string",
+        "duration": "number",
+        "size": "number",
+        "bit_rate": "number"
+      },
+      "streams": [
+        {
+          "codec_type": "video|audio",
+          "codec_name": "string",
+          "width": "number (video)",
+          "height": "number (video)",
+          "sample_rate": "number (audio)"
+        }
+      ]
+    }
+    EOF
+
+    cat > test-assets/fixtures/runtime-validation.json <<'EOF'
+    {
+      "ffmpegAvailable": true,
+      "ffprobeAvailable": true,
+      "requiredCodecs": ["libx264", "libmp3lame", "libopus"],
+      "codecsPresent": [],
+      "validationPassed": true
+    }
+    EOF
+    ```
 
 4) **Upgrade** observability wrappers (Powertools)
 
-**Note**: `backend/lib/logging.ts` already exists as a stub from WP00-01. Replace its contents with Powertools implementation:
+    **Note**: `backend/lib/logging.ts` already exists as a stub from WP00-01. Replace its contents with Powertools implementation:
 
-Create `backend/lib/init-observability.ts` — **Single initialization helper**:
+    Create `backend/lib/init-observability.ts` — **Single initialization helper**:
 
-```javascript
-// backend/lib/init-observability.ts
-const { Logger } = require('@aws-lambda-powertools/logger');
-const { Metrics } = require('@aws-lambda-powertools/metrics');
-const { Tracer } = require('@aws-lambda-powertools/tracer');
+    ```javascript
+    // backend/lib/init-observability.ts
+    const { Logger } = require('@aws-lambda-powertools/logger');
+    const { Metrics } = require('@aws-lambda-powertools/metrics');
+    const { Tracer } = require('@aws-lambda-powertools/tracer');
 
-/**
- * Initialize observability stack for a Lambda handler
- * @param {Object} options - Configuration options
- * @param {string} options.serviceName - Service name (e.g., 'AudioExtraction')
- * @param {string} options.correlationId - Correlation ID from context
- * @param {string} options.tenantId - Tenant identifier
- * @param {string} options.jobId - Job identifier
- * @param {string} options.step - Current processing step
- * @returns {Object} { logger, metrics, tracer }
- */
-function initObservability({
-  serviceName,
-  correlationId,
-  tenantId,
-  jobId,
-  step,
-}) {
-  const logger = new Logger({
-    serviceName: process.env.POWERTOOLS_SERVICE_NAME || 'TalkAvocado/MediaProcessing',
-    logLevel: process.env.LOG_LEVEL || 'INFO',
-    persistentLogAttributes: {
+    /**
+    * Initialize observability stack for a Lambda handler
+    * @param {Object} options - Configuration options
+    * @param {string} options.serviceName - Service name (e.g., 'AudioExtraction')
+    * @param {string} options.correlationId - Correlation ID from context
+    * @param {string} options.tenantId - Tenant identifier
+    * @param {string} options.jobId - Job identifier
+    * @param {string} options.step - Current processing step
+    * @returns {Object} { logger, metrics, tracer }
+    */
+    function initObservability({
+      serviceName,
       correlationId,
       tenantId,
       jobId,
       step,
-    },
-  });
+    }) {
+      const logger = new Logger({
+        serviceName: process.env.POWERTOOLS_SERVICE_NAME || 'TalkAvocado/MediaProcessing',
+        logLevel: process.env.LOG_LEVEL || 'INFO',
+        persistentLogAttributes: {
+          correlationId,
+          tenantId,
+          jobId,
+          step,
+        },
+      });
 
-  const metrics = new Metrics({
-    namespace: process.env.POWERTOOLS_METRICS_NAMESPACE || 'TalkAvocado',
-    serviceName,
-    defaultDimensions: {
-      Service: serviceName,
-      Environment: process.env.TALKAVOCADO_ENV || 'dev',
-      TenantId: tenantId || 'unknown',
-    },
-  });
+      const metrics = new Metrics({
+        namespace: process.env.POWERTOOLS_METRICS_NAMESPACE || 'TalkAvocado',
+        serviceName,
+        defaultDimensions: {
+          Service: serviceName,
+          Environment: process.env.TALKAVOCADO_ENV || 'dev',
+          TenantId: tenantId || 'unknown',
+        },
+      });
 
-  const tracer = new Tracer({
-    serviceName,
-    enabled: process.env.ENABLE_XRAY === 'true',
-  });
+      const tracer = new Tracer({
+        serviceName,
+        enabled: process.env.ENABLE_XRAY === 'true',
+      });
 
-  return { logger, metrics, tracer };
-}
+      return { logger, metrics, tracer };
+    }
 
-module.exports = { initObservability };
-```
+    module.exports = { initObservability };
+    ```
 
-Then create supporting wrappers:
+    Then create supporting wrappers:
 
-- `backend/lib/logging.ts` — **upgrade** to thin wrapper providing context fields via Powertools Logger
-- `backend/lib/metrics.ts` — **create** Powertools Metrics (EMF) with standard dims  
-- `backend/lib/ffmpeg-runtime.ts` — **create** exec with timing, stderr capture, X‑Ray subsegment
+    - `backend/lib/logging.ts` — **upgrade** to thin wrapper providing context fields via Powertools Logger
+    - `backend/lib/metrics.ts` — **create** Powertools Metrics (EMF) with standard dims  
+    - `backend/lib/ffmpeg-runtime.ts` — **create** exec with timing, stderr capture, X‑Ray subsegment
 
 5) Configure functions (IaC or CLI)  
-- Set image URI, memory, timeout, ephemeral storage (≥ 6GB)
-- Attach DLQ or on-failure destination
-- Enable X‑Ray tracing
+
+    - Set image URI, memory, timeout, ephemeral storage (≥ 6GB)
+    - Attach DLQ or on-failure destination
+    - Enable X‑Ray tracing
 
 6) Local parity
 
-**Enhance** `tools/harness/run-local-pipeline.js` to:
-- Detect if running inside Docker container or locally
-- If local and container image available, wrap service invocations with `docker run`
-- Pass environment variables and mount storage paths
-- Fall back to direct Node.js execution if Docker unavailable
+    **Enhance** `tools/harness/run-local-pipeline.js` to:
 
-Use `docker run` (or `sam local`) with the same image for local testing:
+    - Detect if running inside Docker container or locally
+    - If local and container image available, wrap service invocations with `docker run`
+    - Pass environment variables and mount storage paths
+    - Fall back to direct Node.js execution if Docker unavailable
 
-```bash
-docker run --rm \
-  -v "$(pwd)/storage:/var/task/storage" \
-  -e TALKAVOCADO_ENV=dev \
-  -e MEDIA_STORAGE_PATH=/var/task/storage \
-  <ECR_URI>/ffmpeg-runtime:latest \
-  node -e "require('./backend/services/audio-extraction/handler').handler(event, context)"
-```
+    Use `docker run` (or `sam local`) with the same image for local testing:
+
+    ```bash
+    docker run --rm \
+      -v "$(pwd)/storage:/var/task/storage" \
+      -e TALKAVOCADO_ENV=dev \
+      -e MEDIA_STORAGE_PATH=/var/task/storage \
+      <ECR_URI>/ffmpeg-runtime:latest \
+      node -e "require('./backend/services/audio-extraction/handler').handler(event, context)"
+    ```
 
 ### Phase 2: Service Integration
 
-7) Update service handlers  
-- Replace direct `console` with logger wrapper  
-- Replace raw `execSync` with `ffmpeg-runtime` helper  
-- Emit metrics for operations and errors  
-- Stream I/O via storage abstraction (WP00‑02)
+1) Update service handlers  
 
-8) Monitoring and alarms  
-- Create CloudWatch dashboard and alarms (error rate, duration P95, DLQ)
+    - Replace direct `console` with logger wrapper  
+    - Replace raw `execSync` with `ffmpeg-runtime` helper  
+    - Emit metrics for operations and errors  
+    - Stream I/O via storage abstraction (WP00‑02)
 
-9) Power/Cost tuning  
-- Run Lambda Power Tuning; document chosen tier
+2) Monitoring and alarms  
 
-10) Deploy and validate  
-- Validate acceptance criteria end-to-end
+    - Create CloudWatch dashboard and alarms (error rate, duration P95, DLQ)
+
+3) Power/Cost tuning  
+
+    - Run Lambda Power Tuning; document chosen tier
+
+4) Deploy and validate  
+
+    - Validate acceptance criteria end-to-end
 
 ## Detailed Implementation Notes
 
@@ -610,9 +629,9 @@ Default to Lambda container image with FFmpeg. Use Lambda layer only if image pi
 ## Dependencies
 
 - **MFU-WP00-01-IAC**: Required for backend project structure, harness, CI  
-  https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-01-IAC-platform-bootstrap-and-ci.md
+  <https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-01-IAC-platform-bootstrap-and-ci.md>
 - **MFU-WP00-02-BE**: Required for storage abstraction (`backend/lib/storage.ts`) and manifest utilities (`backend/lib/manifest.ts`)  
-  https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-02-BE-manifest-tenancy-and-storage-schema.md
+  <https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-02-BE-manifest-tenancy-and-storage-schema.md>
 - **Future MFUs**: Enables WP01-01 through WP01-07
 
 ## Risks / Open Questions

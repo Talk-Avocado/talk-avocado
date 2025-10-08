@@ -26,6 +26,13 @@ Stand up repository standards, CI checks, environment configuration, storage pat
 
 **Technical Scope**:
 
+- Decisions Adopted (Phase-1):
+  - Orchestration via AWS Step Functions (Standard) is the Phase-1 baseline.
+  - CI adds schema validation, harness lanes (`cuts`, `transitions`, `edit`), and UAT artefact publish.
+  - Logging fields standardized: `{correlationId, tenantId, jobId, step, error.type}`.
+  - Tenant isolation enforced in tests; add `--negative-tests` in harness CI.
+  - Golden tolerances and timeouts read from `docs/uat/uat-config.json`.
+
 - Repository scaffolding (README, ROADMAP)
 - GitHub Actions CI (lint + tests; Node and Python lanes)
 - Environment naming: dev, stage, prod
