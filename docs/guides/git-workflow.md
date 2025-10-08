@@ -24,7 +24,7 @@ MFU (Minimum Feature Unit) is our approach to breaking down work into small, man
 
 ### Branch Strategy
 
-```
+```text
 main (production)
   ↑
 dev (integration)
@@ -41,6 +41,7 @@ mfu-* branches (feature work)
 ### Prerequisites
 
 1. **Required Tools:**
+
    ```bash
    # Git
    git --version
@@ -50,12 +51,14 @@ mfu-* branches (feature work)
    ```
 
 2. **Clone the Repository:**
+
    ```bash
    git clone <repository-url>
    cd talk-avocado
    ```
 
 3. **Make the Workflow Script Executable:**
+
    ```bash
    chmod +x scripts/dev-tools/git-workflow.sh
    ```
@@ -63,12 +66,14 @@ mfu-* branches (feature work)
 ### First Run
 
 Launch the interactive menu:
+
 ```bash
 ./scripts/dev-tools/git-workflow.sh
 ```
 
 You'll see:
-```
+
+```text
 Talk Avocado Development Workflow v3.0.0
 -------------------------------------------
 
@@ -98,17 +103,20 @@ Lint & Docs:
 ### Step 1: Create MFU Branch
 
 **Interactive:**
+
 ```bash
 ./scripts/dev-tools/git-workflow.sh
 # Select option: 1
 ```
 
 **Command Line:**
+
 ```bash
 ./scripts/dev-tools/git-workflow.sh mfu-create
 ```
 
 **What happens:**
+
 1. Shows available MFUs from `docs/mfu-backlog/`
 2. You select an MFU or provide a custom name
 3. Script switches to `dev` branch
@@ -116,7 +124,8 @@ Lint & Docs:
 5. Creates and checks out your new `mfu-*` branch
 
 **Example:**
-```
+
+```text
 Available MFUs in current work cycle:
 
 1) MFU-WP00-01-IAC-platform-bootstrap-and-ci
@@ -133,6 +142,7 @@ Selected: Infrastructure as Code: Platform Bootstrap and CI
 ### Step 2: Work on Your MFU
 
 Make your changes as normal:
+
 ```bash
 # Edit files
 vim podcast-automation/ExtractAudioFromVideo/index.js
@@ -149,17 +159,20 @@ git add .
 #### Regular Commit (with validation)
 
 **Interactive:**
+
 ```bash
 ./scripts/dev-tools/git-workflow.sh
 # Select option: 2
 ```
 
 **Command Line:**
+
 ```bash
 ./scripts/dev-tools/git-workflow.sh mfu-commit
 ```
 
 **What happens:**
+
 1. Validates you're on an MFU branch
 2. Runs smart validation (only validates changed file categories)
 3. Opens structured commit process (see below)
@@ -178,7 +191,7 @@ Use this for rapid iteration during development:
 
 Both commit options use a structured process:
 
-```
+```text
 1. Staging changes...
    Stage all changes? [Y/n]: y
    ✓ All changes staged
@@ -227,7 +240,8 @@ Push changes to remote? [Y/n]: y
 ```
 
 **Example Commit Messages:**
-```
+
+```text
 feat(api): add video rendering endpoint
 fix(scripts): resolve audio extraction timeout
 docs(guides): update MFU workflow documentation
@@ -240,17 +254,20 @@ chore(deps): update AWS SDK to v3.865.0
 When your MFU is ready to merge to `dev`:
 
 **Interactive:**
+
 ```bash
 ./scripts/dev-tools/git-workflow.sh
 # Select option: 4
 ```
 
 **Command Line:**
+
 ```bash
 ./scripts/dev-tools/git-workflow.sh mfu-complete
 ```
 
 **What happens:**
+
 1. Runs final validation
 2. Switches to `dev` branch
 3. Pulls latest changes
@@ -260,20 +277,23 @@ When your MFU is ready to merge to `dev`:
 
 ### Step 5: Release (Dev → Main)
 
-**⚠️ Typically done by team lead or during release cycles**
+**⚠️ Typically done by team lead or during release cycles**:
 
 **Interactive:**
+
 ```bash
 ./scripts/dev-tools/git-workflow.sh
 # Select option: 5
 ```
 
 **Command Line:**
+
 ```bash
 ./scripts/dev-tools/git-workflow.sh mfu-release
 ```
 
 **What happens:**
+
 1. Validates you're on `dev` branch
 2. Runs validation
 3. Switches to `main` branch
@@ -340,7 +360,7 @@ When your MFU is ready to merge to `dev`:
 
 Follow the [Conventional Commits](https://www.conventionalcommits.org/) format:
 
-```
+```text
 <type>(<scope>): <description>
 
 [optional body]
@@ -349,6 +369,7 @@ Follow the [Conventional Commits](https://www.conventionalcommits.org/) format:
 ```
 
 **Types:**
+
 - `feat`: New feature
 - `fix`: Bug fix
 - `docs`: Documentation changes
@@ -361,6 +382,7 @@ Follow the [Conventional Commits](https://www.conventionalcommits.org/) format:
 - `build`: Build system changes
 
 **Scope Examples:**
+
 - `scripts`: Development scripts
 - `lambda`: Lambda functions
 - `docs`: Documentation
@@ -371,12 +393,14 @@ Follow the [Conventional Commits](https://www.conventionalcommits.org/) format:
 ### When to Use Fast Commit
 
 ✅ **Use Fast Commit When:**
+
 - Rapidly iterating on a solution
 - Making frequent small commits during active development
 - Working on experimental code
 - Time-sensitive debugging
 
 ❌ **Don't Use Fast Commit For:**
+
 - Final commits before completing MFU
 - Changes you're about to push to shared branches
 - Code that others will review immediately
@@ -384,12 +408,14 @@ Follow the [Conventional Commits](https://www.conventionalcommits.org/) format:
 ### Validation
 
 The workflow includes smart validation that:
+
 - **Caches results** to avoid redundant checks
 - **Only validates changed categories** (docs, scripts, etc.)
 - **Skips validation** for documentation-only changes
 - **Runs middleware checks** when code changes
 
 **Manual Validation:**
+
 ```bash
 # Check markdown
 ./scripts/dev-tools/git-workflow.sh check-markdown
@@ -401,12 +427,14 @@ The workflow includes smart validation that:
 ### Documentation
 
 Always update documentation when:
+
 - Adding new features
 - Changing workflows
 - Modifying APIs or interfaces
 - Creating new MFUs
 
 **Check and fix markdown issues:**
+
 ```bash
 # Check
 ./scripts/dev-tools/git-workflow.sh check-markdown
@@ -422,6 +450,7 @@ Always update documentation when:
 **Problem:** Trying to commit MFU progress from wrong branch.
 
 **Solution:**
+
 ```bash
 # Check current branch
 git branch
@@ -438,6 +467,7 @@ git checkout MFU-WP00-01-IAC-platform-bootstrap-and-ci
 **Problem:** Code changes don't pass validation checks.
 
 **Solution:**
+
 ```bash
 # Check what failed
 ./scripts/dev-tools/git-workflow.sh validate
@@ -453,6 +483,7 @@ git checkout MFU-WP00-01-IAC-platform-bootstrap-and-ci
 **Problem:** Conflicts when completing MFU or syncing.
 
 **Solution:**
+
 ```bash
 # The script will notify you of conflicts
 # Resolve conflicts manually
@@ -476,6 +507,7 @@ git commit
 **Problem:** Remote branch has changes you don't have locally.
 
 **Solution:**
+
 ```bash
 # Pull latest changes
 git pull origin <your-branch>
@@ -498,6 +530,7 @@ After a work cycle is complete:
 ```
 
 This will:
+
 1. List all local MFU branches
 2. Ask for confirmation
 3. Delete completed branches
@@ -567,4 +600,3 @@ This will:
 ---
 
 **Questions or Issues?** Contact the development team or check the project documentation in `docs/`.
-
