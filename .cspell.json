@@ -1,0 +1,35 @@
+{
+  "version": "0.2",
+  "language": "en",
+  "enableFiletypes": [
+    "markdown"
+  ],
+  "ignorePaths": [
+    "node_modules/**",
+    ".git/**",
+    "*.log",
+    "*.json",
+    "*.js",
+    "*.ts",
+    "*.tsx",
+    "*.jsx",
+    "*.py",
+    "*.sh",
+    "*.yml",
+    "*.yaml",
+    "*.toml",
+    "package-lock.json"
+  ],
+  "files": [
+    "**/*.md"
+  ],
+  "words": [
+    "avocado",
+    "ffmpeg",
+    "mfu",
+    "semver",
+    "tenancy",
+    "webhook",
+    "whisper"
+  ]
+}
