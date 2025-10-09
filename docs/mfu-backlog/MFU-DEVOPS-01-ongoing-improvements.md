@@ -8,13 +8,17 @@ This MFU focuses on improving the development workflow scripts and ensuring cros
 ### 1. Git Workflow Script Validation Issues
 **Problem**: Functions 3) "Commit MFU progress (with validation)" and 4) "Complete MFU" were failing due to validation issues.
 
-**Root Cause**: The `run_structured_commit_process` function expected interactive input but wasn't receiving it properly when called from the command line.
+**Root Causes**: 
+1. The `run_structured_commit_process` function expected interactive input but wasn't receiving it properly when called from the command line
+2. The validation system was incorrectly trying to run frontend and backend validation even when those directories didn't have the required structure (package.json, next.config.js for frontend; pyproject.toml, app/ directory for backend)
 
-**Solution**: 
+**Solutions**: 
 - Created a new `run_non_interactive_commit_process` function specifically for MFU workflows
 - Auto-detects commit type, scope, and description based on changed files
 - Automatically stages, commits, and pushes changes without requiring user input
 - Updated `commit_mfu_progress` function to use the new non-interactive process
+- Enhanced validation logic to only run frontend/backend validation when those directories have the proper structure
+- Fixed `classify_changed_files()` function to properly detect valid frontend/backend contexts
 
 ### 2. Windows Compatibility Issues
 **Problem**: Scripts had several Windows-specific compatibility issues that would prevent them from working correctly on Windows with Git Bash.
