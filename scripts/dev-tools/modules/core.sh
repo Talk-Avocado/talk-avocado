@@ -846,13 +846,22 @@ run_structured_commit_process() {
   echo -e "${BLUE}1. Staging changes...${NC}"
   git status --short
   echo ""
-  read -r -p "Stage all changes? [Y/n]: " stage_changes
-  if [[ ! "$stage_changes" =~ ^[Nn]$ ]]; then
+  
+  # Check if we're in an interactive terminal
+  if [[ -t 0 ]]; then
+    read -r -p "Stage all changes? [Y/n]: " stage_changes
+    if [[ ! "$stage_changes" =~ ^[Nn]$ ]]; then
+      git add .
+      echo -e "${GREEN}✓ All changes staged${NC}"
+    else
+      echo "Please stage your changes manually with: git add <files>"
+      return 1
+    fi
+  else
+    # Non-interactive mode - auto-stage all changes
+    echo "Non-interactive mode: auto-staging all changes"
     git add .
     echo -e "${GREEN}✓ All changes staged${NC}"
-  else
-    echo "Please stage your changes manually with: git add <files>"
-    return 1
   fi
   
   # Prompt for commit type
@@ -951,6 +960,107 @@ run_structured_commit_process() {
     fi
     echo -e "${GREEN}✅ Changes pushed to remote${NC}"
   fi
+  
+  return 0
+}
+
+# Non-interactive commit process for MFU workflow
+run_non_interactive_commit_process() {
+  echo -e "${BLUE}Starting non-interactive commit process...${NC}"
+  
+  ensure_project_root || return 1
+  
+  # Check for uncommitted changes
+  if [[ -z $(git status --porcelain) ]]; then
+    echo -e "${YELLOW}No changes to commit${NC}"
+    return 0
+  fi
+  
+  echo -e "${BLUE}1. Staging changes...${NC}"
+  git status --short
+  echo ""
+  echo "Auto-staging all changes"
+  git add .
+  echo -e "${GREEN}✓ All changes staged${NC}"
+  
+  # Auto-detect commit type based on changed files
+  local changed_files
+  changed_files=$(git diff --cached --name-only)
+  
+  local commit_type=""
+  if echo "$changed_files" | grep -q "\.md$"; then
+    commit_type="docs"
+    echo "Detected documentation changes, using 'docs'"
+  elif echo "$changed_files" | grep -q "scripts/"; then
+    commit_type="chore"
+    echo "Detected script changes, using 'chore'"
+  elif echo "$changed_files" | grep -q "backend/"; then
+    commit_type="feat"
+    echo "Detected backend changes, using 'feat'"
+  else
+    commit_type="feat"
+    echo "Defaulting to 'feat'"
+  fi
+  
+  # Auto-detect scope based on changed files
+  local commit_scope=""
+  if echo "$changed_files" | grep -q "scripts/"; then
+    commit_scope="scripts"
+    echo "Detected script changes, using scope 'scripts'"
+  elif echo "$changed_files" | grep -q "docs/"; then
+    commit_scope="docs"
+    echo "Detected documentation changes, using scope 'docs'"
+  elif echo "$changed_files" | grep -q "backend/"; then
+    commit_scope="api"
+    echo "Detected backend changes, using scope 'api'"
+  else
+    echo "No specific scope detected"
+  fi
+  
+  # Generate description based on changes
+  local commit_description=""
+  if echo "$changed_files" | grep -q "\.md$"; then
+    commit_description="Update documentation"
+  elif echo "$changed_files" | grep -q "scripts/"; then
+    commit_description="Update development scripts"
+  elif echo "$changed_files" | grep -q "backend/"; then
+    commit_description="Update backend implementation"
+  else
+    commit_description="Update project files"
+  fi
+  echo "Generated description: '$commit_description'"
+  
+  # Build commit message
+  local commit_message=""
+  if [[ -n "$commit_scope" ]]; then
+    commit_message="${commit_type}(${commit_scope}): ${commit_description}"
+  else
+    commit_message="${commit_type}: ${commit_description}"
+  fi
+  
+  # Show preview
+  echo ""
+  echo -e "${BLUE}Commit message preview:${NC}"
+  echo -e "${GREEN}$commit_message${NC}"
+  echo ""
+  echo "Auto-confirming commit"
+  
+  # Commit changes
+  echo -e "${BLUE}Committing changes...${NC}"
+  if ! git commit -m "$commit_message"; then
+    echo -e "${RED}❌ Failed to commit changes${NC}"
+    return 1
+  fi
+  
+  echo -e "${GREEN}✅ Changes committed successfully${NC}"
+  
+  # Auto-push
+  echo "Auto-pushing changes"
+  if ! git push -u origin "$(get_current_branch)"; then
+    echo -e "${RED}❌ Failed to push changes${NC}"
+    return 1
+  fi
+  echo -e "${GREEN}✅ Changes pushed to remote${NC}"
   
   return 0
 }
