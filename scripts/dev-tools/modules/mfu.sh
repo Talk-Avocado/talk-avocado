@@ -169,11 +169,21 @@ run_mfu_context_validation() {
   local validation_level="standard"
   local ran_any=0
 
-  # If scripts changed, run all validations
+  # If scripts changed, run all validations for existing directories
   if [[ "$changed_categories" =~ scripts ]]; then
     echo -e "${YELLOW}Scripts changed. Running all validations and invalidating all caches.${NC}"
     clear_validation_cache
-    changed_categories="frontend backend docs config other"
+    # Only include categories that actually exist and have valid structure in this project
+    local all_categories=""
+    if [[ -d "frontend" ]] && [[ -f "frontend/package.json" ]] && [[ -f "frontend/next.config.js" ]]; then
+      all_categories+="frontend "
+    fi
+    if [[ -d "backend" ]] && [[ -f "backend/pyproject.toml" ]] && [[ -d "backend/app" ]]; then
+      all_categories+="backend "
+    fi
+    all_categories+="docs config other"
+    changed_categories="$all_categories"
+    echo "Updated categories to: $changed_categories"
   fi
 
   # If only docs changed
@@ -197,7 +207,7 @@ run_mfu_context_validation() {
       fi
       cd - > /dev/null || return 1
     else
-      echo -e "${YELLOW}⚠️  Frontend changes detected but no frontend directory${NC}"
+      echo -e "${YELLOW}⚠️  Frontend changes detected but no frontend directory - skipping frontend validation${NC}"
     fi
   fi
 
@@ -215,7 +225,7 @@ run_mfu_context_validation() {
       fi
       cd - > /dev/null || return 1
     else
-      echo -e "${YELLOW}⚠️  Backend changes detected but no backend directory${NC}"
+      echo -e "${YELLOW}⚠️  Backend changes detected but no backend directory - skipping backend validation${NC}"
     fi
   fi
 
@@ -591,7 +601,7 @@ show_mfu_performance_metrics() {
   cache_file=$(get_validation_cache_file)
   
   if [[ -f "$cache_file" ]]; then
-    echo "  Last validation: $(date -r "$cache_file")"
+    echo "  Last validation: $(get_file_modification_time "$cache_file")"
     echo "  Cache valid: $(is_validation_cache_valid && echo "Yes" || echo "No")"
     
     if command -v jq &> /dev/null; then
