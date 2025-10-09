@@ -115,3 +115,68 @@ Notes:
 - Letterbox/pillarbox to preserve AR, never stretch.
 - Loudness target −16 LUFS ±1.
 - Default crossfade 500 ms.
+
+## Manifest and Storage Schema (v1.0.0)
+
+### Environment Standards
+- Environments: `dev`, `stage`, `prod`
+- Environment variable: `TALKAVOCADO_ENV` (defaults to `dev`)
+- Storage path: `MEDIA_STORAGE_PATH` (defaults to `./storage`)
+
+### Canonical Storage Layout
+All storage follows the pattern: `{env}/{tenantId}/{jobId}/...`
+
+```
+{env}/                          # dev, stage, prod
+  {tenantId}/                   # [a-z0-9-_] (1-64 chars)
+    {jobId}/                    # UUID for this processing job
+      manifest.json             # canonical job state and artifact registry
+      input/
+        {originalFilename}
+        metadata.json
+      audio/
+        {jobId}.mp3
+        extraction-log.json
+      transcripts/
+        transcript.json
+        captions.source.srt
+        analysis.json
+      plan/
+        cut_plan.json
+        planner-config.json
+        analysis-log.json
+      renders/
+        preview.mp4
+        final.mp4
+        render-log.json
+      subtitles/
+        final.srt
+        style.json
+      logs/
+        pipeline.log
+        errors.json
+```
+
+### Manifest Schema Versioning
+- Current version: `schemaVersion = "1.0.0"`
+- Schema validation: Required on every write operation
+- Service-specific fields: Use `extra.<service>.*` namespace
+- Schema owner: Backend team (see ADR-003)
+
+### Tenant Isolation
+- Tenant ID pattern: `^[a-z0-9](?:[a-z0-9-_]{0,62}[a-z0-9])?$`
+- DynamoDB: Tenant-scoped primary keys (`tenantId` as partition key)
+- IAM: Session tags include `tenantId` for access control
+- Storage: Path-based isolation with no cross-tenant access
+
+### Local vs S3 Mode
+- Phase 1: Local filesystem mode only (`./storage/` root)
+- Phase 2: S3 mode with identical logical keys
+- Compatibility: Legacy mirror mode available via `ENABLE_LEGACY_MIRROR=true`
+
+### Standardized Folder Names
+- `transcripts/` (plural) - matches existing codebase usage
+- `renders/` - all video outputs
+- `subtitles/` - subtitle files (SRT, VTT)
+- `plan/` - cut plans and configuration
+- `logs/` - processing logs and errors

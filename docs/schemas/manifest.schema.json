@@ -1,0 +1,127 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "TalkAvocado Job Manifest",
+  "description": "Canonical job state and artifact registry for video processing pipeline",
+  "type": "object",
+  "required": ["schemaVersion", "env", "tenantId", "jobId", "createdAt", "updatedAt", "status"],
+  "properties": {
+    "schemaVersion": { "type": "string", "const": "1.0.0" },
+    "env": { "type": "string", "enum": ["dev", "stage", "prod", "test"] },
+    "tenantId": {
+      "type": "string",
+      "pattern": "^[a-z0-9](?:[a-z0-9-_]{0,62}[a-z0-9])?$",
+      "description": "Alphanumeric with -/_ between, 1-64 chars"
+    },
+    "jobId": { "type": "string", "format": "uuid" },
+    "status": { "type": "string", "enum": ["pending", "processing", "completed", "failed", "cancelled"] },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "updatedAt": { "type": "string", "format": "date-time" },
+
+    "sourceVideoKey": {
+      "type": "string",
+      "description": "Storage key to the normalized MP4 (if normalized)"
+    },
+
+    "input": {
+      "type": "object",
+      "required": ["sourceKey", "originalFilename", "bytes", "mimeType"],
+      "properties": {
+        "sourceKey": { "type": "string" },
+        "originalFilename": { "type": "string" },
+        "bytes": { "type": "integer", "minimum": 0 },
+        "mimeType": { "type": "string", "pattern": "^(video|audio)/.*" },
+        "checksum": { "type": "string" },
+        "uploadedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+
+    "audio": {
+      "type": "object",
+      "properties": {
+        "key": { "type": "string" },
+        "codec": { "type": "string", "enum": ["mp3", "wav", "aac"] },
+        "durationSec": { "type": "number", "minimum": 0 },
+        "bitrateKbps": { "type": "integer", "minimum": 0 },
+        "sampleRate": { "type": "integer", "enum": [16000, 22050, 44100, 48000] },
+        "extractedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+
+    "transcript": {
+      "type": "object",
+      "properties": {
+        "jsonKey": { "type": "string" },
+        "srtKey": { "type": "string" },
+        "language": { "type": "string", "pattern": "^[a-z]{2}(-[A-Z]{2})?$" },
+        "model": { "type": "string", "enum": ["tiny", "base", "small", "medium", "large"] },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "transcribedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+
+    "plan": {
+      "type": "object",
+      "properties": {
+        "key": { "type": "string" },
+        "schemaVersion": { "type": "string" },
+        "algorithm": { "type": "string" },
+        "totalCuts": { "type": "integer", "minimum": 0 },
+        "plannedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+
+    "renders": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["key", "type", "codec"],
+        "properties": {
+          "key": { "type": "string" },
+          "type": { "type": "string", "enum": ["preview", "final", "thumbnail"] },
+          "codec": { "type": "string", "enum": ["h264", "h265", "vp9"] },
+          "durationSec": { "type": "number", "minimum": 0 },
+          "resolution": { "type": "string", "pattern": "^\\d+x\\d+$" },
+          "notes": { "type": "string" },
+          "renderedAt": { "type": "string", "format": "date-time" }
+        }
+      }
+    },
+
+    "subtitles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["key", "type", "format"],
+        "properties": {
+          "key": { "type": "string" },
+          "type": { "type": "string", "enum": ["source", "final"] },
+          "format": { "type": "string", "enum": ["srt", "vtt"] },
+          "durationSec": { "type": "number", "minimum": 0 },
+          "wordCount": { "type": "integer", "minimum": 0 },
+          "generatedAt": { "type": "string", "format": "date-time" }
+        }
+      }
+    },
+
+    "logs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "key": { "type": "string" },
+          "type": { "type": "string", "enum": ["pipeline", "error", "debug"] },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      }
+    },
+
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "clientVersion": { "type": "string" },
+        "processingTimeMs": { "type": "integer", "minimum": 0 },
+        "tags": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}
