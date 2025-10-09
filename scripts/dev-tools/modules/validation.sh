@@ -282,7 +282,7 @@ show_validation_cache_status() {
   
   if [[ -f "$cache_file" ]]; then
     echo "  Cache file: $cache_file"
-    echo "  Last validation: $(date -r "$cache_file")"
+    echo "  Last validation: $(get_file_modification_time "$cache_file")"
     echo "  Cache valid: $(is_validation_cache_valid && echo "Yes" || echo "No")"
     echo "  Files changed: $(have_files_changed_since_validation && echo "Yes" || echo "No")"
     
