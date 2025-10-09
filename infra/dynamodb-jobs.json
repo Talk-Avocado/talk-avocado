@@ -1,0 +1,33 @@
+{
+  "TableName": "talkavocado-{env}-jobs",
+  "KeySchema": [
+    { "AttributeName": "tenantId", "KeyType": "HASH" },
+    { "AttributeName": "jobSort", "KeyType": "RANGE" }
+  ],
+  "AttributeDefinitions": [
+    { "AttributeName": "tenantId", "AttributeType": "S" },
+    { "AttributeName": "jobSort", "AttributeType": "S" },
+    { "AttributeName": "status", "AttributeType": "S" },
+    { "AttributeName": "createdAt", "AttributeType": "S" }
+  ],
+  "GlobalSecondaryIndexes": [
+    {
+      "IndexName": "tenant-status-index",
+      "KeySchema": [
+        { "AttributeName": "tenantId", "KeyType": "HASH" },
+        { "AttributeName": "status", "KeyType": "RANGE" }
+      ],
+      "Projection": { "ProjectionType": "ALL" }
+    },
+    {
+      "IndexName": "tenant-created-index",
+      "KeySchema": [
+        { "AttributeName": "tenantId", "KeyType": "HASH" },
+        { "AttributeName": "createdAt", "KeyType": "RANGE" }
+      ],
+      "Projection": { "ProjectionType": "ALL" }
+    }
+  ],
+  "BillingMode": "PAY_PER_REQUEST",
+  "StreamSpecification": { "StreamEnabled": true, "StreamViewType": "NEW_AND_OLD_IMAGES" }
+}

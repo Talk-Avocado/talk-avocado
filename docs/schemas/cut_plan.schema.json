@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "TalkAvocado Cut Plan",
+  "description": "Smart cut planning output",
+  "type": "object",
+  "required": ["cuts"],
+  "properties": {
+    "schemaVersion": { "type": "string", "const": "1.0.0" },
+    "source": { "type": "string" },
+    "output": { "type": "string" },
+    "cuts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["start", "end", "type"],
+        "properties": {
+          "start": { "type": "string", "description": "SS.SS | mm:ss(.sss) | hh:mm:ss(.sss)" },
+          "end": { "type": "string", "description": "SS.SS | mm:ss(.sss) | hh:mm:ss(.sss)" },
+          "type": { "type": "string", "enum": ["keep", "cut"], "description": "Segment type: keep for content to retain, cut for content to remove" },
+          "reason": { "type": "string" },
+          "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "processingTimeMs": { "type": "integer", "minimum": 0 },
+        "parameters": { "type": "object" }
+      }
+    }
+  }
+}
