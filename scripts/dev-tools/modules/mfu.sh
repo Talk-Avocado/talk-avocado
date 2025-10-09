@@ -272,8 +272,8 @@ commit_mfu_progress() {
     return 1
   fi
   
-  # Use the structured commit process
-  run_structured_commit_process
+  # Use the non-interactive commit process for MFU workflow
+  run_non_interactive_commit_process
 }
 
 # Fast MFU progress commit (skips validation for rapid development)
