@@ -24,6 +24,7 @@
     "**/*.md"
   ],
   "words": [
+    "adrs",
     "avocado",
     "ffmpeg",
     "mfu",
