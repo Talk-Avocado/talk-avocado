@@ -11,6 +11,36 @@ BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
+# Windows compatibility helper
+is_windows() {
+  [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "cygwin" ]] || [[ "$OSTYPE" == "win32" ]]
+}
+
+# Cross-platform date command wrapper
+get_file_modification_time() {
+  local file="$1"
+  if is_windows; then
+    # Windows Git Bash - use GNU date with stat
+    date -d "@$(stat -c %Y "$file" 2>/dev/null || echo "0")" 2>/dev/null || echo "Unknown"
+  else
+    # Unix-like systems - use BSD date
+    date -r "$file" 2>/dev/null || echo "Unknown"
+  fi
+}
+
+# Cross-platform timestamp to date conversion
+timestamp_to_date() {
+  local timestamp="$1"
+  local format="${2:-%Y-%m-%d %H:%M:%S}"
+  if is_windows; then
+    # Windows Git Bash - use GNU date format
+    date -d "@$timestamp" "+$format" 2>/dev/null || echo ""
+  else
+    # Unix-like systems - use BSD date format
+    date -r "$timestamp" "+$format" 2>/dev/null || echo ""
+  fi
+}
+
 # Ensure we're in the frontend context
 ensure_frontend_context() {
   if [[ -f "package.json" ]] && [[ -f "next.config.js" ]]; then
@@ -63,7 +93,15 @@ get_current_branch() {
 
 # Validation cache functions
 get_validation_cache_file() {
-  local cache_dir="$HOME/.cache/consultancy-platform/validation"
+  # Cross-platform cache directory
+  local cache_dir
+  if [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "cygwin" ]]; then
+    # Windows Git Bash
+    cache_dir="$HOME/.cache/consultancy-platform/validation"
+  else
+    # Unix-like systems
+    cache_dir="$HOME/.cache/consultancy-platform/validation"
+  fi
   mkdir -p "$cache_dir"
   echo "$cache_dir/validation_cache.json"
 }
@@ -113,9 +151,9 @@ have_files_changed_since_validation() {
     return 0 # Files have "changed" if no cache exists
   fi
   
-  # Convert timestamp to date format for git
+  # Convert timestamp to date format for git (cross-platform)
   local cache_date
-  cache_date=$(date -r "$cache_timestamp" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || echo "")
+  cache_date=$(timestamp_to_date "$cache_timestamp" "%Y-%m-%d %H:%M:%S")
   
   if [[ -z "$cache_date" ]]; then
     return 0 # If we can't parse the timestamp, assume files changed
@@ -1283,14 +1321,32 @@ classify_changed_files() {
   cache_timestamp=$(get_validation_cache_timestamp)
 
   if [[ "$cache_timestamp" == "0" ]]; then
-    echo "frontend backend scripts docs config other"
+    # First run - only return categories that actually exist and have valid structure in this project
+    local categories=""
+    if [[ -d "frontend" ]] && [[ -f "frontend/package.json" ]] && [[ -f "frontend/next.config.js" ]]; then
+      categories+="frontend "
+    fi
+    if [[ -d "backend" ]] && [[ -f "backend/pyproject.toml" ]] && [[ -d "backend/app" ]]; then
+      categories+="backend "
+    fi
+    categories+="scripts docs config other"
+    echo "$categories" | xargs # trim
     return 0
   fi
 
   local cache_date
-  cache_date=$(date -r "$cache_timestamp" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || echo "")
+  cache_date=$(timestamp_to_date "$cache_timestamp" "%Y-%m-%d %H:%M:%S")
   if [[ -z "$cache_date" ]]; then
-    echo "frontend backend scripts docs config other"
+    # Fallback - only return categories that actually exist and have valid structure in this project
+    local categories=""
+    if [[ -d "frontend" ]] && [[ -f "frontend/package.json" ]] && [[ -f "frontend/next.config.js" ]]; then
+      categories+="frontend "
+    fi
+    if [[ -d "backend" ]] && [[ -f "backend/pyproject.toml" ]] && [[ -d "backend/app" ]]; then
+      categories+="backend "
+    fi
+    categories+="scripts docs config other"
+    echo "$categories" | xargs # trim
     return 0
   fi
 
