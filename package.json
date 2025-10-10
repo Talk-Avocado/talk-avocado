@@ -1,0 +1,21 @@
+{
+  "name": "talk-avocado",
+  "version": "1.0.0",
+  "description": "TalkAvocado video processing pipeline",
+  "type": "commonjs",
+  "scripts": {
+    "test": "bash scripts/test.sh",
+    "setup": "bash scripts/setup.sh",
+    "format": "bash scripts/format.sh",
+    "harness": "node tools/harness/run-local-pipeline-simple.cjs"
+  },
+  "dependencies": {
+    "uuid": "^13.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

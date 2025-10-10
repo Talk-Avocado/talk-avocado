@@ -1,0 +1,8 @@
+{
+  "schemaVersion": "1.0.0",
+  "generatedAt": "2025-10-01T12:00:00Z",
+  "ffmpegVersion": "6.0",
+  "description": "Sample golden for short test video",
+  "inputFile": "sample-short.mp4",
+  "duration": "30 seconds"
+}

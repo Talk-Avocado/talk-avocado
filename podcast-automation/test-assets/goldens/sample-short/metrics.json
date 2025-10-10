@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "1.0.0",
+  "generatedAt": "2025-10-01T12:00:00Z",
+  "audio": {
+    "durationSec": 30.5,
+    "_tolerance": 0.1
+  },
+  "transcript": {
+    "wordCount": 38,
+    "_tolerance": 5
+  },
+  "plan": {
+    "cutsCount": 3,
+    "_exact": true
+  },
+  "render": {
+    "durationSec": 28.2,
+    "_tolerance": 0.1
+  }
+}
