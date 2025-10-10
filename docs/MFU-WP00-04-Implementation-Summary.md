@@ -14,13 +14,16 @@ Successfully implemented the orchestration skeleton and job status API for TalkA
 ### 🏗️ **Architecture Components**
 
 #### 1. API Layer (`backend/lib/api/jobs/`)
+
 - **`createJob.ts`**: POST /jobs endpoint for job creation
 - **`getJob.ts`**: GET /jobs/{jobId} endpoint for job status retrieval
 
 #### 2. Orchestration Layer (`orchestration/state-machines/`)
+
 - **`pipeline.asl.json`**: AWS Step Functions state machine definition
 
 #### 3. Service Handlers (`backend/services/`)
+
 - **`mark-processing/`**: Updates job status to "processing"
 - **`mark-complete/`**: Updates job status to "completed"
 - **`mark-failed/`**: Updates job status to "failed" with error logging
@@ -28,6 +31,7 @@ Successfully implemented the orchestration skeleton and job status API for TalkA
 ### 🔧 **Key Features Implemented**
 
 #### Job Creation API
+
 ```typescript
 POST /jobs
 {
@@ -41,6 +45,7 @@ POST /jobs
 ```
 
 **Response (201)**:
+
 ```json
 {
   "jobId": "2ac30e88-b30d-43fc-8b19-cb3b265ef5f4",
@@ -52,11 +57,13 @@ POST /jobs
 ```
 
 #### Job Status API
+
 ```typescript
 GET /jobs/{jobId}?tenantId=demo-tenant
 ```
 
 **Response (200)**:
+
 ```json
 {
   "jobId": "2ac30e88-b30d-43fc-8b19-cb3b265ef5f4",
@@ -97,6 +104,7 @@ The AWS Step Functions state machine implements the complete pipeline:
 ```
 
 **Key Features**:
+
 - Retry logic for transient errors (`TRANSIENT_DEPENDENCY`, `TIMEOUT`)
 - Error handling with catch blocks routing to `mark-failed`
 - Conditional transitions (transitions step is optional)
@@ -105,12 +113,14 @@ The AWS Step Functions state machine implements the complete pipeline:
 ### 🔒 **Security & Isolation**
 
 #### Tenant Isolation
+
 - All operations require and validate `tenantId`
 - Tenant ID format validation: `^[a-z0-9](?:[a-z0-9-_]{0,62}[a-z0-9])?$`
 - Cross-tenant access prevention in all API endpoints
 - Tenant-scoped DynamoDB keys: `{tenantId}#{jobSort}`
 
 #### Input Validation
+
 - Required field validation for `tenantId`
 - MIME type validation for media files
 - File size and metadata validation
@@ -119,7 +129,9 @@ The AWS Step Functions state machine implements the complete pipeline:
 ### 📊 **Observability Integration**
 
 #### Structured Logging
+
 All components use Powertools logging with consistent fields:
+
 ```typescript
 {
   correlationId: "test-correlation-123",
@@ -131,6 +143,7 @@ All components use Powertools logging with consistent fields:
 ```
 
 #### Error Tracking
+
 - Comprehensive error logging with stack traces
 - Error categorization (validation, not found, internal)
 - Correlation ID propagation through all error paths
@@ -138,12 +151,14 @@ All components use Powertools logging with consistent fields:
 ### 💾 **Storage Implementation**
 
 #### Local-First Approach
+
 - All operations use local filesystem in Phase 1
 - S3-compatible key structure: `{env}/{tenantId}/{jobId}/...`
 - Manifest-driven artifact tracking
 - Mock DynamoDB for local development
 
 #### Manifest Integration
+
 - Uses canonical manifest schema from WP00-02
 - Schema validation on every write operation
 - Progressive artifact registration
@@ -152,7 +167,8 @@ All components use Powertools logging with consistent fields:
 ### 🧪 **Testing & Validation**
 
 #### Smoke Test Results
-```
+
+```text
 🧪 Starting MFU-WP00-04 smoke test...
 Environment: dev
 Storage path: ./storage
@@ -183,11 +199,13 @@ Storage path: ./storage
 ## Dependencies Satisfied
 
 ### ✅ **Hard Dependencies**
+
 - **MFU-WP00-01**: Repository scaffolding and CI ✅
 - **MFU-WP00-02**: Manifest schema and storage abstraction ✅  
 - **MFU-WP00-03**: Observability wrappers and logging ✅
 
 ### 🔗 **Integration Points**
+
 - Uses `backend/lib/storage.ts` for path management
 - Uses `backend/lib/manifest.ts` for schema validation
 - Uses `backend/lib/logging.ts` for structured logging
@@ -195,7 +213,7 @@ Storage path: ./storage
 
 ## File Structure
 
-```
+```text
 backend/lib/api/jobs/
 ├── createJob.ts          # POST /jobs handler
 └── getJob.ts             # GET /jobs/{jobId} handler
@@ -232,11 +250,13 @@ storage/dev/demo-tenant/
 ## Next Steps
 
 ### Immediate (Phase 1)
+
 1. **Integration Testing**: Connect with existing service handlers from `podcast-automation`
 2. **Harness Integration**: Update `tools/harness/run-local-pipeline.js` to use new API
 3. **Error Scenarios**: Test failure paths and recovery mechanisms
 
 ### Future (WP01)
+
 1. **AWS Deployment**: Replace mock DynamoDB with real AWS DynamoDB
 2. **Step Functions**: Deploy actual AWS Step Functions state machine
 3. **S3 Integration**: Replace local storage with S3 bindings
