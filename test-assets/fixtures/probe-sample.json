@@ -1,0 +1,17 @@
+{
+  "format": {
+    "format_name": "string",
+    "duration": "number",
+    "size": "number",
+    "bit_rate": "number"
+  },
+  "streams": [
+    {
+      "codec_type": "video|audio",
+      "codec_name": "string",
+      "width": "number (video)",
+      "height": "number (video)",
+      "sample_rate": "number (audio)"
+    }
+  ]
+}
