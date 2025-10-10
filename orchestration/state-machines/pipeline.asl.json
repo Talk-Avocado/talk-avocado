@@ -1,0 +1,210 @@
+{
+  "Comment": "TalkAvocado Phase-1 Pipeline - Orchestration Skeleton",
+  "StartAt": "mark-processing",
+  "States": {
+    "mark-processing": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:talkavocado-${Env}-mark-processing",
+      "Next": "audio-extraction",
+      "Retry": [
+        {
+          "ErrorEquals": ["TRANSIENT_DEPENDENCY", "TIMEOUT"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "mark-failed",
+          "ResultPath": "$.error"
+        }
+      ]
+    },
+    "audio-extraction": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:talkavocado-${Env}-audio-extraction",
+      "Next": "transcription",
+      "Retry": [
+        {
+          "ErrorEquals": ["TRANSIENT_DEPENDENCY", "TIMEOUT"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "mark-failed",
+          "ResultPath": "$.error"
+        }
+      ]
+    },
+    "transcription": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:talkavocado-${Env}-transcription",
+      "Next": "smart-cut-planner",
+      "Retry": [
+        {
+          "ErrorEquals": ["TRANSIENT_DEPENDENCY", "TIMEOUT"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "mark-failed",
+          "ResultPath": "$.error"
+        }
+      ]
+    },
+    "smart-cut-planner": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:talkavocado-${Env}-smart-cut-planner",
+      "Next": "video-cuts",
+      "Retry": [
+        {
+          "ErrorEquals": ["TRANSIENT_DEPENDENCY", "TIMEOUT"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "mark-failed",
+          "ResultPath": "$.error"
+        }
+      ]
+    },
+    "video-cuts": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:talkavocado-${Env}-video-cuts",
+      "Next": "transitions-choice",
+      "Retry": [
+        {
+          "ErrorEquals": ["TRANSIENT_DEPENDENCY", "TIMEOUT"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "mark-failed",
+          "ResultPath": "$.error"
+        }
+      ]
+    },
+    "transitions-choice": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.applyTransitions",
+          "BooleanEquals": true,
+          "Next": "video-transitions"
+        }
+      ],
+      "Default": "subtitles-post-edit"
+    },
+    "video-transitions": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:talkavocado-${Env}-video-transitions",
+      "Next": "subtitles-post-edit",
+      "Retry": [
+        {
+          "ErrorEquals": ["TRANSIENT_DEPENDENCY", "TIMEOUT"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "mark-failed",
+          "ResultPath": "$.error"
+        }
+      ]
+    },
+    "subtitles-post-edit": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:talkavocado-${Env}-subtitles-post-edit",
+      "Next": "branding-layer",
+      "Retry": [
+        {
+          "ErrorEquals": ["TRANSIENT_DEPENDENCY", "TIMEOUT"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "mark-failed",
+          "ResultPath": "$.error"
+        }
+      ]
+    },
+    "branding-layer": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:talkavocado-${Env}-branding-layer",
+      "Next": "mark-complete",
+      "Retry": [
+        {
+          "ErrorEquals": ["TRANSIENT_DEPENDENCY", "TIMEOUT"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "mark-failed",
+          "ResultPath": "$.error"
+        }
+      ]
+    },
+    "mark-complete": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:talkavocado-${Env}-mark-complete",
+      "End": true,
+      "Retry": [
+        {
+          "ErrorEquals": ["TRANSIENT_DEPENDENCY", "TIMEOUT"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "mark-failed",
+          "ResultPath": "$.error"
+        }
+      ]
+    },
+    "mark-failed": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:talkavocado-${Env}-mark-failed",
+      "End": true,
+      "Retry": [
+        {
+          "ErrorEquals": ["TRANSIENT_DEPENDENCY", "TIMEOUT"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3,
+          "BackoffRate": 2.0
+        }
+      ]
+    }
+  }
+}

@@ -45,7 +45,7 @@ class FFmpegRuntime {
 
       return true;
     } catch (error) {
-      this.logger.error('FFmpeg runtime validation failed', { error: error.message });
+      this.logger.error('FFmpeg runtime validation failed', { error: error instanceof Error ? error.message : String(error) });
       return false;
     }
   }
@@ -102,8 +102,8 @@ class FFmpegRuntime {
         command,
         operation,
         duration,
-        error: error.message,
-        stderr: error.stderr || ''
+        error: error instanceof Error ? error.message : String(error),
+        stderr: (error as any).stderr || ''
       });
 
       throw error;
@@ -140,15 +140,15 @@ class FFmpegRuntime {
         let stdout = '';
         let stderr = '';
 
-        child.stdout.on('data', (data) => {
+        child.stdout.on('data', (data: any) => {
           stdout += data.toString();
         });
 
-        child.stderr.on('data', (data) => {
+        child.stderr.on('data', (data: any) => {
           stderr += data.toString();
         });
 
-        child.on('close', (code) => {
+        child.on('close', (code: any) => {
           const duration = Date.now() - startTime;
 
           if (code === 0) {
@@ -186,7 +186,7 @@ class FFmpegRuntime {
           }
         });
 
-        child.on('error', (error) => {
+        child.on('error', (error: any) => {
           const duration = Date.now() - startTime;
           
           this.metrics.recordFFmpegExecution(command, duration, false);
@@ -223,7 +223,7 @@ class FFmpegRuntime {
           command,
           operation,
           duration,
-          error: error.message
+          error: error instanceof Error ? error.message : String(error)
         });
 
         if (subsegment) {
@@ -262,7 +262,7 @@ class FFmpegRuntime {
       this.metrics.recordTmpUsage(tmpUsage);
       return tmpUsage;
     } catch (error) {
-      this.logger.warn('Could not check /tmp space', { error: error.message });
+      this.logger.warn('Could not check /tmp space', { error: error instanceof Error ? error.message : String(error) });
       return 0;
     }
   }

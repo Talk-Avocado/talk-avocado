@@ -19,6 +19,12 @@ function initObservability({
   tenantId,
   jobId,
   step,
+}: {
+  serviceName: string;
+  correlationId: string;
+  tenantId: string;
+  jobId: string;
+  step: string;
 }) {
   const logger = new Logger({
     serviceName: process.env.POWERTOOLS_SERVICE_NAME || 'TalkAvocado/MediaProcessing',
