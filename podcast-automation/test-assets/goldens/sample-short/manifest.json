@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "1.0.0",
+  "env": "dev",
+  "tenantId": "t-local",
+  "status": "completed",
+  "audio": { "codec": "mp3" },
+  "transcript": { "language": "en" },
+  "plan": { "schemaVersion": "1.0.0" },
+  "renders": [
+    { "type": "preview", "codec": "h264" }
+  ]
+}

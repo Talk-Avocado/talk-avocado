@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// tools/harness/run-local-pipeline.js
+// tools/harness/run-local-pipeline.cjs
 const { parseArgs } = require('node:util');
 const { readFileSync, copyFileSync } = require('node:fs');
 const { v4: uuidv4 } = require('uuid');
@@ -97,7 +97,7 @@ async function main() {
   // 5. Compare goldens if provided
   if (values.goldens) {
     console.log(`[harness] Comparing against goldens: ${values.goldens}`);
-    const { compareGoldens } = require('./compare-goldens');
+    const { compareGoldens } = require('./compare-goldens.cjs');
     const passed = await compareGoldens({
       actualPath: pathFor(keyFor(env, tenantId, jobId)),
       goldensPath: values.goldens,

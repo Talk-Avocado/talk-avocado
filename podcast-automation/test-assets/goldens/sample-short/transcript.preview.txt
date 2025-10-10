@@ -1,0 +1,1 @@
+This is a sample transcript for testing the harness. It contains about forty-five words to match the expected word count in the metrics. The transcript should be processed correctly by the transcripti
