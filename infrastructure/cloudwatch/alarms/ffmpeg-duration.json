@@ -1,0 +1,52 @@
+{
+  "alarms": [
+    {
+      "AlarmName": "TalkAvocado-FFmpeg-Duration-High",
+      "AlarmDescription": "FFmpeg execution duration is above threshold",
+      "MetricName": "FFmpegExecTime",
+      "Namespace": "TalkAvocado",
+      "Statistic": "Average",
+      "Period": 300,
+      "EvaluationPeriods": 2,
+      "Threshold": 300000.0,
+      "ComparisonOperator": "GreaterThanThreshold",
+      "TreatMissingData": "notBreaching",
+      "Dimensions": [
+        {
+          "Name": "Service",
+          "Value": "MediaProcessing"
+        }
+      ],
+      "AlarmActions": [
+        "arn:aws:sns:us-east-1:123456789012:TalkAvocado-Alerts"
+      ],
+      "OKActions": [
+        "arn:aws:sns:us-east-1:123456789012:TalkAvocado-Alerts"
+      ]
+    },
+    {
+      "AlarmName": "TalkAvocado-Lambda-Duration-P95-High",
+      "AlarmDescription": "Lambda function duration P95 is above 90% of timeout",
+      "MetricName": "Duration",
+      "Namespace": "AWS/Lambda",
+      "Statistic": "Average",
+      "Period": 300,
+      "EvaluationPeriods": 2,
+      "Threshold": 270000.0,
+      "ComparisonOperator": "GreaterThanThreshold",
+      "TreatMissingData": "notBreaching",
+      "Dimensions": [
+        {
+          "Name": "FunctionName",
+          "Value": "audio-extraction"
+        }
+      ],
+      "AlarmActions": [
+        "arn:aws:sns:us-east-1:123456789012:TalkAvocado-Alerts"
+      ],
+      "OKActions": [
+        "arn:aws:sns:us-east-1:123456789012:TalkAvocado-Alerts"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+{
+  "version": "ffmpeg version",
+  "configuration": [],
+  "note": "Expected to contain libx264, libmp3lame, libopus codecs"
+}

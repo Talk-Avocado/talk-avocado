@@ -1,0 +1,14 @@
+{
+  "name": "ffmpeg-test-function",
+  "version": "1.0.0",
+  "description": "FFmpeg runtime validation function for Lambda",
+  "main": "handler.js",
+  "scripts": {
+    "test": "node handler.js"
+  },
+  "dependencies": {},
+  "devDependencies": {},
+  "keywords": ["ffmpeg", "lambda", "validation", "runtime"],
+  "author": "Talk Avocado Team",
+  "license": "MIT"
+}

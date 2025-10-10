@@ -1,0 +1,7 @@
+{
+  "ffmpegAvailable": true,
+  "ffprobeAvailable": true,
+  "requiredCodecs": ["libx264", "libmp3lame", "libopus"],
+  "codecsPresent": [],
+  "validationPassed": true
+}

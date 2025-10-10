@@ -1,4 +1,4 @@
-// ExtractAudioFromVideo.js — Perfected Streaming Edition
+// ExtractAudioFromVideo.js — Enhanced with Observability
 const { S3Client, GetObjectCommand, PutObjectCommand } = require("@aws-sdk/client-s3");
 const { LambdaClient, InvokeCommand } = require("@aws-sdk/client-lambda");
 const { spawn, execSync } = require("child_process");
@@ -6,16 +6,35 @@ const { tmpdir } = require("os");
 const { join, basename } = require("path");
 const { createWriteStream, readFileSync, unlinkSync, existsSync } = require("fs");
 
+// Import observability wrappers
+const { initObservability } = require('../../lib/init-observability');
+const { FFmpegRuntime } = require('../../lib/ffmpeg-runtime');
+
 const s3 = new S3Client({ region: process.env.AWS_REGION });
 const lambda = new LambdaClient({ region: process.env.AWS_REGION });
 
-exports.handler = async (event) => {
-  console.log("✅ Lambda triggered");
-  console.log("📦 Event payload:", JSON.stringify(event));
+exports.handler = async (event, context) => {
+  // Initialize observability
+  const { logger, metrics, tracer } = initObservability({
+    serviceName: 'AudioExtraction',
+    correlationId: context?.awsRequestId || 'local-' + Date.now(),
+    tenantId: event.tenantId || 'default',
+    jobId: event.jobId || 'unknown',
+    step: 'audio-extraction',
+  });
+
+  const ffmpeg = new FFmpegRuntime(logger, metrics, tracer);
+
+  logger.info('Audio extraction Lambda triggered', { 
+    eventType: event.Records ? 'S3Event' : 'DirectInvoke',
+    recordCount: event.Records?.length || 0 
+  });
 
   const record = event.Records?.[0];
   if (!record) {
-    console.error("❌ No event record found");
+    logger.error('No event record found');
+    metrics.addCount('AudioExtractionError', { ErrorType: 'NoRecord' });
+    metrics.publishStoredMetrics();
     return { statusCode: 400, body: "No event record" };
   }
 
@@ -28,40 +47,48 @@ exports.handler = async (event) => {
   const normalizedPath = join(tmpdir(), `${nameWithoutExt}.mp4`);
   const tempOutputPath = join(tmpdir(), `${nameWithoutExt}.mp3`);
 
+  logger.info('Starting audio extraction', { 
+    bucket, 
+    key, 
+    originalName, 
+    nameWithoutExt 
+  });
+
   try {
+    // Validate FFmpeg runtime
+    if (!(await ffmpeg.validateRuntime())) {
+      throw new Error('FFmpeg runtime validation failed');
+    }
+
     // ⬇️ Stream from S3 → Local disk
-    console.log(`⬇️ Streaming download from S3: ${key}`);
+    logger.info('Streaming download from S3', { key });
     await streamS3ToFile(bucket, key, tempInputPath);
 
     // 🔄 Convert to MP4 if needed
     let inputForAudio = tempInputPath;
     if (!key.toLowerCase().endsWith(".mp4")) {
-      console.log("🔄 Converting to .mp4");
-      execSync(`ffmpeg -i "${tempInputPath}" -c:v libx264 -crf 23 -preset fast -c:a aac -b:a 128k -y "${normalizedPath}"`, { stdio: "inherit" });
+      logger.info('Converting to MP4 format');
+      const convertCommand = `ffmpeg -i "${tempInputPath}" -c:v libx264 -crf 23 -preset fast -c:a aac -b:a 128k -y "${normalizedPath}"`;
+      await ffmpeg.executeCommand(convertCommand, 'VideoConversion');
       inputForAudio = normalizedPath;
     }
 
     // 📤 Save final MP4 to S3
     const finalVideoKey = `mp4/${nameWithoutExt}.mp4`;
     await uploadFileToS3(bucket, finalVideoKey, inputForAudio, "video/mp4");
-    console.log(`📤 .mp4 saved as: ${finalVideoKey}`);
+    logger.info('MP4 saved to S3', { key: finalVideoKey });
 
     // 🎧 Extract MP3 audio
-    console.log("🎧 Extracting audio...");
-    await runFfmpeg([
-      "-i", inputForAudio,
-      "-vn",
-      "-acodec", "libmp3lame",
-      "-b:a", "128k",
-      tempOutputPath
-    ]);
+    logger.info('Extracting audio to MP3');
+    const audioExtractCommand = `ffmpeg -i "${inputForAudio}" -vn -acodec libmp3lame -b:a 128k "${tempOutputPath}"`;
+    await ffmpeg.executeCommand(audioExtractCommand, 'AudioExtraction');
 
     if (!existsSync(tempOutputPath)) throw new Error(".mp3 not created");
 
     // 📤 Save MP3 to S3
     const audioKey = `mp3/${nameWithoutExt}.mp3`;
     await uploadFileToS3(bucket, audioKey, tempOutputPath, "audio/mpeg");
-    console.log(`📤 .mp3 saved as: ${audioKey}`);
+    logger.info('MP3 saved to S3', { key: audioKey });
 
     // 🚀 Trigger StartTranscriptionJob Lambda
     await lambda.send(new InvokeCommand({
@@ -71,15 +98,42 @@ exports.handler = async (event) => {
         Records: [{ s3: { bucket: { name: bucket }, object: { key: audioKey } } }]
       })
     }));
-    console.log("🚀 StartTranscriptionJob invoked");
+    logger.info('StartTranscriptionJob invoked', { audioKey });
 
     // 🧹 Cleanup
     [tempInputPath, tempOutputPath, normalizedPath].forEach(p => existsSync(p) && unlinkSync(p));
 
-    return { statusCode: 200, body: `Extracted and uploaded ${audioKey}` };
+    // Record success metrics
+    metrics.addCount('AudioExtractionSuccess');
+    metrics.publishStoredMetrics();
+
+    logger.info('Audio extraction completed successfully', { 
+      audioKey, 
+      finalVideoKey,
+      correlationId: context?.awsRequestId 
+    });
+
+    return { 
+      statusCode: 200, 
+      body: `Extracted and uploaded ${audioKey}`,
+      correlationId: context?.awsRequestId 
+    };
   } catch (error) {
-    console.error("🔥 Lambda failed:", error);
-    return { statusCode: 500, body: `Error: ${error.message}` };
+    logger.error('Audio extraction failed', { 
+      error: error.message, 
+      stack: error.stack,
+      bucket,
+      key 
+    });
+    
+    metrics.addCount('AudioExtractionError', { ErrorType: error.name || 'Unknown' });
+    metrics.publishStoredMetrics();
+    
+    return { 
+      statusCode: 500, 
+      body: `Error: ${error.message}`,
+      correlationId: context?.awsRequestId 
+    };
   }
 };
 
@@ -134,13 +188,3 @@ async function uploadFileToS3(bucket, key, filePath, contentType) {
 }
 
 
-/**
- * Run ffmpeg command with logging
- */
-function runFfmpeg(args) {
-  return new Promise((resolve, reject) => {
-    const ffmpeg = spawn("ffmpeg", args);
-    ffmpeg.stderr.on("data", data => console.log("ffmpeg:", data.toString()));
-    ffmpeg.on("close", code => (code === 0 ? resolve() : reject(new Error(`ffmpeg exited with code ${code}`))));
-  });
-}

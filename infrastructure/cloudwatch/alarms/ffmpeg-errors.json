@@ -1,0 +1,52 @@
+{
+  "alarms": [
+    {
+      "AlarmName": "TalkAvocado-FFmpeg-ErrorRate-High",
+      "AlarmDescription": "FFmpeg error rate is above 5%",
+      "MetricName": "ErrorRate",
+      "Namespace": "TalkAvocado",
+      "Statistic": "Average",
+      "Period": 300,
+      "EvaluationPeriods": 2,
+      "Threshold": 5.0,
+      "ComparisonOperator": "GreaterThanThreshold",
+      "TreatMissingData": "notBreaching",
+      "Dimensions": [
+        {
+          "Name": "Service",
+          "Value": "MediaProcessing"
+        }
+      ],
+      "AlarmActions": [
+        "arn:aws:sns:us-east-1:123456789012:TalkAvocado-Alerts"
+      ],
+      "OKActions": [
+        "arn:aws:sns:us-east-1:123456789012:TalkAvocado-Alerts"
+      ]
+    },
+    {
+      "AlarmName": "TalkAvocado-FFmpeg-DLQ-Messages",
+      "AlarmDescription": "Dead Letter Queue has messages",
+      "MetricName": "ApproximateNumberOfVisibleMessages",
+      "Namespace": "AWS/SQS",
+      "Statistic": "Average",
+      "Period": 300,
+      "EvaluationPeriods": 1,
+      "Threshold": 0.0,
+      "ComparisonOperator": "GreaterThanThreshold",
+      "TreatMissingData": "notBreaching",
+      "Dimensions": [
+        {
+          "Name": "QueueName",
+          "Value": "TalkAvocado-FFmpeg-DLQ"
+        }
+      ],
+      "AlarmActions": [
+        "arn:aws:sns:us-east-1:123456789012:TalkAvocado-Alerts"
+      ],
+      "OKActions": [
+        "arn:aws:sns:us-east-1:123456789012:TalkAvocado-Alerts"
+      ]
+    }
+  ]
+}

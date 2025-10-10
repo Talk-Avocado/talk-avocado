@@ -1,0 +1,121 @@
+[33mcommit 1ed3bbe22c2403866abf0250a3e5207a3776f4c2[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mMFU-WP00-02-BE-manifest-tenancy-and-storage-schema[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/dev[m[33m, [m[1;31morigin/HEAD[m[33m, [m[1;32mmain[m[33m)[m
+Merge: fd1d9ba c1abf66
+Author: Stephen Bavister <sb@connectedstate.co.uk>
+Date:   Thu Oct 9 20:59:07 2025 +0100
+
+    Merge branch 'MFU-DEVOPS-01-ongoing-improvements' into dev
+
+ docs/{ => guides}/WINDOWS_COMPATIBILITY.md | 0
+ 1 file changed, 0 insertions(+), 0 deletions(-)
+
+[33mcommit c1abf66862830fedea7d6b49312ad2ccceb6dbfb[m
+Author: Stephen Bavister <sb@connectedstate.co.uk>
+Date:   Thu Oct 9 20:59:02 2025 +0100
+
+    docs(docs): Update documentation
+
+ docs/{ => guides}/WINDOWS_COMPATIBILITY.md | 0
+ 1 file changed, 0 insertions(+), 0 deletions(-)
+
+[33mcommit fd1d9ba957362246921b01b3a1346faab300503a[m
+Merge: 2d608d4 c8028fb
+Author: Stephen Bavister <sb@connectedstate.co.uk>
+Date:   Thu Oct 9 20:57:48 2025 +0100
+
+    Merge branch 'MFU-DEVOPS-01-ongoing-improvements' into dev
+
+ .../MFU-DEVOPS-01-ongoing-improvements.md          | 33 [32m+++++++++++++++++++[m[31m---[m
+ 1 file changed, 29 insertions(+), 4 deletions(-)
+
+[33mcommit c8028fbae6bf158ffed6b4523f353a42ff8c4868[m
+Author: Stephen Bavister <sb@connectedstate.co.uk>
+Date:   Thu Oct 9 20:57:37 2025 +0100
+
+    docs(docs): Update documentation
+
+ .../MFU-DEVOPS-01-ongoing-improvements.md          | 29 [32m+++++++++++++++++++[m[31m---[m
+ 1 file changed, 25 insertions(+), 4 deletions(-)
+
+[33mcommit 15156a5e7dd9fe2aca30f5ba6289a4910b09859d[m
+Author: Stephen Bavister <sb@connectedstate.co.uk>
+Date:   Thu Oct 9 20:56:27 2025 +0100
+
+    docs(docs): Update documentation
+
+ docs/mfu-backlog/MFU-DEVOPS-01-ongoing-improvements.md | 8 [32m++++++[m[31m--[m
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+[33mcommit 2d608d436f9a42c89d1583dfa2cda7741a9363ca[m
+Merge: 8a0a6cb 266e430
+Author: Stephen Bavister <sb@connectedstate.co.uk>
+Date:   Thu Oct 9 20:55:50 2025 +0100
+
+    Merge branch 'MFU-DEVOPS-01-ongoing-improvements' into dev
+
+ docs/WINDOWS_COMPATIBILITY.md                      | 225 [32m+++++++++++++++++++++[m
+ .../MFU-DEVOPS-01-ongoing-improvements.md          | 116 [32m+++++++++++[m
+ scripts/dev-tools/modules/core.sh                  |  68 [32m++++++[m[31m-[m
+ scripts/dev-tools/modules/mfu.sh                   |  20 [32m+[m[31m-[m
+ scripts/dev-tools/modules/validation.sh            |   2 [32m+[m[31m-[m
+ scripts/dev-tools/test-windows-compatibility.sh    | 170 [32m++++++++++++++++[m
+ 6 files changed, 589 insertions(+), 12 deletions(-)
+
+[33mcommit 266e43091b8459cff4a7b76c3a17ca579bc4af62[m
+Author: Stephen Bavister <sb@connectedstate.co.uk>
+Date:   Thu Oct 9 20:55:45 2025 +0100
+
+    docs(scripts): Update documentation
+
+ docs/WINDOWS_COMPATIBILITY.md                      | 225 [32m+++++++++++++++++++++[m
+ .../MFU-DEVOPS-01-ongoing-improvements.md          | 116 [32m+++++++++++[m
+ scripts/dev-tools/modules/core.sh                  |  68 [32m++++++[m[31m-[m
+ scripts/dev-tools/modules/mfu.sh                   |  20 [32m+[m[31m-[m
+ scripts/dev-tools/modules/validation.sh            |   2 [32m+[m[31m-[m
+ scripts/dev-tools/test-windows-compatibility.sh    | 170 [32m++++++++++++++++[m
+ 6 files changed, 589 insertions(+), 12 deletions(-)
+
+[33mcommit 8a0a6cb27f338f4287b99b07a94a99e9e161138f[m
+Merge: cb31efc 6de7706
+Author: Stephen Bavister <sb@connectedstate.co.uk>
+Date:   Thu Oct 9 20:41:32 2025 +0100
+
+    Merge branch 'MFU-DEVOPS-01-ongoing-improvements' into dev
+
+ .../MFU-DEVOPS-01-ongoing-improvements.md          |   0
+ scripts/dev-tools/modules/core.sh                  | 120 [32m++++++++++++++++++++[m[31m-[m
+ scripts/dev-tools/modules/mfu.sh                   |   4 [32m+[m[31m-[m
+ 3 files changed, 117 insertions(+), 7 deletions(-)
+
+[33mcommit 6de770698db3c1533fd53e0c14689d96788c47c8[m
+Author: Stephen Bavister <sb@connectedstate.co.uk>
+Date:   Thu Oct 9 20:41:27 2025 +0100
+
+    docs(scripts): Update documentation
+
+ .../MFU-DEVOPS-01-ongoing-improvements.md          |   0
+ scripts/dev-tools/modules/core.sh                  | 120 [32m++++++++++++++++++++[m[31m-[m
+ scripts/dev-tools/modules/mfu.sh                   |   4 [32m+[m[31m-[m
+ 3 files changed, 117 insertions(+), 7 deletions(-)
+
+[33mcommit cb31efcce06624a0ad08a6395523fdaa37468dc8[m[33m ([m[1;31morigin/MFU-WP00-02-BE-manifest-tenancy-and-storage-schema[m[33m)[m
+Author: Radha <iymemyself1@gmail.com>
+Date:   Thu Oct 9 20:15:16 2025 +0530
+
+    feat(mfu): mfu wp00 02 delivered
+
+ backend/lib/integration.test.ts            | 191 [32m+++++++++[m
+ backend/lib/manifest.test.ts               | 181 [32m++++++++[m
+ backend/lib/manifest.ts                    |  59 [32m+++[m
+ backend/lib/storage.test.ts                |  93 [32m++++[m
+ backend/lib/storage.ts                     |  49 [32m+++[m
+ backend/lib/types.ts                       | 106 [32m+++++[m
+ backend/package-lock.json                  | 667 [32m+++++++++++++++++++++++++++++[m
+ backend/package.json                       |  24 [32m++[m
+ backend/tsconfig.json                      |  17 [32m+[m
+ docs/CONVENTIONS.md                        |  65 [32m+++[m
+ docs/MFU-WP00-02-Implementation-Summary.md | 128 [32m++++++[m
+ docs/schemas/cut_plan.schema.json          |  33 [32m++[m
+ docs/schemas/manifest.schema.json          | 127 [32m++++++[m
+ infra/dynamodb-jobs.json                   |  33 [32m++[m
+ tools/harness/generate-sample-job.js       |  27 [32m++[m
+ 15 files changed, 1800 insertions(+)

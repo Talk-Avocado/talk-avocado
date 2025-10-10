@@ -2,7 +2,7 @@
 
 const path = require("path");
 const fs = require("fs");
-const { execSync } = require("child_process");
+const { execSync, spawn } = require("child_process");
 
 // Parse command line arguments
 function parseArgs() {
@@ -12,7 +12,9 @@ function parseArgs() {
     job: null,
     input: null,
     env: "dev",
-    help: false
+    help: false,
+    container: false,
+    containerImage: null
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -29,6 +31,12 @@ function parseArgs() {
         break;
       case "--env":
         options.env = args[++i];
+        break;
+      case "--container":
+        options.container = true;
+        break;
+      case "--container-image":
+        options.containerImage = args[++i];
         break;
       case "--help":
       case "-h":
@@ -57,6 +65,8 @@ Options:
   --job <id>        Job ID (default: auto-generated)
   --input <path>    Input video file path
   --env <env>       Environment (dev|stage|prod) (default: dev)
+  --container       Use container execution (requires Docker)
+  --container-image <image> Container image to use (default: ffmpeg-runtime:latest)
   --help, -h        Show this help message
 
 Examples:
@@ -71,6 +81,36 @@ function generateJobId() {
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
   const random = Math.random().toString(36).substring(2, 8);
   return `job-${timestamp}-${random}`;
+}
+
+// Check if running inside Docker container
+function isRunningInContainer() {
+  try {
+    return fs.existsSync('/.dockerenv') || fs.existsSync('/proc/1/cgroup');
+  } catch {
+    return false;
+  }
+}
+
+// Check if Docker is available
+function isDockerAvailable() {
+  try {
+    execSync('docker --version', { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Get container image name
+function getContainerImage(options) {
+  if (options.containerImage) {
+    return options.containerImage;
+  }
+  
+  // Try to get from environment or use default
+  const defaultImage = process.env.FFMPEG_CONTAINER_IMAGE || 'ffmpeg-runtime:latest';
+  return defaultImage;
 }
 
 // Validate input file
@@ -168,16 +208,19 @@ function updateManifestStep(env, tenantId, jobId, step, status, error = null) {
 }
 
 // Run a service handler
-async function runService(serviceName, event, env, tenantId, jobId) {
+async function runService(serviceName, event, env, tenantId, jobId, options = {}) {
   console.log(`\n=== ${serviceName.toUpperCase()} ===`);
   
   try {
     updateManifestStep(env, tenantId, jobId, serviceName, "running");
     
-    const handlerPath = path.resolve(__dirname, "..", "..", "backend", "services", serviceName, "handler.js");
-    const handler = require(handlerPath);
-    
-    await handler.handler(event);
+    if (options.container && !isRunningInContainer()) {
+      // Run in container
+      await runServiceInContainer(serviceName, event, env, tenantId, jobId, options);
+    } else {
+      // Run directly
+      await runServiceDirect(serviceName, event, env, tenantId, jobId);
+    }
     
     updateManifestStep(env, tenantId, jobId, serviceName, "completed");
     console.log(`✅ ${serviceName} completed successfully`);
@@ -186,6 +229,101 @@ async function runService(serviceName, event, env, tenantId, jobId) {
     console.error(`❌ ${serviceName} failed:`, error.message);
     updateManifestStep(env, tenantId, jobId, serviceName, "failed", error.message);
     throw error;
+  }
+}
+
+// Run service directly (Node.js)
+async function runServiceDirect(serviceName, event, env, tenantId, jobId) {
+  const handlerPath = path.resolve(__dirname, "..", "..", "backend", "services", serviceName, "handler.js");
+  const handler = require(handlerPath);
+  
+  // Add context for Lambda-like environment
+  const context = {
+    awsRequestId: `local-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
+    functionName: serviceName,
+    functionVersion: '$LATEST',
+    invokedFunctionArn: `arn:aws:lambda:local:123456789012:function:${serviceName}`,
+    memoryLimitInMB: '3008',
+    remainingTimeInMillis: () => 300000, // 5 minutes
+    getRemainingTimeInMillis: () => 300000
+  };
+  
+  await handler.handler(event, context);
+}
+
+// Run service in container
+async function runServiceInContainer(serviceName, event, env, tenantId, jobId, options) {
+  if (!isDockerAvailable()) {
+    throw new Error("Docker is not available. Install Docker or run without --container flag.");
+  }
+  
+  const containerImage = getContainerImage(options);
+  const storagePath = process.env.MEDIA_STORAGE_PATH || "./storage";
+  const jobPath = path.join(storagePath, env, tenantId, jobId);
+  
+  // Prepare environment variables
+  const envVars = [
+    `TALKAVOCADO_ENV=${env}`,
+    `MEDIA_STORAGE_PATH=/var/task/storage`,
+    `LOCAL_MODE=true`,
+    `POWERTOOLS_SERVICE_NAME=TalkAvocado/MediaProcessing`,
+    `POWERTOOLS_METRICS_NAMESPACE=TalkAvocado`,
+    `ENABLE_XRAY=false`
+  ];
+  
+  // Create a temporary script to run the service
+  const scriptContent = `
+const handler = require('./backend/services/${serviceName}/handler.js');
+const event = ${JSON.stringify(event)};
+const context = {
+  awsRequestId: 'local-${Date.now()}-${Math.random().toString(36).substring(2, 8)}',
+  functionName: '${serviceName}',
+  functionVersion: '$LATEST',
+  invokedFunctionArn: 'arn:aws:lambda:local:123456789012:function:${serviceName}',
+  memoryLimitInMB: '3008',
+  remainingTimeInMillis: () => 300000,
+  getRemainingTimeInMillis: () => 300000
+};
+
+handler.handler(event, context)
+  .then(() => {
+    console.log('Service completed successfully');
+    process.exit(0);
+  })
+  .catch((error) => {
+    console.error('Service failed:', error.message);
+    process.exit(1);
+  });
+`;
+  
+  const scriptPath = path.join(jobPath, 'temp-service-runner.js');
+  fs.writeFileSync(scriptPath, scriptContent);
+  
+  try {
+    // Run container with mounted storage
+    const dockerArgs = [
+      'run', '--rm',
+      '-v', `${path.resolve(storagePath)}:/var/task/storage`,
+      '-v', `${path.resolve(__dirname, '..', '..')}:/var/task`,
+      '-w', '/var/task',
+      ...envVars.map(envVar => ['-e', envVar]).flat(),
+      containerImage,
+      'node', `/var/task/storage/${env}/${tenantId}/${jobId}/temp-service-runner.js`
+    ];
+    
+    console.log(`🐳 Running ${serviceName} in container: ${containerImage}`);
+    
+    const result = execSync(`docker ${dockerArgs.join(' ')}`, {
+      encoding: 'utf8',
+      stdio: 'inherit',
+      timeout: 300000 // 5 minutes
+    });
+    
+  } finally {
+    // Clean up temporary script
+    if (fs.existsSync(scriptPath)) {
+      fs.unlinkSync(scriptPath);
+    }
   }
 }
 
@@ -230,7 +368,7 @@ async function runPipeline(options) {
           object: { key: `raw/${path.basename(storedInputPath)}` }
         }
       }]
-    }, env, tenant, jobId);
+    }, env, tenant, jobId, options);
     
     // Step 2: Transcription
     await runService("transcription", {
@@ -240,7 +378,7 @@ async function runPipeline(options) {
           object: { key: `mp3/${baseName}.mp3` }
         }
       }]
-    }, env, tenant, jobId);
+    }, env, tenant, jobId, options);
     
     // Step 3: Smart Cut Planning
     await runService("smart-cut-planner", {
@@ -250,7 +388,7 @@ async function runPipeline(options) {
           object: { key: `transcripts/${baseName}.json` }
         }
       }]
-    }, env, tenant, jobId);
+    }, env, tenant, jobId, options);
     
     // Step 4: Video Rendering
     await runService("video-render-engine", {
@@ -260,7 +398,7 @@ async function runPipeline(options) {
           object: { key: `plans/${baseName}.cutplan.json` }
         }
       }]
-    }, env, tenant, jobId);
+    }, env, tenant, jobId, options);
     
     console.log("\n🎉 Pipeline completed successfully!");
     console.log(`   Final output: ${path.join(jobPath, "renders", `${baseName}.final.mp4`)}`);
