@@ -1,427 +1,360 @@
-// TranscribeWithWhisper.js (Debug Mode — Chunked Processing + Words[] Recovery Retry + Fail-Fast on Missing Words[])
-// Load .env for local mode
-if (process.env.LOCAL_MODE === "true") {
-  const path = require("path");
-  require("dotenv").config({ path: path.resolve(__dirname, "..", "..", "..", ".env") });
+// backend/services/transcription/handler.js
+import { initObservability } from '../../dist/init-observability.js';
+import { keyFor, pathFor, writeFileAtKey, readFileAtKey } from '../../dist/storage.js';
+import { loadManifest, saveManifest } from '../../dist/manifest.js';
+import { execFileSync } from 'node:child_process';
+import { existsSync, writeFileSync, readFileSync, unlinkSync } from 'node:fs';
+import { basename, dirname, join, extname } from 'node:path';
+
+// Error types for better error handling
+class TranscriptionError extends Error {
+  constructor(message, type, details = {}) {
+    super(message);
+    this.name = 'TranscriptionError';
+    this.type = type;
+    this.details = details;
+  }
 }
 
-const { execSync } = require("child_process");
-const { S3Client, GetObjectCommand, PutObjectCommand } = require("@aws-sdk/client-s3");
-const { SecretsManagerClient, GetSecretValueCommand } = require("@aws-sdk/client-secrets-manager");
-const https = require("https");
-const path = require("path");
-const { tmpdir } = require("os");
-const { join } = require("path");
-const { createReadStream, createWriteStream, unlinkSync, existsSync, statSync, readFileSync } = require("fs");
+const ERROR_TYPES = {
+  INPUT_NOT_FOUND: 'INPUT_NOT_FOUND',
+  WHISPER_EXECUTION: 'WHISPER_EXECUTION',
+  WHISPER_NOT_AVAILABLE: 'WHISPER_NOT_AVAILABLE',
+  TRANSCRIPT_PARSE: 'TRANSCRIPT_PARSE',
+  SRT_GENERATION: 'SRT_GENERATION',
+  MANIFEST_UPDATE: 'MANIFEST_UPDATE',
+  STORAGE_ERROR: 'STORAGE_ERROR'
+};
 
-
-const s3 = new S3Client({ region: process.env.AWS_REGION });
-const secrets = new SecretsManagerClient({ region: process.env.AWS_REGION });
-
-exports.handler = async (event) => {
-  console.log("✅ TranscribeWithWhisper Lambda triggered");
-  console.log("📦 Event payload:", JSON.stringify(event));
-
-  const record = event.Records?.[0];
-  if (!record) return console.error("❌ No event record found");
-
-  const bucket = record.s3.bucket.name;
-  const key = decodeURIComponent(record.s3.object.key.replace(/\+/g, " "));
-  if (!key.endsWith(".mp3")) {
-    console.log("⏭ Skipped non-mp3 file:", key);
-    return;
+/**
+ * Convert Whisper JSON output to SRT format
+ * @param {Object} transcriptData - Whisper JSON output with segments
+ * @param {Object} options - Formatting options
+ * @returns {string} SRT formatted text
+ */
+function generateSRT(transcriptData, options = {}) {
+  const maxLineChars = Number(options.maxLineChars || process.env.TRANSCRIPT_SRT_MAX_LINE_CHARS || 42);
+  const maxLines = Number(options.maxLines || process.env.TRANSCRIPT_SRT_MAX_LINES || 2);
+  
+  if (!transcriptData.segments || transcriptData.segments.length === 0) {
+    throw new TranscriptionError(
+      'No segments found in transcript data',
+      ERROR_TYPES.SRT_GENERATION,
+      { segmentCount: 0 }
+    );
   }
 
-  const baseName = path.basename(key, ".mp3");
-  const tempPath = join(tmpdir(), `${baseName}.mp3`);
+  const srtLines = [];
+  let index = 1;
 
-  try {
-    // 🔑 Get API key
-let apiKey;
-if (process.env.LOCAL_MODE === "true") {
-  apiKey = process.env.OPENAI_API_KEY;
-} else {
-  const secret = await secrets.send(new GetSecretValueCommand({ SecretId: "OpenAIWhisperAPIKey" }));
-  apiKey = JSON.parse(secret.SecretString).OPENAI_API_KEY;
+  for (const segment of transcriptData.segments) {
+    const text = (segment.text || '').trim();
+    if (!text) continue;
+
+    // Format timestamps: HH:MM:SS,mmm
+    const startTime = formatSRTTimestamp(segment.start);
+    const endTime = formatSRTTimestamp(segment.end);
+
+    // Word wrap text if needed
+    const wrappedLines = wordWrap(text, maxLineChars, maxLines);
+
+    srtLines.push(index);
+    srtLines.push(`${startTime} --> ${endTime}`);
+    srtLines.push(wrappedLines);
+    srtLines.push(''); // Blank line between entries
+    index++;
+  }
+
+  return srtLines.join('\n');
 }
 
+/**
+ * Format seconds to SRT timestamp format (HH:MM:SS,mmm)
+ */
+function formatSRTTimestamp(seconds) {
+  const hours = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+  const ms = Math.floor((seconds % 1) * 1000);
+  
+  return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')},${String(ms).padStart(3, '0')}`;
+}
 
-    // 📥 Stream MP3 from S3 to temp file
-    console.log(`⬇️ Streaming download from S3: ${key}`);
-    await streamS3ToFile(bucket, key, tempPath);
+/**
+ * Word wrap text to fit line constraints
+ */
+function wordWrap(text, maxChars, maxLines) {
+  const words = text.split(/\s+/);
+  const lines = [];
+  let currentLine = '';
 
-    // 📏 Log file diagnostics
-    const stats = statSync(tempPath);
-    console.log(`📏 MP3 size: ${(stats.size / 1024 / 1024).toFixed(2)} MB`);
-    const headerBytes = readFileSync(tempPath).slice(0, 32).toString("hex").match(/.{1,2}/g).join(" ");
-    console.log(`🔍 First 32 bytes (hex): ${headerBytes}`);
+  for (const word of words) {
+    const testLine = currentLine ? `${currentLine} ${word}` : word;
+    
+    if (testLine.length <= maxChars) {
+      currentLine = testLine;
+    } else {
+      if (currentLine) lines.push(currentLine);
+      currentLine = word;
+      
+      if (lines.length >= maxLines) {
+        break;
+      }
+    }
+  }
+  
+  if (currentLine && lines.length < maxLines) {
+    lines.push(currentLine);
+  }
 
-    // 🎧 ffprobe diagnostics (optional)
+  return lines.slice(0, maxLines).join('\n');
+}
+
+/**
+ * Calculate average confidence from Whisper segments
+ */
+function calculateConfidence(transcriptData) {
+  if (!transcriptData.segments || transcriptData.segments.length === 0) {
+    return 0;
+  }
+
+  let totalConfidence = 0;
+  let count = 0;
+
+  for (const segment of transcriptData.segments) {
+    // Whisper segments may have 'no_speech_prob' (invert for confidence)
+    // or direct confidence scores depending on implementation
+    if (typeof segment.confidence === 'number') {
+      totalConfidence += segment.confidence;
+      count++;
+    } else if (typeof segment.no_speech_prob === 'number') {
+      totalConfidence += (1 - segment.no_speech_prob);
+      count++;
+    }
+  }
+
+  return count > 0 ? totalConfidence / count : 0;
+}
+
+const handler = async (event, context) => {
+  const { env, tenantId, jobId, audioKey } = event;
+  const correlationId = event.correlationId || context.awsRequestId;
+
+  const { logger, metrics, tracer } = initObservability({
+    serviceName: 'Transcription',
+    correlationId,
+    tenantId,
+    jobId,
+    step: 'transcription',
+  });
+
+  try {
+    // Validate input exists
+    const inputPath = pathFor(audioKey);
+    if (!existsSync(inputPath)) {
+      throw new TranscriptionError(
+        `Audio input not found: ${audioKey}`,
+        ERROR_TYPES.INPUT_NOT_FOUND,
+        { audioKey, inputPath }
+      );
+    }
+
+    const model = process.env.WHISPER_MODEL || 'medium';
+    const language = process.env.WHISPER_LANGUAGE || 'en';
+    const device = process.env.WHISPER_DEVICE || 'cpu';
+
+    logger.info('Starting transcription', {
+      input: basename(inputPath),
+      model,
+      language,
+      device
+    });
+
+    // Define output keys
+    const transcriptJsonKey = keyFor(env, tenantId, jobId, 'transcripts', 'transcript.json');
+    const transcriptSrtKey = keyFor(env, tenantId, jobId, 'transcripts', 'captions.source.srt');
+    const transcriptJsonPath = pathFor(transcriptJsonKey);
+    const transcriptSrtPath = pathFor(transcriptSrtKey);
+
+    // Execute Whisper transcription
+    // Note: Assumes whisper CLI is available (whisper or whisper-ctranslate2)
+    let transcriptData;
     try {
-      const ffprobeFull = execSync(`ffprobe -v quiet -print_format json -show_format -show_streams "${tempPath}"`).toString();
-      console.log(`🛠 Audio Format Details:\n${ffprobeFull}`);
-    } catch {
-      console.warn("⚠️ Could not determine audio format via ffprobe");
-    }
-
-    // ⏳ Initial split — hard cap at 600s to avoid Whisper max limits
-const chunkPaths = splitAudio(tempPath, 600);
-
-    // Log actual duration of each chunk for debugging
-chunkPaths.forEach((p, idx) => {
-  try {
-    const dur = parseFloat(execSync(`ffprobe -v error -show_entries format=duration -of default=nokey=1:noprint_wrappers=1 "${p}"`).toString().trim());
-    console.log(`⏱ Chunk ${idx + 1}: ${dur.toFixed(2)} seconds`);
-  } catch {
-    console.warn(`⚠️ Failed to get duration for chunk ${idx + 1}: ${p}`);
-  }
-});
-
-    console.log(`🔪 Created ${chunkPaths.length} chunk(s)`);
-
-    let mergedTranscript = { text: "", words: [], segments: [] };
-    let offset = 0;
-
-    for (const chunkPath of chunkPaths) {
-      console.log(`🗣 Transcribing chunk: ${path.basename(chunkPath)} (offset ${offset}s)`);
-
-      let result = await retryAsync(() => callWhisper(apiKey, chunkPath), 3, 2000, chunkPath);
-
-if (result && result.autoSplit) {
-  // Process each smaller chunk and merge back
-  for (const smallChunk of result.chunks) {
-    let smallTranscript = await retryAsync(() => callWhisper(apiKey, smallChunk), 3, 2000, smallChunk) || {};
-    normalizeTranscript(smallTranscript);
-
-    if (smallTranscript.words.length === 0 && smallTranscript.segments.length > 0) {
-      console.warn(`⚠️ Missing words[] in auto-split chunk — retrying with strict settings`);
-      const retrySmall = await retryAsync(() => callWhisper(apiKey, smallChunk, true), 2, 2000, smallChunk) || {};
-      normalizeTranscript(retrySmall);
-      if (retrySmall.words.length > 0) {
-        console.log(`✅ Recovered words[] in auto-split chunk`);
-        smallTranscript = retrySmall;
+      const whisperCmd = process.env.WHISPER_CMD || 'whisper';
+      const outputDir = dirname(transcriptJsonPath);
+      
+      // Check if Whisper is available
+      try {
+        execFileSync(whisperCmd, ['--help'], { encoding: 'utf8', stdio: 'pipe' });
+      } catch (checkErr) {
+        throw new TranscriptionError(
+          `Whisper command not found: ${whisperCmd}. Install with: pip install openai-whisper`,
+          ERROR_TYPES.WHISPER_NOT_AVAILABLE,
+          { whisperCmd }
+        );
       }
-    }
 
-    if (smallTranscript.words.length === 0) {
-      console.error(`❌ No words[] found for auto-split chunk after retries`);
-      continue;
-    }
+      // Run Whisper: output JSON and SRT
+      logger.info('Executing Whisper', { whisperCmd, model, language });
+      
+      const whisperArgs = [
+        inputPath,
+        '--model', model,
+        '--language', language,
+        '--output_format', 'json',
+        '--output_dir', outputDir,
+        '--device', device,
+        '--verbose', 'False'
+      ];
 
-    // Merge into main transcript
-    if (smallTranscript.text) {
-      mergedTranscript.text += (mergedTranscript.text ? " " : "") + smallTranscript.text;
-    }
-    mergedTranscript.words.push(
-      ...smallTranscript.words.map(w => ({
-        ...w,
-        start: parseFloat((w.start + offset).toFixed(2)),
-        end: parseFloat((w.end + offset).toFixed(2))
-      }))
-    );
-    mergedTranscript.segments.push(
-      ...smallTranscript.segments.map(s => ({
-        ...s,
-        start: parseFloat((s.start + offset).toFixed(2)),
-        end: parseFloat((s.end + offset).toFixed(2))
-      }))
-    );
-    offset += getAudioDuration(smallChunk);
-  }
-  continue; // skip rest of the normal chunk logic
-}
+      const whisperOutput = execFileSync(whisperCmd, whisperArgs, {
+        encoding: 'utf8',
+        maxBuffer: 50 * 1024 * 1024, // 50MB buffer for large outputs
+        timeout: 600000 // 10 min timeout
+      });
 
-let chunkTranscript = result || {};
+      logger.info('Whisper execution completed', { outputLength: whisperOutput.length });
 
-      // 🔄 Normalize AWS-style → OpenAI-style
-      normalizeTranscript(chunkTranscript);
+      // Read generated JSON (Whisper writes to <basename>.json)
+      const jsonBasename = basename(inputPath, extname(inputPath)) + '.json';
+      const whisperJsonPath = join(outputDir, jsonBasename);
 
-      // 🔄 Retry if still no words[] but segments exist
-      if (chunkTranscript.words.length === 0 && chunkTranscript.segments.length > 0) {
-        console.warn(`⚠️ Missing words[] for ${path.basename(chunkPath)} — retrying with strict settings`);
-        const retryTranscript = await retryAsync(() => callWhisper(apiKey, chunkPath, true), 2, 2000) || {};
-        normalizeTranscript(retryTranscript);
-        if (retryTranscript.words.length > 0) {
-          console.log(`✅ Successfully recovered words[] for ${path.basename(chunkPath)}`);
-          chunkTranscript = retryTranscript;
+      if (!existsSync(whisperJsonPath)) {
+        throw new TranscriptionError(
+          `Whisper output not found at expected path: ${whisperJsonPath}`,
+          ERROR_TYPES.WHISPER_EXECUTION,
+          { expectedPath: whisperJsonPath, outputDir }
+        );
+      }
+
+      transcriptData = JSON.parse(readFileSync(whisperJsonPath, 'utf8'));
+
+      // Move to canonical location if needed
+      if (whisperJsonPath !== transcriptJsonPath) {
+        writeFileAtKey(transcriptJsonKey, JSON.stringify(transcriptData, null, 2));
+        unlinkSync(whisperJsonPath); // Clean up temp file
+      }
+
+    } catch (whisperErr) {
+      throw new TranscriptionError(
+        `Whisper execution failed: ${whisperErr.message}`,
+        ERROR_TYPES.WHISPER_EXECUTION,
+        {
+          inputPath,
+          model,
+          language,
+          whisperError: whisperErr.message
         }
-      }
-
-      // 🛑 Fail-fast if still missing words[]
-      if (chunkTranscript.words.length === 0) {
-        console.error(`❌ No words[] found for chunk ${path.basename(chunkPath)} after retries`);
-        console.error("📄 Raw Whisper JSON dump (truncated):\n", JSON.stringify(chunkTranscript).slice(0, 5000));
-        throw new Error(`❌ Missing word-level data for chunk ${path.basename(chunkPath)}`);
-      }
-
-      // Merge text
-      if (chunkTranscript.text) {
-        mergedTranscript.text += (mergedTranscript.text ? " " : "") + chunkTranscript.text;
-      }
-
-      // Merge words with timestamp offset
-      mergedTranscript.words.push(
-        ...chunkTranscript.words.map(w => ({
-          ...w,
-          start: parseFloat((w.start + offset).toFixed(2)),
-          end: parseFloat((w.end + offset).toFixed(2))
-        }))
       );
-
-      // Merge segments with timestamp offset
-      mergedTranscript.segments.push(
-        ...chunkTranscript.segments.map(s => ({
-          ...s,
-          start: parseFloat((s.start + offset).toFixed(2)),
-          end: parseFloat((s.end + offset).toFixed(2))
-        }))
-      );
-
-      // Increment offset
-      const chunkDur = chunkTranscript.words.length
-        ? Math.max(...chunkTranscript.words.map(w => w.end))
-        : 600;
-      offset += chunkDur;
     }
 
-    // 💾 Save transcript
-const outputKey = `transcripts/${baseName}.json`;
-if (process.env.LOCAL_MODE === "true") {
-  console.log(`🧪 [Local Mode] Saving transcript locally as ${outputKey}`);
-  const { writeFileSync, mkdirSync } = require("fs");
-  const { resolve, dirname } = require("path");
+    // Validate transcript structure
+    if (!transcriptData.segments || !Array.isArray(transcriptData.segments)) {
+      throw new TranscriptionError(
+        'Invalid transcript structure: missing or invalid segments array',
+        ERROR_TYPES.TRANSCRIPT_PARSE,
+        { hasSegments: !!transcriptData.segments, segmentsType: typeof transcriptData.segments }
+      );
+    }
 
-  const localPath = resolve(__dirname, "..", "..", "..", "podcast-automation", "test-assets", outputKey);
-  mkdirSync(dirname(localPath), { recursive: true });
-  writeFileSync(localPath, JSON.stringify(mergedTranscript, null, 2));
-} else {
-  await s3.send(new PutObjectCommand({
-    Bucket: bucket,
-    Key: outputKey,
-    Body: JSON.stringify(mergedTranscript, null, 2),
-    ContentType: "application/json"
-  }));
-}
-console.log(`✅ Whisper transcript saved to: ${outputKey}`);
+    // Generate SRT from transcript JSON
+    let srtContent;
+    try {
+      srtContent = generateSRT(transcriptData);
+      writeFileAtKey(transcriptSrtKey, srtContent);
+      logger.info('SRT generation completed', { srtKey: transcriptSrtKey });
+    } catch (srtErr) {
+      throw new TranscriptionError(
+        `SRT generation failed: ${srtErr.message}`,
+        ERROR_TYPES.SRT_GENERATION,
+        {
+          transcriptSrtKey,
+          segmentCount: transcriptData.segments?.length || 0,
+          srtError: srtErr.message
+        }
+      );
+    }
 
+    // Calculate confidence
+    const confidence = calculateConfidence(transcriptData);
 
-    // 🧹 Cleanup
-    [tempPath, ...chunkPaths].forEach(p => existsSync(p) && unlinkSync(p));
+    // Update manifest with error handling
+    try {
+      const manifest = loadManifest(env, tenantId, jobId);
+      manifest.transcript = manifest.transcript || {};
+      manifest.transcript.jsonKey = transcriptJsonKey;
+      manifest.transcript.srtKey = transcriptSrtKey;
+      manifest.transcript.language = transcriptData.language || language;
+      manifest.transcript.model = model;
+      manifest.transcript.confidence = Number.isFinite(confidence) ? confidence : undefined;
+      manifest.transcript.transcribedAt = new Date().toISOString();
+      manifest.updatedAt = new Date().toISOString();
+      saveManifest(env, tenantId, jobId, manifest);
+    } catch (manifestErr) {
+      throw new TranscriptionError(
+        `Manifest update failed: ${manifestErr.message}`,
+        ERROR_TYPES.MANIFEST_UPDATE,
+        {
+          env,
+          tenantId,
+          jobId,
+          transcriptJsonKey,
+          transcriptSrtKey,
+          manifestError: manifestErr.message
+        }
+      );
+    }
 
+    logger.info('Transcription completed', {
+      jsonKey: transcriptJsonKey,
+      srtKey: transcriptSrtKey,
+      language: transcriptData.language || language,
+      model,
+      confidence,
+      segmentCount: transcriptData.segments.length
+    });
+    metrics.addMetric('TranscriptionSuccess', 'Count', 1);
+    metrics.addMetric('TranscriptSegments', 'Count', transcriptData.segments.length);
+    metrics.publishStoredMetrics();
+
+    return { ok: true, transcriptJsonKey, transcriptSrtKey, correlationId };
   } catch (err) {
-    console.error("🔥 TranscribeWithWhisper failed:", err);
+    // Enhanced error handling with specific error types
+    const errorType = err.type || 'UNKNOWN_ERROR';
+    const errorDetails = err.details || {};
+
+    logger.error('Transcription failed', {
+      error: err.message,
+      errorType,
+      errorDetails,
+      audioKey: event.audioKey,
+      tenantId,
+      jobId
+    });
+
+    metrics.addMetric('TranscriptionError', 'Count', 1);
+    metrics.addMetric(`TranscriptionError_${errorType}`, 'Count', 1);
+    metrics.publishStoredMetrics();
+
+    // Update manifest status on failure if possible
+    try {
+      const manifest = loadManifest(env, tenantId, jobId);
+      manifest.status = 'failed';
+      manifest.updatedAt = new Date().toISOString();
+      if (!manifest.logs) manifest.logs = [];
+      manifest.logs.push({
+        type: 'error',
+        message: `Transcription failed: ${err.message}`,
+        errorType,
+        createdAt: new Date().toISOString()
+      });
+      saveManifest(env, tenantId, jobId, manifest);
+    } catch (manifestErr) {
+      logger.error('Failed to update manifest with error status', { manifestError: manifestErr.message });
+    }
+
     throw err;
   }
 };
 
-// --- Helpers ---
-
-function normalizeTranscript(t) {
-  if (!t.words) t.words = [];
-  if (!t.segments) t.segments = [];
-
-  // AWS Transcribe-style → words[]
-  if (t.results?.items?.length) {
-    t.words = t.results.items
-      .filter(i => i.start_time && i.end_time && i.type === "pronunciation")
-      .map(i => ({
-        start: parseFloat(i.start_time),
-        end: parseFloat(i.end_time),
-        word: i.alternatives?.[0]?.content || ""
-      }));
-  }
-
-  // AWS Transcribe-style → segments[]
-  if (t.results?.audio_segments?.length) {
-    t.segments = t.results.audio_segments.map(seg => {
-      const segWords = (seg.items || [])
-        .map(idx => t.results.items[idx])
-        .filter(i => i?.start_time && i?.end_time)
-        .map(i => ({
-          start: parseFloat(i.start_time),
-          end: parseFloat(i.end_time),
-          word: i.alternatives?.[0]?.content || ""
-        }));
-      return {
-        start: segWords.length ? segWords[0].start : 0,
-        end: segWords.length ? segWords[segWords.length - 1].end : 0,
-        words: segWords
-      };
-    });
-  }
-
-  // Recover from OpenAI verbose_json segments[].words
-  if (t.words.length === 0 && Array.isArray(t.segments)) {
-    const recovered = t.segments.flatMap(s => s.words || []);
-    if (recovered.length) {
-      console.warn(`⚠️ Recovered ${recovered.length} words from segments[].words`);
-      t.words = recovered;
-    }
-  }
-}
-
-async function streamS3ToFile(bucket, key, filePath) {
-  if (process.env.LOCAL_MODE === "true") {
-    console.log("🧪 [Local Mode] Reading MP3 from local disk:", key);
-    const { copyFileSync } = require("fs");
-    const { resolve } = require("path");
-
-    // Read from shared test-assets folder with same S3 subfolder structure
-    const localPath = resolve(__dirname, "..", "..", "..", "podcast-automation", "test-assets", key);
-    copyFileSync(localPath, filePath);
-    return;
-  }
-
-  const { Body } = await s3.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
-  return new Promise((resolve, reject) => {
-    const fileStream = createWriteStream(filePath);
-    Body.pipe(fileStream).on("error", reject).on("close", resolve);
-  });
-}
-
-function splitAudio(inputPath, chunkDurationSec) {
-  const outputTemplate = join(tmpdir(), `chunk-%03d.mp3`);
-  // Re-encode with libmp3lame, normalize, and pad last chunk with silence
-  execSync(
-    `ffmpeg -i "${inputPath}" -af "apad=pad_dur=5,aresample=async=1:min_hard_comp=0.100:first_pts=0" \
-     -f segment -segment_time ${chunkDurationSec} -c:a libmp3lame -b:a 128k "${outputTemplate}" -y`
-  );
-
-  return require("fs").readdirSync(tmpdir())
-    .filter(f => f.startsWith("chunk-") && f.endsWith(".mp3"))
-    .map(f => join(tmpdir(), f))
-    .filter(f => {
-      try {
-        const dur = parseFloat(execSync(
-          `ffprobe -v error -show_entries format=duration -of default=nokey=1:noprint_wrappers=1 "${f}"`
-        ).toString().trim());
-        if (dur < 1) {
-          console.warn(`⚠️ Skipping very short chunk (${dur.toFixed(2)}s): ${f}`);
-          return false;
-        }
-        return true;
-      } catch {
-        console.warn(`⚠️ Could not determine duration for ${f}, keeping by default`);
-        return true;
-      }
-    })
-    .sort();
-}
-
-
-
-
-async function retryAsync(fn, retries, delay, filePath) {
-  let attempt = 0;
-  while (attempt <= retries) {
-    try {
-      return await fn();
-    } catch (err) {
-      attempt++;
-      console.warn(`⚠️ Attempt ${attempt} failed: ${err.message}`);
-      
-      // Whisper 500/502/503/504 — retry
-      if (isRetryableError(err) && attempt <= retries) {
-        const wait = delay * attempt;
-        console.log(`⏳ Retrying in ${wait / 1000}s...`);
-        await new Promise(res => setTimeout(res, wait));
-        continue;
-      }
-
-      // If we still fail after last retry AND it's retryable → auto-split the chunk
-      if (isRetryableError(err) && attempt > retries && filePath) {
-        console.warn(`🔀 Auto-splitting ${filePath} into smaller chunks due to repeated Whisper failure`);
-        // Force smaller subchunks for stability — max 300 seconds
-const targetDuration = Math.min(300, Math.floor(getAudioDuration(filePath) / 2));
-const newChunks = splitAudio(filePath, targetDuration);
-
-        console.log(`   Created ${newChunks.length} smaller chunks from ${path.basename(filePath)}`);
-        return { autoSplit: true, chunks: newChunks };
-      }
-
-      throw err; // non-retryable or no more retries
-    }
-  }
-}
-
-function isRetryableError(err) {
-  // Treat common server-side failures as retryable
-  return /500|502|503|504/.test(err.message);
-}
-
-
-function getAudioDuration(filePath) {
-  try {
-    return parseFloat(execSync(`ffprobe -v error -show_entries format=duration -of default=nokey=1:noprint_wrappers=1 "${filePath}"`).toString().trim());
-  } catch {
-    return 0;
-  }
-}
-
-
-
-async function callWhisper(apiKey, filePath, forceWordLevel = false) {
-  const boundary = `----WhisperBoundary${Date.now()}`;
-
-  // Start building form head with required Whisper parameters
-  let formHead =
-    `--${boundary}\r\nContent-Disposition: form-data; name="model"\r\n\r\nwhisper-1\r\n` +
-    `--${boundary}\r\nContent-Disposition: form-data; name="response_format"\r\n\r\nverbose_json\r\n` +
-    `--${boundary}\r\nContent-Disposition: form-data; name="timestamp_granularities[]"\r\n\r\nword\r\n` +
-    `--${boundary}\r\nContent-Disposition: form-data; name="timestamp_granularities[]"\r\n\r\nsegment\r\n` +
-    `--${boundary}\r\nContent-Disposition: form-data; name="language"\r\n\r\nen\r\n`;
-
-  // Force verbatim transcription parameters
-  formHead +=
-    `--${boundary}\r\nContent-Disposition: form-data; name="temperature"\r\n\r\n0\r\n` +
-    `--${boundary}\r\nContent-Disposition: form-data; name="condition_on_previous_text"\r\n\r\nfalse\r\n` +
-    `--${boundary}\r\nContent-Disposition: form-data; name="initial_prompt"\r\n\r\nTranscribe everything exactly as spoken, including hesitations, stutters, repeated words, filler sounds like 'uh', 'um', 'you know', and all pauses.\r\n` +
-    `--${boundary}\r\nContent-Disposition: form-data; name="no_speech_threshold"\r\n\r\n0\r\n` +
-    `--${boundary}\r\nContent-Disposition: form-data; name="compression_ratio_threshold"\r\n\r\n0\r\n`;
-
-  // If forceWordLevel is true, add stricter decoding params
-  if (forceWordLevel) {
-    formHead +=
-      `--${boundary}\r\nContent-Disposition: form-data; name="beam_size"\r\n\r\n5\r\n`;
-  }
-
-  // Attach the file
-  formHead +=
-    `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${path.basename(filePath)}"\r\nContent-Type: audio/mpeg\r\n\r\n`;
-
-  const formTail = `\r\n--${boundary}--\r\n`;
-  const stats = statSync(filePath);
-  const totalLength = Buffer.byteLength(formHead) + stats.size + Buffer.byteLength(formTail);
-
-  console.log(`📤 Sending chunk: ${filePath} (${(stats.size / 1024 / 1024).toFixed(2)} MB)`);
-
-  return new Promise((resolve, reject) => {
-    const req = https.request({
-      hostname: "api.openai.com",
-      path: "/v1/audio/transcriptions",
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": `multipart/form-data; boundary=${boundary}`,
-        "Content-Length": totalLength
-      }
-    }, res => {
-      let data = "";
-      res.on("data", chunk => data += chunk);
-      res.on("end", () => {
-        console.log(`📥 Whisper API responded with HTTP ${res.statusCode}`);
-        if (res.statusCode >= 500) return reject(new Error(`${res.statusCode} Whisper server error`));
-        try {
-          resolve(JSON.parse(data));
-        } catch {
-          console.error("❌ Failed to parse Whisper response. Raw output:\n", data);
-          reject(new Error("Failed to parse Whisper response"));
-        }
-      });
-    });
-
-    req.on("error", reject);
-    req.write(formHead);
-    createReadStream(filePath).on("end", () => req.end(formTail)).pipe(req, { end: false });
-  });
-}
+export { handler };
