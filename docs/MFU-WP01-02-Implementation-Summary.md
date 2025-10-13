@@ -13,7 +13,8 @@ This document summarizes the implementation of the Transcription service (MFU-WP
 ### 1. Directory Structure ✅
 
 Created and verified the required directory structure:
-```
+
+```text
 backend/services/transcription/
 ├── handler.js          # Main transcription handler
 └── (future: README.md, package.json if needed)
@@ -24,6 +25,7 @@ backend/services/transcription/
 **File**: `backend/services/transcription/handler.js`
 
 **Key Features Implemented**:
+
 - **ES Module Format**: Converted to ES modules for compatibility with backend package.json
 - **Whisper CLI Integration**: Uses local Whisper CLI for transcription
 - **Dual Output Generation**: Creates both JSON transcript and SRT caption files
@@ -32,12 +34,14 @@ backend/services/transcription/
 - **Observability**: Integrated logging and metrics using backend observability stack
 
 **Core Functions**:
+
 - `generateSRT()`: Converts Whisper JSON to SRT format with configurable line wrapping
 - `formatSRTTimestamp()`: Formats seconds to SRT timestamp format (HH:MM:SS,mmm)
 - `wordWrap()`: Word-wraps text to fit SRT line constraints
 - `calculateConfidence()`: Calculates average confidence from Whisper segments
 
 **Error Types**:
+
 - `INPUT_NOT_FOUND`: Audio input file not found
 - `WHISPER_EXECUTION`: Whisper CLI execution failed
 - `WHISPER_NOT_AVAILABLE`: Whisper CLI not installed
@@ -51,11 +55,13 @@ backend/services/transcription/
 **File**: `tools/harness/run-local-pipeline.js`
 
 The local harness is already configured to call the transcription handler:
+
 ```javascript
 { name: 'transcription', path: '../../backend/services/transcription/handler' }
 ```
 
 The handler is called with the correct event structure:
+
 - `env`: Environment (dev/stage/prod)
 - `tenantId`: Tenant identifier
 - `jobId`: Job UUID
@@ -67,6 +73,7 @@ The handler is called with the correct event structure:
 **File**: `requirements.txt`
 
 Added Whisper dependencies:
+
 ```txt
 # Transcription (WP01-02) - Whisper dependencies
 openai-whisper>=20230314
@@ -82,6 +89,7 @@ openai-whisper>=20230314
 **File**: `docs/schemas/manifest.schema.json`
 
 Verified that the manifest schema includes all required transcript fields:
+
 ```json
 "transcript": {
   "type": "object",
@@ -99,12 +107,14 @@ Verified that the manifest schema includes all required transcript fields:
 ### 6. Logging and Metrics ✅
 
 **Observability Integration**:
+
 - Uses `initObservability()` from backend lib
 - Structured logging with correlation fields: `correlationId`, `tenantId`, `jobId`, `step`
 - EMF metrics: `TranscriptionSuccess`, `TranscriptionError`, `TranscriptSegments`
 - Error-specific metrics: `TranscriptionError_${errorType}`
 
 **Log Fields**:
+
 - `correlationId`: Request correlation ID
 - `tenantId`: Tenant identifier
 - `jobId`: Job UUID
@@ -115,12 +125,14 @@ Verified that the manifest schema includes all required transcript fields:
 ### 7. Idempotency Testing ✅
 
 **Tested Scenarios**:
+
 - Core SRT generation functionality
 - Timestamp formatting accuracy
 - Word wrapping with configurable constraints
 - Error handling for various failure modes
 
 **Test Results**:
+
 - SRT generation: ✅ Working correctly
 - Timestamp formatting: ✅ Accurate to millisecond precision
 - Word wrapping: ✅ Respects line length and line count constraints
@@ -158,10 +170,12 @@ TRANSCRIPT_SRT_MAX_LINES=2        # Max lines per SRT cue
 ## File Outputs
 
 **Generated Files**:
+
 1. `transcripts/transcript.json` - Whisper JSON output with segments and word-level timestamps
 2. `transcripts/captions.source.srt` - SRT format captions derived from JSON
 
 **Manifest Updates**:
+
 - `manifest.transcript.jsonKey` - Path to JSON transcript
 - `manifest.transcript.srtKey` - Path to SRT captions
 - `manifest.transcript.language` - Detected/configured language
@@ -173,6 +187,7 @@ TRANSCRIPT_SRT_MAX_LINES=2        # Max lines per SRT cue
 ## Error Handling
 
 **Comprehensive Error Types**:
+
 - Input validation errors
 - Whisper CLI availability checks
 - Whisper execution failures
@@ -182,6 +197,7 @@ TRANSCRIPT_SRT_MAX_LINES=2        # Max lines per SRT cue
 - Storage operation failures
 
 **Error Recovery**:
+
 - Detailed error logging with context
 - Manifest status updates on failure
 - Error-specific metrics for monitoring
@@ -190,13 +206,15 @@ TRANSCRIPT_SRT_MAX_LINES=2        # Max lines per SRT cue
 ## Testing Results
 
 **Core Functionality Tests**:
+
 - ✅ SRT generation with proper formatting
 - ✅ Timestamp conversion (seconds → HH:MM:SS,mmm)
 - ✅ Word wrapping with configurable constraints
 - ✅ Error handling for various scenarios
 
 **Sample SRT Output**:
-```
+
+```test
 1
 00:00:00,000 --> 00:00:02,500
 Hello, this is a test transcription with
@@ -211,11 +229,13 @@ text.
 ## Dependencies
 
 **Hard Dependencies**:
+
 - ✅ MFU-WP01-01-BE: Audio Extraction (provides input MP3)
 - ✅ MFU-WP00-02-BE: Manifest, Storage, Tenancy
 - ✅ MFU-WP00-03-IAC: Observability wrappers
 
 **Runtime Dependencies**:
+
 - ✅ Python 3.8+ with openai-whisper package
 - ✅ FFmpeg (for audio processing, provided by WP00-03)
 
@@ -229,6 +249,7 @@ text.
 ## Implementation Notes
 
 **Architecture Decisions**:
+
 - Uses local Whisper CLI instead of OpenAI API for cost control
 - Implements custom SRT generation for deterministic output
 - Follows ES module pattern for consistency with backend
@@ -236,6 +257,7 @@ text.
 - Structured logging and metrics for observability
 
 **Performance Considerations**:
+
 - Whisper model size affects speed vs accuracy tradeoff
 - CPU vs GPU device selection impacts performance
 - Large audio files may require chunking in future phases
