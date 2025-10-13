@@ -15,7 +15,7 @@ Successfully implemented the test harness and golden samples system for TalkAvoc
 #### 1. Harness Components (`tools/harness/`)
 
 - ✅ **`run-local-pipeline.js`**: Full production harness for end-to-end pipeline execution
-- ✅ **`run-local-pipeline-simple.cjs`**: Simplified harness with mock handlers for testing
+- ✅ **`run-local-pipeline-simple.js`**: Simplified harness with mock handlers for testing
 - ✅ **`compare-goldens.js`**: Golden file comparison engine with tolerance support
 - ✅ **`generate-sample-job.js`**: Sample data generator for testing
 
@@ -91,7 +91,7 @@ node tools/harness/run-local-pipeline.js \
 
 #### Mock Handler System
 
-The simplified harness (`run-local-pipeline-simple.cjs`) provides:
+The simplified harness (`run-local-pipeline-simple.js`) provides:
 
 - **Audio Extraction**: Mock MP3 generation with duration tracking
 - **Transcription**: Simulated transcript with word count validation
@@ -155,7 +155,7 @@ harness:
   steps:
     - name: Run harness on golden sample
       run: |
-        node tools/harness/run-local-pipeline-simple.cjs \
+        node tools/harness/run-local-pipeline-simple.js \
           --input podcast-automation/test-assets/raw/sample-short.mp4 \
           --goldens podcast-automation/test-assets/goldens/sample-short \
           --env dev
@@ -234,7 +234,7 @@ harness:
 ```text
 tools/harness/
 ├── run-local-pipeline.js          # Full production harness
-├── run-local-pipeline-simple.cjs  # Simplified harness with mocks
+├── run-local-pipeline-simple.js   # Simplified harness with mocks
 ├── compare-goldens.js             # Golden comparison engine
 ├── compare-goldens.cjs            # CommonJS version
 └── generate-sample-job.js         # Sample data generator

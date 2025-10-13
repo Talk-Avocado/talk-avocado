@@ -4,7 +4,7 @@ This directory contains documentation for the test harness samples and golden fi
 
 ## Current Implementation Status
 
-The harness is currently implemented with a simplified version (`run-local-pipeline-simple.cjs`) that uses mock handlers for testing purposes. This allows the golden comparison functionality to be fully tested while the actual service handlers are being developed.
+The harness is currently implemented with a simplified version (`run-local-pipeline-simple.js`) that uses mock handlers for testing purposes. This allows the golden comparison functionality to be fully tested while the actual service handlers are being developed.
 
 **Note**: The full harness (`run-local-pipeline.cjs`) will be available once the service handlers are compatible with the module system.
 
@@ -128,14 +128,14 @@ Optional metadata about the golden:
 ### Basic Test (No Golden Comparison)
 
 ```bash
-node tools/harness/run-local-pipeline-simple.cjs \
+node tools/harness/run-local-pipeline-simple.js \
   --input podcast-automation/test-assets/raw/sample-short.mp4
 ```
 
 ### Test with Golden Comparison
 
 ```bash
-node tools/harness/run-local-pipeline-simple.cjs \
+node tools/harness/run-local-pipeline-simple.js \
   --input podcast-automation/test-assets/raw/sample-short.mp4 \
   --goldens podcast-automation/test-assets/goldens/sample-short
 ```
@@ -143,7 +143,7 @@ node tools/harness/run-local-pipeline-simple.cjs \
 ### Strict Mode (Exact Matches Only)
 
 ```bash
-node tools/harness/run-local-pipeline-simple.cjs \
+node tools/harness/run-local-pipeline-simple.js \
   --input podcast-automation/test-assets/raw/sample-short.mp4 \
   --goldens podcast-automation/test-assets/goldens/sample-short \
   --strict
