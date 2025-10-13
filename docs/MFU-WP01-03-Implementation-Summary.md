@@ -16,7 +16,7 @@ Successfully implemented the Smart Cut Planner service according to the MFU-WP01
 
 The implementation follows the specified service architecture with ES modules:
 
-```
+```text
 backend/services/smart-cut-planner/
 ├── handler.js               # Main Lambda handler (ES module)
 ├── handler-simple.js        # Simplified handler for testing
@@ -29,6 +29,7 @@ backend/services/smart-cut-planner/
 #### 1. Planning Logic (`planner-logic.js`)
 
 **Key Functions Implemented:**
+
 - `getDefaultConfig()` - Loads configuration from environment variables
 - `detectSilence(segments, config)` - Identifies pauses between segments
 - `detectFillerWords(segments, config)` - Finds filler words with context
@@ -38,6 +39,7 @@ backend/services/smart-cut-planner/
 - `planCuts(transcriptData, userConfig)` - Main entry point
 
 **Algorithm Features:**
+
 - **Silence Detection**: Identifies gaps ≥ `minPauseMs` (default 1500ms) between segments
 - **Filler Word Detection**: Removes configurable filler words with 0.3s context buffer
 - **Merge Strategy**: Combines cuts within `mergeThresholdMs` (default 500ms)
@@ -47,6 +49,7 @@ backend/services/smart-cut-planner/
 #### 2. Handler (`handler.js`)
 
 **Features Implemented:**
+
 - Error handling with custom `PlannerError` class and error taxonomy
 - Schema validation using Ajv against `docs/schemas/cut_plan.schema.json`
 - Manifest updates with plan metadata
@@ -54,6 +57,7 @@ backend/services/smart-cut-planner/
 - EMF metrics emission (success, error counts, processing time)
 
 **Error Types:**
+
 - `INPUT_NOT_FOUND` - Transcript file missing
 - `TRANSCRIPT_PARSE` - JSON parsing failure
 - `TRANSCRIPT_INVALID` - Missing segments
@@ -64,6 +68,7 @@ backend/services/smart-cut-planner/
 #### 3. Configuration
 
 **Environment Variables:**
+
 ```env
 PLANNER_MIN_PAUSE_MS=1500
 PLANNER_FILLER_WORDS=um,uh,like,you know,so,actually
@@ -78,6 +83,7 @@ ENABLE_GPT_PLANNER=false
 ### Dependencies Added
 
 Updated `package.json` with required dependencies:
+
 ```json
 {
   "dependencies": {
@@ -92,12 +98,14 @@ Updated `package.json` with required dependencies:
 ### Functional Testing
 
 **Test Case**: Sample transcript with 4 segments and silence gaps
+
 - **Input**: 4 transcript segments with 1.5s and 2.0s silence gaps
 - **Output**: 7 cut plan segments (4 keep, 3 cut)
 - **Processing Time**: ~1ms
 - **Schema Validation**: ✅ Passed
 
 **Generated Cut Plan:**
+
 ```json
 {
   "schemaVersion": "1.0.0",
@@ -127,6 +135,7 @@ Updated `package.json` with required dependencies:
 ### Determinism Testing
 
 **Test**: Multiple runs with identical input
+
 - **Runs**: 2 consecutive executions
 - **Result**: ✅ Identical output (except correlationId)
 - **Determinism**: 100% confirmed
@@ -134,6 +143,7 @@ Updated `package.json` with required dependencies:
 ### Integration Testing
 
 **Harness Integration**: Updated `tools/harness/run-local-pipeline.js` to:
+
 - Pass correct `transcriptKey` parameter to smart-cut-planner
 - Handle ES module compatibility with `.cjs` extensions
 - Maintain proper error handling and manifest updates
@@ -188,12 +198,14 @@ The implementation is designed to support future enhancements:
 ## Files Created/Modified
 
 ### New Files
+
 - `backend/services/smart-cut-planner/planner-logic.js`
 - `backend/services/smart-cut-planner/handler.js`
 - `backend/services/smart-cut-planner/handler-simple.js`
 - `podcast-automation/test-assets/transcripts/sample-short.json`
 
 ### Modified Files
+
 - `package.json` - Added ajv dependencies
 - `tools/harness/run-local-pipeline.js` - Updated for smart-cut-planner integration
 

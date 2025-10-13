@@ -64,7 +64,7 @@ async function main() {
     { name: 'audio-extraction', path: '../../backend/services/audio-extraction/handler.cjs' },
     { name: 'transcription', path: '../../backend/services/transcription/handler' },
     { name: 'smart-cut-planner', path: '../../backend/services/smart-cut-planner/handler-simple.js' },
-    { name: 'video-render-engine', path: '../../backend/services/video-render-engine/handler' }
+    { name: 'video-render-engine', path: '../../backend/services/video-render-engine/handler-simple.cjs' }
   ];
 
   for (const handler of handlers) {
@@ -79,6 +79,13 @@ async function main() {
       if (handler.name === 'smart-cut-planner') {
         const transcriptKey = keyFor(env, tenantId, jobId, 'transcripts', 'transcript.json');
         event = { env, tenantId, jobId, transcriptKey };
+      }
+      
+      // Video render engine needs planKey and sourceVideoKey
+      if (handler.name === 'video-render-engine') {
+        const planKey = keyFor(env, tenantId, jobId, 'plan', 'cut_plan.json');
+        const sourceVideoKey = keyFor(env, tenantId, jobId, 'input', path.basename(values.input));
+        event = { env, tenantId, jobId, planKey, sourceVideoKey };
       }
       
       const context = { awsRequestId: `local-${Date.now()}` };

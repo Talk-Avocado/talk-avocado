@@ -61,7 +61,7 @@ async function main() {
 
   // 3. Invoke handlers in sequence
   const handlers = [
-    { name: 'audio-extraction', path: '../../backend/services/audio-extraction/handler' },
+    { name: 'audio-extraction', path: '../../backend/services/audio-extraction/handler.cjs' },
     { name: 'transcription', path: '../../backend/services/transcription/handler' },
     { name: 'smart-cut-planner', path: '../../backend/services/smart-cut-planner/handler' },
     { name: 'video-render-engine', path: '../../backend/services/video-render-engine/handler' }
@@ -71,7 +71,27 @@ async function main() {
     try {
       console.log(`[harness] Running ${handler.name}...`);
       const { handler: fn } = require(handler.path);
-      const event = { env, tenantId, jobId, inputPath };
+      // Build event based on handler requirements
+      let event = { env, tenantId, jobId, inputKey };
+      
+      // Transcription needs audioKey
+      if (handler.name === 'transcription') {
+        const audioKey = keyFor(env, tenantId, jobId, 'audio', `${jobId}.mp3`);
+        event = { env, tenantId, jobId, audioKey };
+      }
+      
+      // Smart cut planner needs transcriptKey
+      if (handler.name === 'smart-cut-planner') {
+        const transcriptKey = keyFor(env, tenantId, jobId, 'transcripts', 'transcript.json');
+        event = { env, tenantId, jobId, transcriptKey };
+      }
+      
+      // Video render engine needs planKey and sourceVideoKey
+      if (handler.name === 'video-render-engine') {
+        const planKey = keyFor(env, tenantId, jobId, 'plan', 'cut_plan.json');
+        const sourceVideoKey = keyFor(env, tenantId, jobId, 'input', path.basename(values.input));
+        event = { env, tenantId, jobId, planKey, sourceVideoKey };
+      }
       const context = { awsRequestId: `local-${Date.now()}` };
       await fn(event, context);
       console.log(`[harness] ✓ ${handler.name} completed`);
