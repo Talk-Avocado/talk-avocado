@@ -1,19 +1,19 @@
 // VideoRenderEngine.js — Memory-Safe Streaming Edition
+import { S3Client, GetObjectCommand, PutObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
+import { createWriteStream, readFileSync, existsSync, copyFileSync, unlinkSync } from "fs";
+import { execSync } from "child_process";
+import path from "path";
+import os from "os";
+import dotenv from "dotenv";
+
 // Load .env for local mode from project root
 if (process.env.LOCAL_MODE === "true") {
-  const path = require("path");
-  require("dotenv").config({ path: path.resolve(__dirname, "..", "..", "..", ".env") });
+  dotenv.config({ path: path.resolve(process.cwd(), ".env") });
 }
-
-const { S3Client, GetObjectCommand, PutObjectCommand, HeadObjectCommand } = require("@aws-sdk/client-s3");
-const { createWriteStream, readFileSync, existsSync, copyFileSync, unlinkSync } = require("fs");
-const { execSync } = require("child_process");
-const path = require("path");
-const os = require("os");
 
 const s3 = new S3Client({ region: "eu-west-2" });
 
-exports.handler = async (event) => {
+export const handler = async (event) => {
   const record = event.Records?.[0];
   if (!record) {
     console.error("❌ No event record found");

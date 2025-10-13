@@ -1,14 +1,15 @@
 // SmartCutPlanner.js (Debug Mode — Recovery + Raw API logging + no fail-stop on empty)
+import { S3Client, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+import { SecretsManagerClient, GetSecretValueCommand } from "@aws-sdk/client-secrets-manager";
+import https from "https";
+import { execSync } from "child_process";
+import path from "path";
+import dotenv from "dotenv";
+
 // Load .env for local mode from project root
 if (process.env.LOCAL_MODE === "true") {
-  const path = require("path");
-  require("dotenv").config({ path: path.resolve(__dirname, "..", ".env") });
+  dotenv.config({ path: path.resolve(process.cwd(), ".env") });
 }
-
-const { S3Client, GetObjectCommand, PutObjectCommand } = require("@aws-sdk/client-s3");
-const { SecretsManagerClient, GetSecretValueCommand } = require("@aws-sdk/client-secrets-manager");
-const https = require("https");
-const { execSync } = require("child_process");
 
 
 const s3 = new S3Client({
@@ -130,7 +131,7 @@ function mergeCutsWithSnapping(cutRanges, structuredWords) {
   }, []);
 }
 
-exports.handler = async (event) => {
+export const handler = async (event) => {
   const record = event.Records?.[0];
   const bucket = record?.s3?.bucket?.name;
   const key = decodeURIComponent(record?.s3?.object?.key.replace(/\+/g, " "));

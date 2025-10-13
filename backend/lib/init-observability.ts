@@ -1,7 +1,7 @@
 // backend/lib/init-observability.ts
-const { Logger } = require('@aws-lambda-powertools/logger');
-const { Metrics } = require('@aws-lambda-powertools/metrics');
-const { Tracer } = require('@aws-lambda-powertools/tracer');
+import { Logger } from '@aws-lambda-powertools/logger';
+import { Metrics } from '@aws-lambda-powertools/metrics';
+import { Tracer } from '@aws-lambda-powertools/tracer';
 
 /**
  * Initialize observability stack for a Lambda handler
@@ -28,7 +28,7 @@ function initObservability({
 }) {
   const logger = new Logger({
     serviceName: process.env.POWERTOOLS_SERVICE_NAME || 'TalkAvocado/MediaProcessing',
-    logLevel: process.env.LOG_LEVEL || 'INFO',
+    logLevel: (process.env.LOG_LEVEL || 'INFO') as any,
     persistentLogAttributes: {
       correlationId,
       tenantId,

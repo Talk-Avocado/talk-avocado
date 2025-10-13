@@ -1,15 +1,15 @@
 // ExtractAudioFromVideo.js — Perfected Streaming Edition
-const { S3Client, GetObjectCommand, PutObjectCommand } = require("@aws-sdk/client-s3");
-const { LambdaClient, InvokeCommand } = require("@aws-sdk/client-lambda");
-const { spawn, execSync } = require("child_process");
-const { tmpdir } = require("os");
-const { join, basename } = require("path");
-const { createWriteStream, readFileSync, unlinkSync, existsSync } = require("fs");
+import { S3Client, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
+import { spawn, execSync } from "child_process";
+import { tmpdir } from "os";
+import { join, basename } from "path";
+import { createWriteStream, readFileSync, unlinkSync, existsSync } from "fs";
 
 const s3 = new S3Client({ region: process.env.AWS_REGION });
 const lambda = new LambdaClient({ region: process.env.AWS_REGION });
 
-exports.handler = async (event) => {
+export const handler = async (event) => {
   console.log("✅ Lambda triggered");
   console.log("📦 Event payload:", JSON.stringify(event));
 

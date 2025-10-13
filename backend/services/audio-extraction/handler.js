@@ -1,8 +1,11 @@
 // backend/services/audio-extraction/handler.js
-// Note: Using dynamic imports due to ES module compatibility
-const { execFileSync } = require('node:child_process');
-const { existsSync, readFileSync } = require('node:fs');
-const { basename } = require('node:path');
+import { execFileSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
+import { basename } from 'node:path';
+import { initObservability } from '../../dist/init-observability.js';
+import { keyFor, pathFor, writeFileAtKey } from '../../dist/storage.js';
+import { loadManifest, saveManifest } from '../../dist/manifest.js';
+import { FFmpegRuntime } from '../../dist/ffmpeg-runtime.js';
 
 // Error types for better error handling
 class AudioExtractionError extends Error {
@@ -23,12 +26,7 @@ const ERROR_TYPES = {
   STORAGE_ERROR: 'STORAGE_ERROR'
 };
 
-exports.handler = async (event, context) => {
-  // Dynamic imports for ES module compatibility
-  const { initObservability } = await import('../../dist/init-observability.js');
-  const { keyFor, pathFor, writeFileAtKey } = await import('../../dist/storage.js');
-  const { loadManifest, saveManifest } = await import('../../dist/manifest.js');
-  const { FFmpegRuntime } = await import('../../dist/ffmpeg-runtime.js');
+export const handler = async (event, context) => {
 
   const { env, tenantId, jobId, inputKey } = event;
   const correlationId = event.correlationId || context.awsRequestId;
