@@ -61,7 +61,7 @@ async function main() {
 
   // 3. Invoke handlers in sequence
   const handlers = [
-    { name: 'audio-extraction', path: '../../backend/services/audio-extraction/handler' },
+    { name: 'audio-extraction', path: '../../backend/services/audio-extraction/handler.cjs' },
     { name: 'transcription', path: '../../backend/services/transcription/handler' },
     { name: 'smart-cut-planner', path: '../../backend/services/smart-cut-planner/handler' },
     { name: 'video-render-engine', path: '../../backend/services/video-render-engine/handler' }
@@ -71,7 +71,7 @@ async function main() {
     try {
       console.log(`[harness] Running ${handler.name}...`);
       const { handler: fn } = require(handler.path);
-      const event = { env, tenantId, jobId, inputPath };
+      const event = { env, tenantId, jobId, inputKey };
       const context = { awsRequestId: `local-${Date.now()}` };
       await fn(event, context);
       console.log(`[harness] ✓ ${handler.name} completed`);

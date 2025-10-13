@@ -55,4 +55,4 @@ function initObservability({
   return { logger, metrics, tracer };
 }
 
-module.exports = { initObservability };
+export { initObservability };
