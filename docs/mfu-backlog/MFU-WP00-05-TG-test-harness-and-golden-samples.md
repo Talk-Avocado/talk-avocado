@@ -504,7 +504,7 @@ Follow these steps exactly. All paths are repo‑relative.
                 --env dev
           - name: Upload artifacts on failure
             if: failure()
-            uses: actions/upload-artifact@v3
+            uses: actions/upload-artifact@v4
             with:
               name: harness-outputs
               path: storage/
