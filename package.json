@@ -7,6 +7,7 @@
     "test": "bash scripts/test.sh",
     "setup": "bash scripts/setup.sh",
     "format": "bash scripts/format.sh",
+    "lint": "echo 'No linting configured for root package'",
     "harness": "node tools/harness/run-local-pipeline-simple.cjs"
   },
   "dependencies": {
