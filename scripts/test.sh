@@ -6,7 +6,19 @@ STATUS=0
 if [ -f package.json ]; then
   echo "[test] Node lint/tests..."
   if npm run lint --silent 2>/dev/null; then :; else STATUS=1; fi
-  if npm test --silent 2>/dev/null; then :; else echo "[test] No Node tests or failing."; fi
+  # Run backend tests if backend directory exists
+  if [ -d "backend" ] && [ -f "backend/package.json" ]; then
+    echo "[test] Running backend tests..."
+    cd backend
+    if npm run build --silent 2>/dev/null; then
+      if npm test --silent 2>/dev/null; then :; else echo "[test] Backend tests failed or no tests found."; STATUS=1; fi
+    else
+      echo "[test] Backend build failed, skipping tests."; STATUS=1
+    fi
+    cd ..
+  else
+    echo "[test] No backend tests to run."
+  fi
 fi
 
 if [ -d .venv ] && { [ -f pyproject.toml ] || [ -f requirements.txt ]; }; then
