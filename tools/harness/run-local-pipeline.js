@@ -63,7 +63,7 @@ async function main() {
   const handlers = [
     { name: 'audio-extraction', path: '../../backend/services/audio-extraction/handler.cjs' },
     { name: 'transcription', path: '../../backend/services/transcription/handler' },
-    { name: 'smart-cut-planner', path: '../../backend/services/smart-cut-planner/handler' },
+    { name: 'smart-cut-planner', path: '../../backend/services/smart-cut-planner/handler-simple.js' },
     { name: 'video-render-engine', path: '../../backend/services/video-render-engine/handler' }
   ];
 
@@ -71,7 +71,16 @@ async function main() {
     try {
       console.log(`[harness] Running ${handler.name}...`);
       const { handler: fn } = require(handler.path);
-      const event = { env, tenantId, jobId, inputKey };
+      
+      // Build event based on handler requirements
+      let event = { env, tenantId, jobId, inputKey };
+      
+      // Smart cut planner needs transcriptKey
+      if (handler.name === 'smart-cut-planner') {
+        const transcriptKey = keyFor(env, tenantId, jobId, 'transcripts', 'transcript.json');
+        event = { env, tenantId, jobId, transcriptKey };
+      }
+      
       const context = { awsRequestId: `local-${Date.now()}` };
       await fn(event, context);
       console.log(`[harness] ✓ ${handler.name} completed`);

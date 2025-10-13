@@ -1,24 +1,24 @@
 // TranscribeWithWhisper.js (Debug Mode — Chunked Processing + Words[] Recovery Retry + Fail-Fast on Missing Words[])
+import { execSync } from "child_process";
+import { S3Client, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+import { SecretsManagerClient, GetSecretValueCommand } from "@aws-sdk/client-secrets-manager";
+import https from "https";
+import path from "path";
+import { tmpdir } from "os";
+import { join } from "path";
+import { createReadStream, createWriteStream, unlinkSync, existsSync, statSync, readFileSync } from "fs";
+import dotenv from "dotenv";
+
 // Load .env for local mode
 if (process.env.LOCAL_MODE === "true") {
-  const path = require("path");
-require("dotenv").config({ path: path.resolve(__dirname, "..", ".env") });
-
+  dotenv.config({ path: path.resolve(process.cwd(), ".env") });
 }
-const { execSync } = require("child_process");
-const { S3Client, GetObjectCommand, PutObjectCommand } = require("@aws-sdk/client-s3");
-const { SecretsManagerClient, GetSecretValueCommand } = require("@aws-sdk/client-secrets-manager");
-const https = require("https");
-const path = require("path");
-const { tmpdir } = require("os");
-const { join } = require("path");
-const { createReadStream, createWriteStream, unlinkSync, existsSync, statSync, readFileSync } = require("fs");
 
 
 const s3 = new S3Client({ region: process.env.AWS_REGION });
 const secrets = new SecretsManagerClient({ region: process.env.AWS_REGION });
 
-exports.handler = async (event) => {
+export const handler = async (event) => {
   console.log("✅ TranscribeWithWhisper Lambda triggered");
   console.log("📦 Event payload:", JSON.stringify(event));
 

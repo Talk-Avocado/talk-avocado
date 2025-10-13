@@ -1,7 +1,7 @@
 // backend/lib/ffmpeg-runtime.ts
-const { execSync, spawn } = require('child_process');
-const fs = require('fs');
-const path = require('path');
+import { execSync, spawn } from 'child_process';
+import fs from 'fs';
+import path from 'path';
 
 /**
  * FFmpeg runtime helper with timing, stderr capture, and X-Ray subsegment

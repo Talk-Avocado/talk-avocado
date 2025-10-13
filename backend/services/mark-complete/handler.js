@@ -1,6 +1,6 @@
-const { LoggingWrapper } = require('../../lib/logging.js');
-const { currentEnv } = require('../../lib/storage.js');
-const { loadManifest, saveManifest } = require('../../lib/manifest.js');
+import { LoggingWrapper } from '../../dist/logging.js';
+import { currentEnv } from '../../dist/storage.js';
+import { loadManifest, saveManifest } from '../../dist/manifest.js';
 
 // Mock DynamoDB client for Phase 1 (local mode)
 class MockDynamoDB {
@@ -32,7 +32,7 @@ const dynamoDB = new MockDynamoDB();
  * Mark job as completed - updates both DynamoDB and manifest
  * This is called at the end of the pipeline
  */
-exports.handler = async (event) => {
+export const handler = async (event) => {
   const logger = new LoggingWrapper('mark-complete');
   const correlationId = event.correlationId || 'unknown';
   

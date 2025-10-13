@@ -1,5 +1,5 @@
 // backend/lib/metrics.ts
-const { Metrics } = require('@aws-lambda-powertools/metrics');
+import { Metrics } from '@aws-lambda-powertools/metrics';
 
 /**
  * Thin wrapper around Powertools Metrics (EMF) with standard dimensions

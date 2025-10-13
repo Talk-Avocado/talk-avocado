@@ -1,7 +1,7 @@
-import { LoggingWrapper } from '../logging';
-import { currentEnv } from '../storage';
-import { loadManifest } from '../manifest';
-import { Manifest } from '../types';
+import { LoggingWrapper } from '../../logging.js';
+import { currentEnv } from '../../storage.js';
+import { loadManifest } from '../../manifest.js';
+import { Manifest } from '../../types.js';
 
 // Mock DynamoDB client for Phase 1 (local mode)
 // In production, this would be AWS SDK DynamoDB client
