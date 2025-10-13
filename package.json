@@ -2,19 +2,24 @@
   "name": "talk-avocado",
   "version": "1.0.0",
   "description": "TalkAvocado video processing pipeline",
-  "type": "commonjs",
+  "type": "module",
   "scripts": {
     "test": "bash scripts/test.sh",
     "setup": "bash scripts/setup.sh",
     "format": "bash scripts/format.sh",
-    "lint": "echo 'No linting configured for root package'",
-    "harness": "node tools/harness/run-local-pipeline-simple.cjs"
+    "lint": "eslint . --ext .js,.ts",
+    "check-es-modules": "bash scripts/check-es-modules.sh",
+    "harness": "node tools/harness/run-local-pipeline-simple.js"
   },
   "dependencies": {
     "uuid": "^13.0.0"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0"
+    "@types/node": "^20.0.0",
+    "eslint": "^8.0.0",
+    "eslint-plugin-import": "^2.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0"
   },
   "engines": {
     "node": ">=18.0.0"

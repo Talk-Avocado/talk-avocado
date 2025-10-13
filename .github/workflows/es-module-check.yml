@@ -1,0 +1,58 @@
+name: ES Module Compliance Check
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  es-module-check:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm install
+      
+    - name: Check ES Module compliance
+      run: |
+        echo "🔍 Checking ES module compliance..."
+        
+        # Check for CommonJS require statements
+        echo "Checking for require() statements..."
+        if grep -r "require(" --include="*.js" --include="*.ts" --exclude-dir=node_modules --exclude-dir=dist .; then
+          echo "❌ Found require() statements - convert to import"
+          exit 1
+        fi
+        
+        # Check for module.exports statements
+        echo "Checking for module.exports statements..."
+        if grep -r "module\.exports" --include="*.js" --include="*.ts" --exclude-dir=node_modules --exclude-dir=dist .; then
+          echo "❌ Found module.exports statements - convert to export"
+          exit 1
+        fi
+        
+        # Check package.json files for type: "module"
+        echo "Checking package.json files for ES module configuration..."
+        for package_file in $(find . -name "package.json" -not -path "./node_modules/*" -not -path "./dist/*"); do
+          if ! grep -q '"type": "module"' "$package_file"; then
+            echo "⚠️  $package_file missing \"type\": \"module\""
+          fi
+        done
+        
+        echo "✅ ES module compliance check passed"
+        
+    - name: Run ESLint
+      run: npm run lint
+      
+    - name: Run tests
+      run: npm test
