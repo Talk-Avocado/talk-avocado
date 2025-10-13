@@ -1,0 +1,65 @@
+{
+  "schemaVersion": "1.0.0",
+  "source": "transcripts/transcript.json",
+  "output": "plan/cut_plan.json",
+  "cuts": [
+    {
+      "start": "0.00",
+      "end": "5.50",
+      "type": "keep",
+      "reason": "content",
+      "confidence": 1
+    },
+    {
+      "start": "5.50",
+      "end": "7.00",
+      "type": "cut",
+      "reason": "silence_1500ms",
+      "confidence": 1
+    },
+    {
+      "start": "7.00",
+      "end": "12.00",
+      "type": "keep",
+      "reason": "content",
+      "confidence": 1
+    },
+    {
+      "start": "12.00",
+      "end": "14.00",
+      "type": "cut",
+      "reason": "silence_2000ms",
+      "confidence": 1
+    },
+    {
+      "start": "14.00",
+      "end": "18.50",
+      "type": "keep",
+      "reason": "content",
+      "confidence": 1
+    },
+    {
+      "start": "18.50",
+      "end": "20.00",
+      "type": "cut",
+      "reason": "silence_1500ms",
+      "confidence": 1
+    },
+    {
+      "start": "20.00",
+      "end": "25.00",
+      "type": "keep",
+      "reason": "content",
+      "confidence": 1
+    }
+  ],
+  "metadata": {
+    "processingTimeMs": 1,
+    "parameters": {
+      "minPauseMs": 1500,
+      "minCutDurationSec": 0.5,
+      "mergeThresholdMs": 500,
+      "deterministic": true
+    }
+  }
+}
