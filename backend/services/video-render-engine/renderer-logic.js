@@ -1,5 +1,5 @@
 // backend/services/video-render-engine/renderer-logic.js
-import { readFileSync, writeFileSync, mkdtempSync, existsSync, unlinkSync } from 'node:fs';
+import { writeFileSync, mkdtempSync, existsSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFile } from 'node:child_process';

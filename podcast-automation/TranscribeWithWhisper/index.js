@@ -65,7 +65,7 @@ if (process.env.LOCAL_MODE === "true") {
     }
 
     // ⏳ Initial split — hard cap at 600s to avoid Whisper max limits
-const chunkPaths = splitAudio(tempPath, 600);
+const chunkPaths = await splitAudio(tempPath, 600);
 
     // Log actual duration of each chunk for debugging
 chunkPaths.forEach((p, idx) => {
@@ -279,7 +279,7 @@ async function streamS3ToFile(bucket, key, filePath) {
   });
 }
 
-function splitAudio(inputPath, chunkDurationSec) {
+async function splitAudio(inputPath, chunkDurationSec) {
   const outputTemplate = join(tmpdir(), `chunk-%03d.mp3`);
   // Re-encode with libmp3lame, normalize, and pad last chunk with silence
   execSync(
@@ -334,7 +334,7 @@ async function retryAsync(fn, retries, delay, filePath) {
         console.warn(`🔀 Auto-splitting ${filePath} into smaller chunks due to repeated Whisper failure`);
         // Force smaller subchunks for stability — max 300 seconds
 const targetDuration = Math.min(300, Math.floor(getAudioDuration(filePath) / 2));
-const newChunks = splitAudio(filePath, targetDuration);
+const newChunks = await splitAudio(filePath, targetDuration);
 
         console.log(`   Created ${newChunks.length} smaller chunks from ${path.basename(filePath)}`);
         return { autoSplit: true, chunks: newChunks };

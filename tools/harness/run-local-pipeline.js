@@ -6,7 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import path from 'node:path';
 
 // Import storage and manifest helpers
-import { keyFor, pathFor, writeFileAtKey, ensureDirForFile } from '../../backend/dist/storage.js';
+import { keyFor, pathFor, ensureDirForFile } from '../../backend/dist/storage.js';
 import { saveManifest, loadManifest } from '../../backend/dist/manifest.js';
 
 async function main() {

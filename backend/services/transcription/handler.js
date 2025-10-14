@@ -1,9 +1,9 @@
 // backend/services/transcription/handler.js
 import { initObservability } from '../../dist/init-observability.js';
-import { keyFor, pathFor, writeFileAtKey, readFileAtKey } from '../../dist/storage.js';
+import { keyFor, pathFor, writeFileAtKey } from '../../dist/storage.js';
 import { loadManifest, saveManifest } from '../../dist/manifest.js';
 import { execFileSync } from 'node:child_process';
-import { existsSync, writeFileSync, readFileSync, unlinkSync } from 'node:fs';
+import { existsSync, unlinkSync, readFileSync } from 'node:fs';
 import { basename, dirname, join, extname, resolve } from 'node:path';
 
 // Error types for better error handling
@@ -140,7 +140,7 @@ const handler = async (event, context) => {
   const { env, tenantId, jobId, audioKey } = event;
   const correlationId = event.correlationId || context.awsRequestId;
 
-  const { logger, metrics, tracer } = initObservability({
+  const { logger, metrics } = initObservability({
     serviceName: 'Transcription',
     correlationId,
     tenantId,
@@ -174,7 +174,7 @@ const handler = async (event, context) => {
     const transcriptJsonKey = keyFor(env, tenantId, jobId, 'transcripts', 'transcript.json');
     const transcriptSrtKey = keyFor(env, tenantId, jobId, 'transcripts', 'captions.source.srt');
     const transcriptJsonPath = pathFor(transcriptJsonKey);
-    const transcriptSrtPath = pathFor(transcriptSrtKey);
+    // const transcriptSrtPath = pathFor(transcriptSrtKey); // Not used currently
 
     // Execute Whisper transcription
     // Note: Assumes whisper CLI is available (whisper or whisper-ctranslate2)
