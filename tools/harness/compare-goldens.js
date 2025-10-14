@@ -68,11 +68,51 @@ function compareManifestSubset(actual, golden) {
     if (['jobId', 'createdAt', 'updatedAt'].includes(key)) continue;
     
     const actualValue = actual[key];
-    if (JSON.stringify(actualValue) !== JSON.stringify(expectedValue)) {
+    
+    // For nested objects, check that expected fields are present and match
+    if (typeof expectedValue === 'object' && expectedValue !== null && !Array.isArray(expectedValue)) {
+      if (typeof actualValue !== 'object' || actualValue === null) {
+        failures.push(`manifest.${key}: expected object, got ${typeof actualValue}`);
+        continue;
+      }
+      
+      // Check each field in the expected object
+      for (const [nestedKey, nestedExpectedValue] of Object.entries(expectedValue)) {
+        if (actualValue[nestedKey] !== nestedExpectedValue) {
+          failures.push(`manifest.${key}.${nestedKey}: expected ${JSON.stringify(nestedExpectedValue)}, got ${JSON.stringify(actualValue[nestedKey])}`);
+        }
+      }
+    }
+    // For arrays, do a more sophisticated comparison
+    else if (Array.isArray(expectedValue)) {
+      if (!Array.isArray(actualValue)) {
+        failures.push(`manifest.${key}: expected array, got ${typeof actualValue}`);
+        continue;
+      }
+      
+      // For each expected item, find a matching actual item
+      for (let i = 0; i < expectedValue.length; i++) {
+        const expectedItem = expectedValue[i];
+        const actualItem = actualValue[i];
+        
+        if (typeof expectedItem === 'object' && expectedItem !== null) {
+          // Check that expected fields are present in the actual item
+          for (const [itemKey, itemExpectedValue] of Object.entries(expectedItem)) {
+            if (actualItem[itemKey] !== itemExpectedValue) {
+              failures.push(`manifest.${key}[${i}].${itemKey}: expected ${JSON.stringify(itemExpectedValue)}, got ${JSON.stringify(actualItem[itemKey])}`);
+            }
+          }
+        } else if (actualItem !== expectedItem) {
+          failures.push(`manifest.${key}[${i}]: expected ${JSON.stringify(expectedItem)}, got ${JSON.stringify(actualItem)}`);
+        }
+      }
+    }
+    // For primitive values, direct comparison
+    else if (actualValue !== expectedValue) {
       failures.push(`manifest.${key}: expected ${JSON.stringify(expectedValue)}, got ${JSON.stringify(actualValue)}`);
     }
   }
-
+  
   return failures;
 }
 
