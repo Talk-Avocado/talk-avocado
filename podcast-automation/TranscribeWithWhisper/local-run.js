@@ -1,4 +1,4 @@
-const { handler } = require("./index");
+import { handler } from "./index.js";
 
 (async () => {
   // Simulate S3 event for test-assets/mp3/sample.mp3

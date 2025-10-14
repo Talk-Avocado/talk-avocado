@@ -188,8 +188,8 @@ let chunkTranscript = result || {};
 const outputKey = `transcripts/${baseName}.json`;
 if (process.env.LOCAL_MODE === "true") {
   console.log(`🧪 [Local Mode] Saving transcript locally as ${outputKey}`);
-  const { writeFileSync, mkdirSync } = require("fs");
-  const { resolve, dirname } = require("path");
+  const { writeFileSync, mkdirSync } = await import("fs");
+  const { resolve, dirname } = await import("path");
 
   const localPath = resolve(__dirname, "..", "test-assets", outputKey);
   mkdirSync(dirname(localPath), { recursive: true });
@@ -263,8 +263,8 @@ function normalizeTranscript(t) {
 async function streamS3ToFile(bucket, key, filePath) {
   if (process.env.LOCAL_MODE === "true") {
     console.log("🧪 [Local Mode] Reading MP3 from local disk:", key);
-    const { copyFileSync } = require("fs");
-    const { resolve } = require("path");
+    const { copyFileSync } = await import("fs");
+    const { resolve } = await import("path");
 
     // Read from shared test-assets folder with same S3 subfolder structure
     const localPath = resolve(__dirname, "..", "test-assets", key);
@@ -287,7 +287,8 @@ function splitAudio(inputPath, chunkDurationSec) {
      -f segment -segment_time ${chunkDurationSec} -c:a libmp3lame -b:a 128k "${outputTemplate}" -y`
   );
 
-  return require("fs").readdirSync(tmpdir())
+  const fs = await import("fs");
+  return fs.readdirSync(tmpdir())
     .filter(f => f.startsWith("chunk-") && f.endsWith(".mp3"))
     .map(f => join(tmpdir(), f))
     .filter(f => {

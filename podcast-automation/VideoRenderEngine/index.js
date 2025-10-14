@@ -33,8 +33,8 @@ export const handler = async (event) => {
 let cutplan;
 try {
   if (process.env.LOCAL_MODE === "true") {
-    const { readFileSync, existsSync } = require("fs");
-    const { resolve } = require("path");
+    const { readFileSync, existsSync } = await import("fs");
+    const { resolve } = await import("path");
     const localPath = resolve(__dirname, "..", "test-assets", key);
     if (!existsSync(localPath)) {
       throw new Error(`❌ Cutplan file missing: ${localPath}. Aborting render.`);
@@ -83,8 +83,8 @@ cutplan.cuts = cutplan.cuts
     try {
       let polishedMd;
       if (process.env.LOCAL_MODE === "true") {
-        const { readFileSync, existsSync } = require("fs");
-        const { resolve } = require("path");
+        const { readFileSync, existsSync } = await import("fs");
+        const { resolve } = await import("path");
         const localPath = resolve(__dirname, "..", "test-assets", polishedKey);
         if (existsSync(localPath)) {
           polishedMd = readFileSync(localPath, "utf8");
@@ -114,8 +114,8 @@ cutplan.cuts = cutplan.cuts
     const outputPath = path.join(tmpDir, path.basename(outputKey));
 
     if (process.env.LOCAL_MODE === "true") {
-      const { copyFileSync } = require("fs");
-      const { resolve } = require("path");
+      const { copyFileSync } = await import("fs");
+      const { resolve } = await import("path");
       const localSource = resolve(__dirname, "..", "test-assets", inputKey);
       console.log(`🧪 [Local Mode] Copying video from ${localSource}`);
       copyFileSync(localSource, inputPath);
@@ -247,7 +247,7 @@ segments = segments.reduce((merged, seg) => {
         const concatListPath = path.join(os.tmpdir(), "concat_list.txt");
 
         // Extract each keep segment to a temporary file
-        let pLimit = require("p-limit");
+        let pLimit = (await import("p-limit")).default;
 if (typeof pLimit !== "function" && pLimit.default) {
   pLimit = pLimit.default; // For p-limit v4+ (ESM default export)
 }
@@ -275,7 +275,7 @@ await Promise.all(segments.map((seg, i) => limit(async () => {
 
         // Write concat list file
         const concatListContent = segmentFiles.map(f => `file '${f}'`).join("\n");
-        require("fs").writeFileSync(concatListPath, concatListContent);
+        (await import("fs")).writeFileSync(concatListPath, concatListContent);
 
         // Concat all segments into final output
 // Always verify streams first to decide if direct copy is safe
@@ -316,8 +316,8 @@ if (!concatSucceeded) {
 
     // 📤 Save final video
     if (process.env.LOCAL_MODE === "true") {
-      const { copyFileSync, mkdirSync } = require("fs");
-      const { resolve, dirname } = require("path");
+      const { copyFileSync, mkdirSync } = await import("fs");
+      const { resolve, dirname } = await import("path");
       const localDest = resolve(__dirname, "..", "test-assets", outputKey);
       mkdirSync(dirname(localDest), { recursive: true });
       copyFileSync(outputPath, localDest);
@@ -392,8 +392,8 @@ async function copyOriginalVideo(bucket, cutplanKey) {
   const outputKey = originalKey.replace(/^mp4\//, 'review/');
 
   if (process.env.LOCAL_MODE === "true") {
-    const { copyFileSync, mkdirSync } = require("fs");
-    const { resolve, dirname } = require("path");
+    const { copyFileSync, mkdirSync } = await import("fs");
+    const { resolve, dirname } = await import("path");
     const localSource = resolve(__dirname, "..", "test-assets", originalKey);
     const localDest = resolve(__dirname, "..", "test-assets", outputKey);
     mkdirSync(dirname(localDest), { recursive: true });

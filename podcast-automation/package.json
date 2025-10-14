@@ -1,4 +1,5 @@
 {
+  "type": "module",
   "dependencies": {
     "p-limit": "^6.2.0"
   }
