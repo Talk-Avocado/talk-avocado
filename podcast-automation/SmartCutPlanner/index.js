@@ -50,6 +50,70 @@ function snapToWordBoundary(sec, transcriptWords, toEnd = false) {
   return parseFloat(Number(closest).toFixed(2)) || 0;
 }
 
+// Validate cut schema
+function isValidCutSchema(json) {
+  if (!json || typeof json !== "object" || !Array.isArray(json.cuts)) return false;
+  return json.cuts.every(cut =>
+    typeof cut.start === "string" &&
+    typeof cut.end === "string" &&
+    typeof cut.reason === "string" &&
+    typeof cut.confidence === "number"
+  );
+}
+
+// Layer 3 JSON translator
+async function layer3TranslateToValidJSON(rawOutput, fallbackCuts) {
+  // Attempt strict parse & schema validation first
+  const parsed = safeParseJSON(rawOutput, null);
+  if (isValidCutSchema(parsed)) {
+    console.log(`✅ Layer 2 output passed strict JSON/schema validation — skipping Layer 3`);
+    return parsed.cuts;
+  }
+  
+  // Fallback to provided cuts if parsing fails
+  console.warn(`⚠️ Layer 2 output failed validation — using fallback cuts`);
+  return fallbackCuts || [];
+}
+
+// Score cut function
+function scoreCut(cut, transcriptWords) {
+  const segWords = transcriptWords.filter(w => w.start >= cut.startSec && w.end <= cut.endSec);
+  const wordCount = segWords.length;
+  const uniqueCount = new Set(segWords.map(w => w.word.toLowerCase())).size;
+  const duration = cut.endSec - cut.startSec;
+  const density = wordCount / (duration || 1);
+  
+  // Simple scoring: prefer cuts with fewer words and lower density
+  return {
+    wordCount,
+    uniqueCount,
+    density,
+    score: wordCount * 0.5 + density * 0.3 + (uniqueCount / wordCount) * 0.2
+  };
+}
+
+// Get cut context for safety validation
+function getCutContextForSafety(cut, structuredWords) {
+  const startCtx = Math.max(0, toSeconds(cut.start) - 1.5);
+  const endCtx = toSeconds(cut.end) + 1.5;
+  return structuredWords.filter(w => w.start >= startCtx && w.end <= endCtx);
+}
+
+// Final fail-safe validation
+function finalFailSafe(cuts, videoDuration) {
+  const MIN_GAP = 0.5;
+  const MAX_DENSITY = 10; // max 1 cut every 10s unless silence
+  let lastTime = -Infinity;
+  const safeCuts = cuts.filter(cut => {
+    const dur = toSeconds(cut.end) - toSeconds(cut.start);
+    if (dur <= 0 || dur > videoDuration) return false;
+    if ((toSeconds(cut.start) - lastTime) < MIN_GAP && !/(silence|pause)/i.test(cut.reason)) return false;
+    lastTime = toSeconds(cut.end);
+    return true;
+  });
+  return safeCuts;
+}
+
 /**
  * Merges close and short cuts with optional snapping to nearest transcript word boundaries.
  * Used in both strict and non-strict modes to keep behavior identical.
@@ -274,7 +338,7 @@ layer1Cuts = layer1Cuts.filter(cut => {
   // ===== LAYER 2: Flow & Meaning Refinement =====
 
 // Build contextual view for GPT (±1.5s before/after)
-function getCutContext(cut) {
+function getCutContext(cut, structuredWords) {
   const startCtx = Math.max(0, toSeconds(cut.start) - 1.5);
   const endCtx = toSeconds(cut.end) + 1.5;
   return structuredWords.filter(w => w.start >= startCtx && w.end <= endCtx);
@@ -283,7 +347,7 @@ function getCutContext(cut) {
 // Attach context to each proposed cut from Layer 1
 const cutsWithContext = layer1Cuts.map(cut => ({
   ...cut,
-  context: getCutContext(cut)
+  context: getCutContext(cut, structuredWords)
 }));
 
 // === LAYER 2 HYBRID PROMPT — combines strict editing rules + conversational context awareness ===
@@ -335,17 +399,6 @@ ${JSON.stringify(wordlessRanges, null, 2)}
   
       
  // ===== LAYER 3: JSON Translator & Finalizer (Conditional Execution) =====
-function isValidCutSchema(json) {
-  if (!json || typeof json !== "object" || !Array.isArray(json.cuts)) return false;
-  return json.cuts.every(cut =>
-    typeof cut.start === "string" &&
-    typeof cut.end === "string" &&
-    typeof cut.reason === "string" &&
-    typeof cut.confidence === "number"
-  );
-}
-
-async function layer3TranslateToValidJSON(rawOutput, fallbackCuts) {
   // Attempt strict parse & schema validation first
   const parsed = safeParseJSON(rawOutput, null);
   if (isValidCutSchema(parsed)) {
@@ -416,20 +469,7 @@ cutRanges = cutRanges.map(cut => ({
   endSec: toSeconds(cut.end)
 }));
 
-function scoreCut(cut, transcriptWords) {
-
-  const segWords = transcriptWords.filter(w => w.start >= cut.startSec && w.end <= cut.endSec);
-  const wordCount = segWords.length;
-  const uniqueCount = new Set(segWords.map(w => w.word.toLowerCase())).size;
-  const duration = cut.endSec - cut.startSec;
-  const density = wordCount / (duration || 1);
-
-  let score = 0;
-  if (uniqueCount <= 2) score += 0.5; // very low unique content
-  if (density < 2) score += 0.3;      // sparse words
-  if (duration < 1.5) score += 0.2;   // short moment
-  return score;
-}
+// scoreCut function moved to top level
 
 console.log("📉 Before scoring filter:", JSON.stringify(cutRanges, null, 2));
 cutRanges = cutRanges.filter(cut => {
@@ -626,15 +666,11 @@ if (overcutFlag) {
 // === SAFETY NET: Second GPT pass to validate filler cuts ===
 if (cutRanges.length > 0) {
   // --- SAFETY NET: Second GPT pass to validate filler cuts WITH per-cut context ---
-function getCutContextForSafety(cut) {
-  const startCtx = Math.max(0, toSeconds(cut.start) - 1.5);
-  const endCtx = toSeconds(cut.end) + 1.5;
-  return structuredWords.filter(w => w.start >= startCtx && w.end <= endCtx);
-}
+// getCutContextForSafety function moved to top level
 
 const cutsWithSafetyContext = cutRanges.map(cut => ({
   ...cut,
-  context: getCutContextForSafety(cut)
+  context: getCutContextForSafety(cut, structuredWords)
 }));
 
 
@@ -642,8 +678,8 @@ const cutsWithSafetyContext = cutRanges.map(cut => ({
 
 
 
-try {
-  const validationPrompt = `
+  try {
+    const validationPrompt = `
 You are a senior podcast/video editor verifying a proposed cut list.
 Only keep cuts that are true filler or dead-air with no risk to pacing, humor, or meaning.
 Remove any cut that contains meaningful words or speech.
@@ -741,7 +777,7 @@ if (!Array.isArray(validatedCuts) || !validatedCuts.every(cut =>
     const cleaned = validatedCutsRaw.replace(/```json|```/g, '').trim();
     parsedSafetyNet = safeParseJSON(cleaned, null);
 
-let validatedCuts = (parsedSafetyNet && Array.isArray(parsedSafetyNet.cuts))
+validatedCuts = (parsedSafetyNet && Array.isArray(parsedSafetyNet.cuts))
   ? parsedSafetyNet.cuts
   : [];
 
@@ -813,8 +849,7 @@ if (!Array.isArray(validatedCuts) || !validatedCuts.every(cut =>
       
           // LOCAL_MODE only — check background sound
           if (process.env.LOCAL_MODE === "true") {
-            const { resolve } = await import("path");
-            const audioPath = resolve(__dirname, "..", "test-assets", `mp4/${base}.mp4`);
+            const audioPath = path.resolve(__dirname, "..", "test-assets", `mp4/${base}.mp4`);
             const hasSound = !isMostlySilent(audioPath, cutStart, cutEnd);
             if (hasSound) {
               console.warn(`❌ Rejected dead-air cut ${cut.start}-${cut.end} — contains background sound`);
@@ -968,7 +1003,6 @@ Rules:
   } catch (err) {
     console.error("⚠️ Safety net GPT validation failed:", err);
   }
-}
 
 // Build final markdown
 const cleanedMd = `### PolishedTranscript\n${fullPolishedTranscript.trim()}\n\n### TimestampsToCut\n` +
@@ -1001,25 +1035,7 @@ cutRanges = cutRanges.filter(cut => {
 });
 
 // === FINAL FAIL-SAFE VALIDATION ===
-function finalFailSafe(cuts, videoDuration) {
-  const MIN_GAP = 0.5;
-  const MAX_DENSITY = 10; // max 1 cut every 10s unless silence
-  let lastTime = -Infinity;
-  const safeCuts = cuts.filter(cut => {
-    const dur = toSeconds(cut.end) - toSeconds(cut.start);
-    if (dur <= 0 || dur > videoDuration) return false;
-    if ((toSeconds(cut.start) - lastTime) < MIN_GAP && !/(silence|pause)/i.test(cut.reason)) return false;
-    lastTime = toSeconds(cut.start);
-    return true;
-  });
-
-  // If we somehow removed everything, fall back to only clear long pauses
-  if (safeCuts.length === 0) {
-    console.warn("⚠️ Fail-safe triggered — rebuilding conservative cut list.");
-    return cuts.filter(c => /(silence|long pause)/i.test(c.reason) && (toSeconds(c.end) - toSeconds(c.start) >= 0.5));
-  }
-  return safeCuts;
-}
+// finalFailSafe function moved to top level
 
 // Detect video duration from structuredWords
 const vidDuration = structuredWords.length ? structuredWords[structuredWords.length - 1].end : 0;

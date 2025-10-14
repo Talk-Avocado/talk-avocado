@@ -84,7 +84,7 @@ jobs:
         run: cd backend && npm run build
       - name: Run harness on golden sample
         run: |
-          node tools/harness/run-local-pipeline-simple.cjs \
+          node tools/harness/run-local-pipeline-simple.js \
             --input podcast-automation/test-assets/raw/sample-short.mp4 \
             --goldens podcast-automation/test-assets/goldens/sample-short \
             --env dev

@@ -1,6 +1,6 @@
 import { execSync } from 'child_process';
 import fs from 'fs';
-import path from 'path';
+// path import removed as it's not used
 
 /**
  * FFmpeg Runtime Validation Function
@@ -25,7 +25,7 @@ exports.handler = async (event, context) => {
 
     // Test FFmpeg availability and version
     try {
-      const ffmpegVersion = execSync('ffmpeg -version', { encoding: 'utf8', timeout: 10000 });
+      execSync('ffmpeg -version', { encoding: 'utf8', timeout: 10000 });
       results.ffmpegAvailable = true;
       console.log('FFmpeg version check passed');
       
@@ -45,7 +45,7 @@ exports.handler = async (event, context) => {
 
     // Test FFprobe availability
     try {
-      const ffprobeVersion = execSync('ffprobe -version', { encoding: 'utf8', timeout: 10000 });
+      execSync('ffprobe -version', { encoding: 'utf8', timeout: 10000 });
       results.ffprobeAvailable = true;
       console.log('FFprobe version check passed');
     } catch (error) {

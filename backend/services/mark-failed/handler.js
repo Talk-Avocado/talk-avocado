@@ -17,7 +17,7 @@ class MockDynamoDB {
   }
 
   async getJobByJobId(tenantId, jobId) {
-    for (const [key, item] of this.items.entries()) {
+    for (const [, item] of this.items.entries()) {
       if (item.tenantId === tenantId && item.jobId === jobId) {
         return item;
       }
@@ -118,7 +118,7 @@ export const handler = async (event) => {
     logger.error('Failed to mark job as failed', { 
       error: handlerError.message,
       stack: handlerError.stack,
-      originalError: error
+      originalError: handlerError
     });
     
     // Return error response for Step Functions

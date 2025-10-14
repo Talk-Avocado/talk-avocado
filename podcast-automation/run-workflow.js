@@ -69,7 +69,8 @@ function confirm(question) {
 
 (async () => {
   try {
-    let { multipleToday, newestFile, todayFiles, files } = getNewestRawFile();
+    const { multipleToday, todayFiles, files } = getNewestRawFile();
+    let newestFile = getNewestRawFile().newestFile;
 
     if (multipleToday) {
       console.warn(`⚠️ Found ${todayFiles.length} raw files modified today:`);

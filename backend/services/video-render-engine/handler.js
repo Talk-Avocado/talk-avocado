@@ -8,7 +8,6 @@ import {
   measureSyncDrift, 
   buildFilterGraph, 
   runFilterGraph,
-  cleanupTempFiles 
 } from './renderer-logic.js';
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
@@ -35,10 +34,11 @@ class VideoRenderError extends Error {
 
 /**
  * Convert seconds to SS.FF format for FFmpeg
+ * Currently unused but kept for potential future use
  */
-function toSSFF(seconds) {
-  return Number(seconds).toFixed(2);
-}
+// function toSSFF(seconds) {
+//   return Number(seconds).toFixed(2);
+// }
 
 /**
  * Main Lambda handler for video render engine

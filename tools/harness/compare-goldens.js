@@ -76,7 +76,7 @@ function compareManifestSubset(actual, golden) {
   return failures;
 }
 
-function compareTranscriptPreview(actualPath, goldenPath, strict) {
+function compareTranscriptPreview(actualPath, goldenPath) {
   const failures = [];
   
   if (!existsSync(goldenPath)) {

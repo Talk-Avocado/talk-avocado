@@ -1,6 +1,6 @@
 // VideoRenderEngine.js — Memory-Safe Streaming Edition
 import { S3Client, GetObjectCommand, PutObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
-import { createWriteStream, readFileSync, existsSync, copyFileSync, unlinkSync } from "fs";
+import { createWriteStream, readFileSync, existsSync, unlinkSync } from "fs";
 import { execSync } from "child_process";
 import path from "path";
 import os from "os";
@@ -174,7 +174,7 @@ if (keepRatio < 0.20) { // Less than 20% keep time
       
           // Apply padding
           let segStart = Math.max(0, toSeconds(lastEnd));
-let segEnd = videoDurationSec;
+const segEnd = videoDurationSec;
 
           // === FRAME GAP SAFEGUARD ===
 // Ensure at least 1 frame gap (~0.034s at 29.97fps) between consecutive segments
@@ -203,7 +203,7 @@ segments.push({
       // Final tail after last cut
       if (videoDurationSec && toSeconds(lastEnd) < videoDurationSec) {
         let segStart = Math.max(0, toSeconds(lastEnd) - pad);
-        let segEnd = videoDurationSec;
+        const segEnd = videoDurationSec;
         // === FRAME GAP SAFEGUARD ===
 // Ensure at least 1 frame gap (~0.034s at 29.97fps) between consecutive segments
 const FRAME_GAP = 1 / 29.97; // ~0.0334s
@@ -257,7 +257,7 @@ const limit = pLimit(4); // max concurrent FFmpeg processes
 
 await Promise.all(segments.map((seg, i) => limit(async () => {
   const segFile = path.join(os.tmpdir(), `segment-${i}.mp4`);
-  let ffmpegSegCmd = `ffmpeg -y -ss ${seg.start} -to ${seg.end} -i "${inputPath}" -c:v libx264 -crf 12 -preset slow -pix_fmt yuv420p -c:a aac -b:a 256k -movflags +faststart "${segFile}"`;
+  const ffmpegSegCmd = `ffmpeg -y -ss ${seg.start} -to ${seg.end} -i "${inputPath}" -c:v libx264 -crf 12 -preset slow -pix_fmt yuv420p -c:a aac -b:a 256k -movflags +faststart "${segFile}"`;
   try {
     console.log(`🎬 Extracting segment ${i + 1}: ${ffmpegSegCmd}`);
     execSync(ffmpegSegCmd, { stdio: "inherit" });

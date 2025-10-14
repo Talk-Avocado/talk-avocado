@@ -17,7 +17,7 @@ class MockDynamoDB {
   }
 
   async getJobByJobId(tenantId, jobId) {
-    for (const [key, item] of this.items.entries()) {
+    for (const [, item] of this.items.entries()) {
       if (item.tenantId === tenantId && item.jobId === jobId) {
         return item;
       }
