@@ -1,7 +1,7 @@
 // backend/lib/ffmpeg-runtime.ts
 import { execSync, spawn } from 'child_process';
 import fs from 'fs';
-import path from 'path';
+// path import removed as it's not used
 
 /**
  * FFmpeg runtime helper with timing, stderr capture, and X-Ray subsegment
@@ -25,14 +25,14 @@ class FFmpegRuntime {
       this.logger.info('Validating FFmpeg runtime availability');
       
       // Check FFmpeg availability
-      const ffmpegVersion = execSync('ffmpeg -version', { 
+      execSync('ffmpeg -version', { 
         encoding: 'utf8', 
         timeout: 10000,
         stdio: ['ignore', 'pipe', 'pipe']
       });
       
       // Check FFprobe availability
-      const ffprobeVersion = execSync('ffprobe -version', { 
+      execSync('ffprobe -version', { 
         encoding: 'utf8', 
         timeout: 10000,
         stdio: ['ignore', 'pipe', 'pipe']
@@ -255,7 +255,7 @@ class FFmpegRuntime {
    */
   async checkTmpSpace(): Promise<number> {
     try {
-      const stats = fs.statSync('/tmp');
+      fs.statSync('/tmp');
       // This is a simplified check - in practice you'd want to use a proper disk space check
       const tmpUsage = 0; // Placeholder - would need proper implementation
       

@@ -1,7 +1,7 @@
 import { test, describe, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert';
 import fs from 'node:fs';
-import path from 'node:path';
+// path import removed as it's not used
 import { 
   keyFor, 
   writeFileAtKey, 

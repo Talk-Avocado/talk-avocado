@@ -1,7 +1,7 @@
 import { LoggingWrapper } from '../../logging.js';
 import { currentEnv } from '../../storage.js';
 import { loadManifest } from '../../manifest.js';
-import { Manifest } from '../../types.js';
+// Manifest type is used in loadManifest return type
 
 // Mock DynamoDB client for Phase 1 (local mode)
 // In production, this would be AWS SDK DynamoDB client
@@ -27,7 +27,7 @@ class MockDynamoDB {
 
   // Helper method to find job by jobId within a tenant
   async getJobByJobId(tenantId: string, jobId: string): Promise<DynamoDBItem | null> {
-    for (const [key, item] of this.items.entries()) {
+    for (const [, item] of this.items.entries()) {
       if (item.tenantId === tenantId && item.jobId === jobId) {
         return item;
       }

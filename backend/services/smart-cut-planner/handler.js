@@ -105,7 +105,9 @@ export const handler = async (event, context) => {
       manifest.logs = manifest.logs || [];
       manifest.logs.push({ type: 'error', message: `Planner failed: ${err.message}`, createdAt: new Date().toISOString() });
       saveManifest(env, tenantId, jobId, manifest);
-    } catch {}
+    } catch {
+      // Ignore errors when trying to log the failure - we're already handling the main error
+    }
     throw err;
   }
 };

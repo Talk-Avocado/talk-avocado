@@ -11,6 +11,7 @@ module.exports = {
     sourceType: 'module'
   },
   rules: {
+<<<<<<< HEAD
     // General code quality - make less strict for now
     'no-unused-vars': 'warn',
     'no-console': 'off',
@@ -29,3 +30,20 @@ module.exports = {
     }
   ]
 };
+=======
+    // General code quality
+    'no-unused-vars': 'warn',
+    'no-console': 'warn',
+    'prefer-const': 'warn',
+    'no-var': 'error',
+    'no-empty': 'warn',
+    'no-undef': 'error'
+  },
+  ignorePatterns: [
+    '**/*.ts',
+    '**/*.d.ts',
+    'backend/dist/**',
+    'node_modules/**'
+  ]
+};
+>>>>>>> MFU-WP01-04-BE-video-engine-cuts

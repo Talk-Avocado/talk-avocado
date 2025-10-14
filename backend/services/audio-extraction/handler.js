@@ -1,9 +1,9 @@
 // backend/services/audio-extraction/handler.js
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { basename } from 'node:path';
 import { initObservability } from '../../dist/init-observability.js';
-import { keyFor, pathFor, writeFileAtKey } from '../../dist/storage.js';
+import { keyFor, pathFor } from '../../dist/storage.js';
 import { loadManifest, saveManifest } from '../../dist/manifest.js';
 import { FFmpegRuntime } from '../../dist/ffmpeg-runtime.js';
 
@@ -113,7 +113,7 @@ export const handler = async (event, context) => {
     const durationSec = Number(probe.format?.duration || aStream.duration || 0);
     const bitrateKbps = Math.round(Number(probe.format?.bit_rate || 0) / 1000);
     const sampleRateHz = Number(aStream.sample_rate || sampleRate);
-    const codec = (aStream.codec_name || 'mp3').toLowerCase();
+    // const codec = (aStream.codec_name || 'mp3').toLowerCase(); // Not used currently
 
     // Update manifest with error handling
     try {
