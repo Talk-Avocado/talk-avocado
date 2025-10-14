@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 // tools/harness/run-local-pipeline.js
-const { parseArgs } = require('node:util');
-const { readFileSync, copyFileSync } = require('node:fs');
-const { v4: uuidv4 } = require('uuid');
-const path = require('node:path');
+import { parseArgs } from 'node:util';
+import { readFileSync, copyFileSync } from 'node:fs';
+import { v4 as uuidv4 } from 'uuid';
+import path from 'node:path';
 
 // Import storage and manifest helpers
-const { keyFor, pathFor, writeFileAtKey, ensureDirForFile } = require('../../backend/dist/storage');
-const { saveManifest, loadManifest } = require('../../backend/dist/manifest');
+import { keyFor, pathFor, writeFileAtKey, ensureDirForFile } from '../../backend/dist/storage.js';
+import { saveManifest, loadManifest } from '../../backend/dist/manifest.js';
 
 async function main() {
   // Parse CLI arguments
@@ -70,7 +70,7 @@ async function main() {
   for (const handler of handlers) {
     try {
       console.log(`[harness] Running ${handler.name}...`);
-      const { handler: fn } = require(handler.path);
+      const { handler: fn } = await import(handler.path);
       
       // Build event based on handler requirements
       let event = { env, tenantId, jobId, inputKey };
@@ -113,7 +113,7 @@ async function main() {
   // 5. Compare goldens if provided
   if (values.goldens) {
     console.log(`[harness] Comparing against goldens: ${values.goldens}`);
-    const { compareGoldens } = require('./compare-goldens');
+    const { compareGoldens } = await import('./compare-goldens.js');
     const passed = await compareGoldens({
       actualPath: pathFor(keyFor(env, tenantId, jobId)),
       goldensPath: values.goldens,

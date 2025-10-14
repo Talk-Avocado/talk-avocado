@@ -1,6 +1,6 @@
-const { handler } = require("./index");
-const fs = require("fs");
-const path = require("path");
+import { handler } from "./index.js";
+import fs from "fs";
+import path from "path";
 
 (async () => {
   // Path to local raw folder

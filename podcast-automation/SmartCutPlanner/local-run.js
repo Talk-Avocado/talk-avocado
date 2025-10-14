@@ -1,4 +1,4 @@
-const { handler } = require("./index");
+import { handler } from "./index.js";
 
 (async () => {
   // Simulate S3 event for the transcript JSON from TranscribeWithWhisper

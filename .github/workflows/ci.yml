@@ -27,6 +27,14 @@ jobs:
           npx eslint . || true
           npx prettier -c . || true
         fi
+    - name: Check ES Module Compliance
+      run: |
+        if [ -f scripts/check-es-modules.sh ]; then
+          bash scripts/check-es-modules.sh
+        else
+          echo "ES module check script not found"
+          exit 1
+        fi
     - name: Tests
       run: |
         if [ -f package.json ]; then

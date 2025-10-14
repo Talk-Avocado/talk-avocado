@@ -1,4 +1,4 @@
-const { handler } = require("./index");
+import { handler } from "./index.js";
 
 (async () => {
   // Simulate S3 event for a cut plan file in test-assets/plans/
