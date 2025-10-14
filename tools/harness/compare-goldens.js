@@ -1,6 +1,6 @@
 // tools/harness/compare-goldens.js
-const { readFileSync, existsSync } = require('node:fs');
-const { join } = require('node:path');
+import { readFileSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
 
 function loadJSON(path) {
   if (!existsSync(path)) return null;
@@ -149,4 +149,4 @@ async function compareGoldens({ actualPath, goldensPath, strict }) {
   return true;
 }
 
-module.exports = { compareGoldens };
+export { compareGoldens };

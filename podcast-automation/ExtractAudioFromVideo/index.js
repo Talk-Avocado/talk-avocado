@@ -89,8 +89,8 @@ export const handler = async (event) => {
 async function streamS3ToFile(bucket, key, filePath) {
   if (process.env.LOCAL_MODE === "true") {
     console.log("🧪 [Local Mode] Reading file from local disk:", key);
-    const { copyFileSync } = require("fs");
-    const { resolve } = require("path");
+    const { copyFileSync } = await import("fs");
+    const { resolve } = await import("path");
 
     // Look in the mirrored subfolder structure inside test-assets
     const localPath = resolve(__dirname, "..", "test-assets", key);
@@ -114,8 +114,8 @@ async function streamS3ToFile(bucket, key, filePath) {
 async function uploadFileToS3(bucket, key, filePath, contentType) {
   if (process.env.LOCAL_MODE === "true") {
     console.log(`🧪 [Local Mode] Saving output locally as ${key}`);
-    const { copyFileSync, mkdirSync } = require("fs");
-    const { resolve, dirname } = require("path");
+    const { copyFileSync, mkdirSync } = await import("fs");
+    const { resolve, dirname } = await import("path");
 
     // Build the same folder structure inside test-assets
     const localPath = resolve(__dirname, "..", "test-assets", key);

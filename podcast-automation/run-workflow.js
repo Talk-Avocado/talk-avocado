@@ -1,6 +1,6 @@
-const path = require("path");
-const fs = require("fs");
-const readline = require("readline");
+import path from "path";
+import fs from "fs";
+import readline from "readline";
 
 // Utility: find newest raw file & detect if multiple new files exist
 function getNewestRawFile() {
@@ -113,7 +113,8 @@ function confirm(question) {
 
     // STEP 1: ExtractAudioFromVideo
     console.log("\n=== STEP 1: ExtractAudioFromVideo ===");
-    await require("./ExtractAudioFromVideo/index").handler({
+    const { handler: extractHandler } = await import("./ExtractAudioFromVideo/index.js");
+    await extractHandler({
       Records: [
         {
           s3: {
@@ -126,7 +127,8 @@ function confirm(question) {
 
     // STEP 2: TranscribeWithWhisper
     console.log("\n=== STEP 2: TranscribeWithWhisper ===");
-    await require("./TranscribeWithWhisper/index").handler({
+    const { handler: transcribeHandler } = await import("./TranscribeWithWhisper/index.js");
+    await transcribeHandler({
       Records: [
         {
           s3: {
@@ -139,7 +141,8 @@ function confirm(question) {
 
     // STEP 3: SmartCutPlanner
     console.log("\n=== STEP 3: SmartCutPlanner ===");
-    await require("./SmartCutPlanner/index").handler({
+    const { handler: plannerHandler } = await import("./SmartCutPlanner/index.js");
+    await plannerHandler({
       Records: [
         {
           s3: {
@@ -152,7 +155,8 @@ function confirm(question) {
 
     // STEP 4: VideoRenderEngine
     console.log("\n=== STEP 4: VideoRenderEngine ===");
-    await require("./VideoRenderEngine/index").handler({
+    const { handler: renderHandler } = await import("./VideoRenderEngine/index.js");
+    await renderHandler({
       Records: [
         {
           s3: {

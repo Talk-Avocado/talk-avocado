@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 // test-smart-cut-planner.js
-const { handler } = require('./backend/services/smart-cut-planner/handler');
-const { keyFor, pathFor, writeFileAtKey, ensureDirForFile } = require('./backend/dist/storage');
-const { saveManifest } = require('./backend/dist/manifest');
-const fs = require('node:fs');
-const path = require('node:path');
+import { handler } from './backend/services/smart-cut-planner/handler.js';
+import { keyFor, pathFor, writeFileAtKey, ensureDirForFile } from './backend/dist/storage.js';
+import { saveManifest } from './backend/dist/manifest.js';
+import fs from 'node:fs';
+import path from 'node:path';
 
 async function testSmartCutPlanner() {
   const env = 'dev';
