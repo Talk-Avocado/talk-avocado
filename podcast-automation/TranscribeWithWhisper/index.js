@@ -3,11 +3,11 @@ import { execSync } from "child_process";
 import { S3Client, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { SecretsManagerClient, GetSecretValueCommand } from "@aws-sdk/client-secrets-manager";
 import https from "https";
-import path from "path";
+import path, { join } from "path";
 import { tmpdir } from "os";
-import { join } from "path";
 import { createReadStream, createWriteStream, unlinkSync, existsSync, statSync, readFileSync } from "fs";
 import dotenv from "dotenv";
+import { logger } from "../../scripts/logger.js";
 
 // Load .env for local mode
 if (process.env.LOCAL_MODE === "true") {
@@ -19,16 +19,19 @@ const s3 = new S3Client({ region: process.env.AWS_REGION });
 const secrets = new SecretsManagerClient({ region: process.env.AWS_REGION });
 
 export const handler = async (event) => {
-  console.log("✅ TranscribeWithWhisper Lambda triggered");
-  console.log("📦 Event payload:", JSON.stringify(event));
+  logger.info("TranscribeWithWhisper Lambda triggered");
+  logger.debug("Event payload", event);
 
   const record = event.Records?.[0];
-  if (!record) return console.error("❌ No event record found");
+  if (!record) {
+    logger.error("No event record found");
+    return;
+  }
 
   const bucket = record.s3.bucket.name;
   const key = decodeURIComponent(record.s3.object.key.replace(/\+/g, " "));
   if (!key.endsWith(".mp3")) {
-    console.log("⏭ Skipped non-mp3 file:", key);
+    logger.info("Skipped non-mp3 file", { key });
     return;
   }
 
@@ -47,21 +50,21 @@ if (process.env.LOCAL_MODE === "true") {
 
 
     // 📥 Stream MP3 from S3 to temp file
-    console.log(`⬇️ Streaming download from S3: ${key}`);
+    logger.info("Streaming download from S3", { key });
     await streamS3ToFile(bucket, key, tempPath);
 
     // 📏 Log file diagnostics
     const stats = statSync(tempPath);
-    console.log(`📏 MP3 size: ${(stats.size / 1024 / 1024).toFixed(2)} MB`);
+    logger.debug("MP3 file size", { sizeMB: (stats.size / 1024 / 1024).toFixed(2) });
     const headerBytes = readFileSync(tempPath).slice(0, 32).toString("hex").match(/.{1,2}/g).join(" ");
-    console.log(`🔍 First 32 bytes (hex): ${headerBytes}`);
+    logger.debug("MP3 header bytes", { headerBytes });
 
     // 🎧 ffprobe diagnostics (optional)
     try {
       const ffprobeFull = execSync(`ffprobe -v quiet -print_format json -show_format -show_streams "${tempPath}"`).toString();
-      console.log(`🛠 Audio Format Details:\n${ffprobeFull}`);
+      logger.debug("Audio format details", { ffprobe: JSON.parse(ffprobeFull) });
     } catch {
-      console.warn("⚠️ Could not determine audio format via ffprobe");
+      logger.warn("Could not determine audio format via ffprobe");
     }
 
     // ⏳ Initial split — hard cap at 600s to avoid Whisper max limits
@@ -71,21 +74,21 @@ const chunkPaths = await splitAudio(tempPath, 600);
 chunkPaths.forEach((p, idx) => {
   try {
     const dur = parseFloat(execSync(`ffprobe -v error -show_entries format=duration -of default=nokey=1:noprint_wrappers=1 "${p}"`).toString().trim());
-    console.log(`⏱ Chunk ${idx + 1}: ${dur.toFixed(2)} seconds`);
+    logger.debug(`Chunk ${idx + 1} duration`, { duration: dur.toFixed(2) });
   } catch {
-    console.warn(`⚠️ Failed to get duration for chunk ${idx + 1}: ${p}`);
+    logger.warn(`Failed to get duration for chunk ${idx + 1}`, { path: p });
   }
 });
 
-    console.log(`🔪 Created ${chunkPaths.length} chunk(s)`);
+    logger.info(`Created ${chunkPaths.length} chunk(s)`);
 
-    let mergedTranscript = { text: "", words: [], segments: [] };
+    const mergedTranscript = { text: "", words: [], segments: [] };
     let offset = 0;
 
     for (const chunkPath of chunkPaths) {
-      console.log(`🗣 Transcribing chunk: ${path.basename(chunkPath)} (offset ${offset}s)`);
+      logger.info(`Transcribing chunk: ${path.basename(chunkPath)} (offset ${offset}s)`);
 
-      let result = await retryAsync(() => callWhisper(apiKey, chunkPath), 3, 2000, chunkPath);
+      const result = await retryAsync(() => callWhisper(apiKey, chunkPath), 3, 2000, chunkPath);
 
 if (result && result.autoSplit) {
   // Process each smaller chunk and merge back
@@ -94,17 +97,17 @@ if (result && result.autoSplit) {
     normalizeTranscript(smallTranscript);
 
     if (smallTranscript.words.length === 0 && smallTranscript.segments.length > 0) {
-      console.warn(`⚠️ Missing words[] in auto-split chunk — retrying with strict settings`);
+      logger.warn(`⚠️ Missing words[] in auto-split chunk — retrying with strict settings`);
       const retrySmall = await retryAsync(() => callWhisper(apiKey, smallChunk, true), 2, 2000, smallChunk) || {};
       normalizeTranscript(retrySmall);
       if (retrySmall.words.length > 0) {
-        console.log(`✅ Recovered words[] in auto-split chunk`);
+        logger.info(`✅ Recovered words[] in auto-split chunk`);
         smallTranscript = retrySmall;
       }
     }
 
     if (smallTranscript.words.length === 0) {
-      console.error(`❌ No words[] found for auto-split chunk after retries`);
+      logger.error(`❌ No words[] found for auto-split chunk after retries`);
       continue;
     }
 
@@ -138,19 +141,19 @@ let chunkTranscript = result || {};
 
       // 🔄 Retry if still no words[] but segments exist
       if (chunkTranscript.words.length === 0 && chunkTranscript.segments.length > 0) {
-        console.warn(`⚠️ Missing words[] for ${path.basename(chunkPath)} — retrying with strict settings`);
+        logger.warn(`⚠️ Missing words[] for ${path.basename(chunkPath)} — retrying with strict settings`);
         const retryTranscript = await retryAsync(() => callWhisper(apiKey, chunkPath, true), 2, 2000) || {};
         normalizeTranscript(retryTranscript);
         if (retryTranscript.words.length > 0) {
-          console.log(`✅ Successfully recovered words[] for ${path.basename(chunkPath)}`);
+          logger.info(`✅ Successfully recovered words[] for ${path.basename(chunkPath)}`);
           chunkTranscript = retryTranscript;
         }
       }
 
       // 🛑 Fail-fast if still missing words[]
       if (chunkTranscript.words.length === 0) {
-        console.error(`❌ No words[] found for chunk ${path.basename(chunkPath)} after retries`);
-        console.error("📄 Raw Whisper JSON dump (truncated):\n", JSON.stringify(chunkTranscript).slice(0, 5000));
+        logger.error(`❌ No words[] found for chunk ${path.basename(chunkPath)} after retries`);
+        logger.error("📄 Raw Whisper JSON dump (truncated):\n", JSON.stringify(chunkTranscript).slice(0, 5000));
         throw new Error(`❌ Missing word-level data for chunk ${path.basename(chunkPath)}`);
       }
 
@@ -187,7 +190,7 @@ let chunkTranscript = result || {};
     // 💾 Save transcript
 const outputKey = `transcripts/${baseName}.json`;
 if (process.env.LOCAL_MODE === "true") {
-  console.log(`🧪 [Local Mode] Saving transcript locally as ${outputKey}`);
+  logger.info(`🧪 [Local Mode] Saving transcript locally as ${outputKey}`);
   const { writeFileSync, mkdirSync } = await import("fs");
   const { resolve, dirname } = await import("path");
 
@@ -202,14 +205,14 @@ if (process.env.LOCAL_MODE === "true") {
     ContentType: "application/json"
   }));
 }
-console.log(`✅ Whisper transcript saved to: ${outputKey}`);
+logger.info(`✅ Whisper transcript saved to: ${outputKey}`);
 
 
     // 🧹 Cleanup
     [tempPath, ...chunkPaths].forEach(p => existsSync(p) && unlinkSync(p));
 
   } catch (err) {
-    console.error("🔥 TranscribeWithWhisper failed:", err);
+    logger.error("🔥 TranscribeWithWhisper failed:", err);
     throw err;
   }
 };
@@ -254,7 +257,7 @@ function normalizeTranscript(t) {
   if (t.words.length === 0 && Array.isArray(t.segments)) {
     const recovered = t.segments.flatMap(s => s.words || []);
     if (recovered.length) {
-      console.warn(`⚠️ Recovered ${recovered.length} words from segments[].words`);
+      logger.warn(`⚠️ Recovered ${recovered.length} words from segments[].words`);
       t.words = recovered;
     }
   }
@@ -262,7 +265,7 @@ function normalizeTranscript(t) {
 
 async function streamS3ToFile(bucket, key, filePath) {
   if (process.env.LOCAL_MODE === "true") {
-    console.log("🧪 [Local Mode] Reading MP3 from local disk:", key);
+    logger.info("🧪 [Local Mode] Reading MP3 from local disk:", key);
     const { copyFileSync } = await import("fs");
     const { resolve } = await import("path");
 
@@ -297,12 +300,12 @@ async function splitAudio(inputPath, chunkDurationSec) {
           `ffprobe -v error -show_entries format=duration -of default=nokey=1:noprint_wrappers=1 "${f}"`
         ).toString().trim());
         if (dur < 1) {
-          console.warn(`⚠️ Skipping very short chunk (${dur.toFixed(2)}s): ${f}`);
+          logger.warn(`⚠️ Skipping very short chunk (${dur.toFixed(2)}s): ${f}`);
           return false;
         }
         return true;
       } catch {
-        console.warn(`⚠️ Could not determine duration for ${f}, keeping by default`);
+        logger.warn(`⚠️ Could not determine duration for ${f}, keeping by default`);
         return true;
       }
     })
@@ -319,24 +322,24 @@ async function retryAsync(fn, retries, delay, filePath) {
       return await fn();
     } catch (err) {
       attempt++;
-      console.warn(`⚠️ Attempt ${attempt} failed: ${err.message}`);
+      logger.warn(`⚠️ Attempt ${attempt} failed: ${err.message}`);
       
       // Whisper 500/502/503/504 — retry
       if (isRetryableError(err) && attempt <= retries) {
         const wait = delay * attempt;
-        console.log(`⏳ Retrying in ${wait / 1000}s...`);
+        logger.info(`⏳ Retrying in ${wait / 1000}s...`);
         await new Promise(res => setTimeout(res, wait));
         continue;
       }
 
       // If we still fail after last retry AND it's retryable → auto-split the chunk
       if (isRetryableError(err) && attempt > retries && filePath) {
-        console.warn(`🔀 Auto-splitting ${filePath} into smaller chunks due to repeated Whisper failure`);
+        logger.warn(`🔀 Auto-splitting ${filePath} into smaller chunks due to repeated Whisper failure`);
         // Force smaller subchunks for stability — max 300 seconds
 const targetDuration = Math.min(300, Math.floor(getAudioDuration(filePath) / 2));
 const newChunks = await splitAudio(filePath, targetDuration);
 
-        console.log(`   Created ${newChunks.length} smaller chunks from ${path.basename(filePath)}`);
+        logger.info(`   Created ${newChunks.length} smaller chunks from ${path.basename(filePath)}`);
         return { autoSplit: true, chunks: newChunks };
       }
 
@@ -394,7 +397,7 @@ async function callWhisper(apiKey, filePath, forceWordLevel = false) {
   const stats = statSync(filePath);
   const totalLength = Buffer.byteLength(formHead) + stats.size + Buffer.byteLength(formTail);
 
-  console.log(`📤 Sending chunk: ${filePath} (${(stats.size / 1024 / 1024).toFixed(2)} MB)`);
+  logger.info(`📤 Sending chunk: ${filePath} (${(stats.size / 1024 / 1024).toFixed(2)} MB)`);
 
   return new Promise((resolve, reject) => {
     const req = https.request({
@@ -410,12 +413,12 @@ async function callWhisper(apiKey, filePath, forceWordLevel = false) {
       let data = "";
       res.on("data", chunk => data += chunk);
       res.on("end", () => {
-        console.log(`📥 Whisper API responded with HTTP ${res.statusCode}`);
+        logger.info(`📥 Whisper API responded with HTTP ${res.statusCode}`);
         if (res.statusCode >= 500) return reject(new Error(`${res.statusCode} Whisper server error`));
         try {
           resolve(JSON.parse(data));
         } catch {
-          console.error("❌ Failed to parse Whisper response. Raw output:\n", data);
+          logger.error("❌ Failed to parse Whisper response. Raw output:\n", data);
           reject(new Error("Failed to parse Whisper response"));
         }
       });

@@ -1,4 +1,5 @@
 import { handler } from "./index.js";
+import { logger } from "scripts/logger.js";
 
 (async () => {
   // Simulate S3 event for test-assets/mp3/sample.mp3
@@ -15,8 +16,8 @@ import { handler } from "./index.js";
 
   try {
     await handler(event);
-    console.log("✅ Local run complete");
+    logger.info("✅ Local run complete");
   } catch (err) {
-    console.error("🔥 Error during local run:", err);
+    logger.error("🔥 Error during local run:", err);
   }
 })();

@@ -5,17 +5,18 @@ import { spawn, execSync } from "child_process";
 import { tmpdir } from "os";
 import { join, basename } from "path";
 import { createWriteStream, readFileSync, unlinkSync, existsSync } from "fs";
+import { logger } from "scripts/logger.js";
 
 const s3 = new S3Client({ region: process.env.AWS_REGION });
 const lambda = new LambdaClient({ region: process.env.AWS_REGION });
 
 export const handler = async (event) => {
-  console.log("✅ Lambda triggered");
-  console.log("📦 Event payload:", JSON.stringify(event));
+  logger.info("✅ Lambda triggered");
+  logger.info("📦 Event payload:", JSON.stringify(event));
 
   const record = event.Records?.[0];
   if (!record) {
-    console.error("❌ No event record found");
+    logger.error("❌ No event record found");
     return { statusCode: 400, body: "No event record" };
   }
 
@@ -30,13 +31,13 @@ export const handler = async (event) => {
 
   try {
     // ⬇️ Stream from S3 → Local disk
-    console.log(`⬇️ Streaming download from S3: ${key}`);
+    logger.info(`⬇️ Streaming download from S3: ${key}`);
     await streamS3ToFile(bucket, key, tempInputPath);
 
     // 🔄 Convert to MP4 if needed
     let inputForAudio = tempInputPath;
     if (!key.toLowerCase().endsWith(".mp4")) {
-      console.log("🔄 Converting to .mp4");
+      logger.info("🔄 Converting to .mp4");
       execSync(`ffmpeg -i "${tempInputPath}" -c:v libx264 -crf 23 -preset fast -c:a aac -b:a 128k -y "${normalizedPath}"`, { stdio: "inherit" });
       inputForAudio = normalizedPath;
     }
@@ -44,10 +45,10 @@ export const handler = async (event) => {
     // 📤 Save final MP4 to S3
     const finalVideoKey = `mp4/${nameWithoutExt}.mp4`;
     await uploadFileToS3(bucket, finalVideoKey, inputForAudio, "video/mp4");
-    console.log(`📤 .mp4 saved as: ${finalVideoKey}`);
+    logger.info(`📤 .mp4 saved as: ${finalVideoKey}`);
 
     // 🎧 Extract MP3 audio
-    console.log("🎧 Extracting audio...");
+    logger.info("🎧 Extracting audio...");
     await runFfmpeg([
       "-i", inputForAudio,
       "-vn",
@@ -61,7 +62,7 @@ export const handler = async (event) => {
     // 📤 Save MP3 to S3
     const audioKey = `mp3/${nameWithoutExt}.mp3`;
     await uploadFileToS3(bucket, audioKey, tempOutputPath, "audio/mpeg");
-    console.log(`📤 .mp3 saved as: ${audioKey}`);
+    logger.info(`📤 .mp3 saved as: ${audioKey}`);
 
     // 🚀 Trigger StartTranscriptionJob Lambda
     await lambda.send(new InvokeCommand({
@@ -71,14 +72,14 @@ export const handler = async (event) => {
         Records: [{ s3: { bucket: { name: bucket }, object: { key: audioKey } } }]
       })
     }));
-    console.log("🚀 StartTranscriptionJob invoked");
+    logger.info("🚀 StartTranscriptionJob invoked");
 
     // 🧹 Cleanup
     [tempInputPath, tempOutputPath, normalizedPath].forEach(p => existsSync(p) && unlinkSync(p));
 
     return { statusCode: 200, body: `Extracted and uploaded ${audioKey}` };
   } catch (error) {
-    console.error("🔥 Lambda failed:", error);
+    logger.error("🔥 Lambda failed:", error);
     return { statusCode: 500, body: `Error: ${error.message}` };
   }
 };
@@ -88,7 +89,7 @@ export const handler = async (event) => {
  */
 async function streamS3ToFile(bucket, key, filePath) {
   if (process.env.LOCAL_MODE === "true") {
-    console.log("🧪 [Local Mode] Reading file from local disk:", key);
+    logger.info("🧪 [Local Mode] Reading file from local disk:", key);
     const { copyFileSync } = await import("fs");
     const { resolve } = await import("path");
 
@@ -113,7 +114,7 @@ async function streamS3ToFile(bucket, key, filePath) {
  */
 async function uploadFileToS3(bucket, key, filePath, contentType) {
   if (process.env.LOCAL_MODE === "true") {
-    console.log(`🧪 [Local Mode] Saving output locally as ${key}`);
+    logger.info(`🧪 [Local Mode] Saving output locally as ${key}`);
     const { copyFileSync, mkdirSync } = await import("fs");
     const { resolve, dirname } = await import("path");
 
@@ -140,7 +141,7 @@ async function uploadFileToS3(bucket, key, filePath, contentType) {
 function runFfmpeg(args) {
   return new Promise((resolve, reject) => {
     const ffmpeg = spawn("ffmpeg", args);
-    ffmpeg.stderr.on("data", data => console.log("ffmpeg:", data.toString()));
+    ffmpeg.stderr.on("data", data => logger.info("ffmpeg:", data.toString()));
     ffmpeg.on("close", code => (code === 0 ? resolve() : reject(new Error(`ffmpeg exited with code ${code}`))));
   });
 }

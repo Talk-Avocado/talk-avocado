@@ -4,6 +4,7 @@ import { handler } from './backend/services/smart-cut-planner/handler.js';
 import { keyFor, pathFor, ensureDirForFile } from './backend/dist/storage.js';
 import { saveManifest } from './backend/dist/manifest.js';
 import fs from 'node:fs';
+import { logger } from "scripts/logger.js";
 // path import removed as it's not used
 
 async function testSmartCutPlanner() {
@@ -11,7 +12,7 @@ async function testSmartCutPlanner() {
   const tenantId = 't-test';
   const jobId = 'test-smart-cut-planner';
   
-  console.log('Testing Smart Cut Planner...');
+  logger.info('Testing Smart Cut Planner...');
   
   // 1. Create test transcript
   const transcriptKey = keyFor(env, tenantId, jobId, 'transcripts', 'transcript.json');
@@ -95,7 +96,7 @@ async function testSmartCutPlanner() {
   };
   
   fs.writeFileSync(transcriptPath, JSON.stringify(testTranscript, null, 2));
-  console.log(`Created test transcript: ${transcriptKey}`);
+  logger.info(`Created test transcript: ${transcriptKey}`);
   
   // 2. Create initial manifest
   const manifest = {
@@ -108,17 +109,17 @@ async function testSmartCutPlanner() {
     updatedAt: new Date().toISOString()
   };
   saveManifest(env, tenantId, jobId, manifest);
-  console.log('Created test manifest');
+  logger.info('Created test manifest');
   
   // 3. Run smart cut planner
   try {
     const event = { env, tenantId, jobId, transcriptKey };
     const context = { awsRequestId: `test-${Date.now()}` };
     
-    console.log('Running smart cut planner...');
+    logger.info('Running smart cut planner...');
     const result = await handler(event, context);
-    console.log('✓ Smart cut planner completed successfully');
-    console.log('Result:', result);
+    logger.info('✓ Smart cut planner completed successfully');
+    logger.info('Result:', result);
     
     // 4. Check output
     const planKey = keyFor(env, tenantId, jobId, 'plan', 'cut_plan.json');
@@ -126,16 +127,16 @@ async function testSmartCutPlanner() {
     
     if (fs.existsSync(planPath)) {
       const cutPlan = JSON.parse(fs.readFileSync(planPath, 'utf-8'));
-      console.log('\nGenerated cut plan:');
-      console.log(JSON.stringify(cutPlan, null, 2));
+      logger.info('\nGenerated cut plan:');
+      logger.info(JSON.stringify(cutPlan, null, 2));
     } else {
-      console.log('❌ Cut plan file not found');
+      logger.info('❌ Cut plan file not found');
     }
     
   } catch (error) {
-    console.error('❌ Smart cut planner failed:', error.message);
-    console.error('Error details:', error);
+    logger.error('❌ Smart cut planner failed:', error.message);
+    logger.error('Error details:', error);
   }
 }
 
-testSmartCutPlanner().catch(console.error);
+testSmartCutPlanner().catch(logger.error);

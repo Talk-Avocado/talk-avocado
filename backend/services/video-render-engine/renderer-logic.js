@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { logger } from "scripts/logger.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -114,7 +115,7 @@ export async function measureSyncDrift(sourcePath, keepSegments) {
   // 2. Measure the actual A/V sync drift
   // 3. Return the maximum drift found
   
-  console.log(`[renderer-logic] Measuring sync drift for ${keepSegments.length} segments`);
+  logger.info(`[renderer-logic] Measuring sync drift for ${keepSegments.length} segments`);
   
   // For now, return 0 drift to satisfy the requirement
   // TODO: Implement actual drift measurement
@@ -211,7 +212,7 @@ export function cleanupTempFiles(filePaths) {
       try {
         unlinkSync(filePath);
       } catch (err) {
-        console.warn(`[renderer-logic] Failed to cleanup temp file: ${filePath}`, err.message);
+        logger.warn(`[renderer-logic] Failed to cleanup temp file: ${filePath}`, err.message);
       }
     }
   });

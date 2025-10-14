@@ -1,6 +1,7 @@
 // tools/harness/compare-goldens.js
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { logger } from "scripts/logger.js";
 
 function loadJSON(path) {
   if (!existsSync(path)) return null;
@@ -152,14 +153,14 @@ function compareTranscriptPreview(actualPath, goldenPath) {
 }
 
 async function compareGoldens({ actualPath, goldensPath, strict }) {
-  console.log('[compare] Loading actuals and goldens...');
+  logger.info('[compare] Loading actuals and goldens...');
 
   const actualManifest = loadJSON(join(actualPath, 'manifest.json'));
   const goldenManifest = loadJSON(join(goldensPath, 'manifest.json'));
   const goldenMetrics = loadJSON(join(goldensPath, 'metrics.json'));
 
   if (!actualManifest) {
-    console.error('[compare] Actual manifest not found');
+    logger.error('[compare] Actual manifest not found');
     return false;
   }
 
@@ -180,12 +181,12 @@ async function compareGoldens({ actualPath, goldensPath, strict }) {
   allFailures = allFailures.concat(transcriptFailures);
 
   if (allFailures.length > 0) {
-    console.error('[compare] Mismatches found:');
-    allFailures.forEach(f => console.error(`  - ${f}`));
+    logger.error('[compare] Mismatches found:');
+    allFailures.forEach(f => logger.error(`  - ${f}`));
     return false;
   }
 
-  console.log('[compare] All checks passed');
+  logger.info('[compare] All checks passed');
   return true;
 }
 

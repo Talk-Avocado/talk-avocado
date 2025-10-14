@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
+import { logger } from "scripts/logger.js";
 
 const ENV = process.env.TALKAVOCADO_ENV || 'dev';
 const ROOT = process.env.MEDIA_STORAGE_PATH || './storage';
@@ -24,4 +25,4 @@ const manifest = {
 const mk = p(ENV, tenantId, jobId, 'manifest.json');
 ensure(mk);
 writeFileSync(mk, JSON.stringify(manifest, null, 2));
-console.log('Wrote manifest:', mk);
+logger.info('Wrote manifest:', mk);
