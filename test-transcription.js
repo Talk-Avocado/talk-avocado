@@ -2,6 +2,7 @@
 import { handler } from './backend/services/transcription/handler.js';
 import { writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
+import { logger } from "scripts/logger.js";
 
 async function testTranscription() {
   // Create a simple test audio file (silence for 2 seconds)
@@ -49,13 +50,13 @@ async function testTranscription() {
   };
   
   try {
-    console.log('Testing transcription handler...');
+    logger.info('Testing transcription handler...');
     const result = await handler(event, context);
-    console.log('Transcription completed successfully:', result);
+    logger.info('Transcription completed successfully:', result);
   } catch (error) {
-    console.error('Transcription failed:', error.message);
-    console.error('Error type:', error.type);
-    console.error('Error details:', error.details);
+    logger.error('Transcription failed:', error.message);
+    logger.error('Error type:', error.type);
+    logger.error('Error details:', error.details);
   }
 }
 

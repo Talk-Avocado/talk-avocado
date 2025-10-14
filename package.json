@@ -6,9 +6,13 @@
   "scripts": {
     "test": "bash scripts/test.sh",
     "setup": "bash scripts/setup.sh",
-    "format": "bash scripts/format.sh",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "format:bash": "bash scripts/format.sh",
     "lint": "eslint . --ext .js,.ts",
-    "check-es-modules": "bash scripts/check-es-modules.sh",
+    "lint:fix": "eslint . --ext .js,.ts --fix",
+    "check-es-modules": "node scripts/check-es-modules.js",
+    "validate-env": "node scripts/validate-dev-env.js",
     "harness": "node tools/harness/run-local-pipeline-simple.js"
   },
   "dependencies": {
@@ -21,7 +25,8 @@
     "@typescript-eslint/eslint-plugin": "^6.21.0",
     "@typescript-eslint/parser": "^6.21.0",
     "eslint": "^8.0.0",
-    "eslint-plugin-import": "^2.0.0"
+    "eslint-plugin-import": "^2.0.0",
+    "prettier": "^3.6.2"
   },
   "engines": {
     "node": ">=18.0.0"

@@ -1,5 +1,6 @@
 import { execSync } from 'child_process';
 import fs from 'fs';
+import { logger } from "scripts/logger.js";
 // path import removed as it's not used
 
 /**
@@ -21,13 +22,13 @@ exports.handler = async (event, context) => {
   };
 
   try {
-    console.log('Starting FFmpeg runtime validation...');
+    logger.info('Starting FFmpeg runtime validation...');
 
     // Test FFmpeg availability and version
     try {
       execSync('ffmpeg -version', { encoding: 'utf8', timeout: 10000 });
       results.ffmpegAvailable = true;
-      console.log('FFmpeg version check passed');
+      logger.info('FFmpeg version check passed');
       
       // Check for required codecs in build configuration
       const buildConf = execSync('ffmpeg -buildconf', { encoding: 'utf8', timeout: 10000 });
@@ -37,20 +38,20 @@ exports.handler = async (event, context) => {
         }
       });
       
-      console.log(`Available codecs: ${results.codecsPresent.join(', ')}`);
+      logger.info(`Available codecs: ${results.codecsPresent.join(', ')}`);
     } catch (error) {
       results.errors.push(`FFmpeg availability check failed: ${error.message}`);
-      console.error('FFmpeg not available:', error.message);
+      logger.error('FFmpeg not available:', error.message);
     }
 
     // Test FFprobe availability
     try {
       execSync('ffprobe -version', { encoding: 'utf8', timeout: 10000 });
       results.ffprobeAvailable = true;
-      console.log('FFprobe version check passed');
+      logger.info('FFprobe version check passed');
     } catch (error) {
       results.errors.push(`FFprobe availability check failed: ${error.message}`);
-      console.error('FFprobe not available:', error.message);
+      logger.error('FFprobe not available:', error.message);
     }
 
     // Test basic FFprobe JSON output (if we have a test file)
@@ -64,14 +65,14 @@ exports.handler = async (event, context) => {
         
         // Validate expected structure
         if (probeData.format && probeData.streams) {
-          console.log('FFprobe JSON structure validation passed');
+          logger.info('FFprobe JSON structure validation passed');
           results.probeValidation = true;
         } else {
           results.errors.push('FFprobe JSON structure validation failed');
         }
       } catch (error) {
         results.errors.push(`FFprobe JSON test failed: ${error.message}`);
-        console.error('FFprobe JSON test failed:', error.message);
+        logger.error('FFprobe JSON test failed:', error.message);
       }
     }
 
@@ -83,7 +84,7 @@ exports.handler = async (event, context) => {
         
         // Verify output file was created
         if (fs.existsSync(event.outputFile)) {
-          console.log('Basic audio extraction test passed');
+          logger.info('Basic audio extraction test passed');
           results.audioExtractionTest = true;
           
           // Clean up test output
@@ -93,7 +94,7 @@ exports.handler = async (event, context) => {
         }
       } catch (error) {
         results.errors.push(`Audio extraction test failed: ${error.message}`);
-        console.error('Audio extraction test failed:', error.message);
+        logger.error('Audio extraction test failed:', error.message);
       }
     }
 
@@ -105,7 +106,7 @@ exports.handler = async (event, context) => {
 
     results.executionTime = Date.now() - startTime;
 
-    console.log('FFmpeg runtime validation completed', {
+    logger.info('FFmpeg runtime validation completed', {
       validationPassed: results.validationPassed,
       executionTime: results.executionTime,
       errors: results.errors.length
@@ -124,7 +125,7 @@ exports.handler = async (event, context) => {
     results.executionTime = Date.now() - startTime;
     results.errors.push(`Unexpected error: ${error.message}`);
     
-    console.error('FFmpeg validation failed with unexpected error:', error);
+    logger.error('FFmpeg validation failed with unexpected error:', error);
     
     return {
       statusCode: 500,

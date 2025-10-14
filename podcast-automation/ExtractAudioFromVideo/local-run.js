@@ -1,6 +1,7 @@
 import { handler } from "./index.js";
 import fs from "fs";
 import path from "path";
+import { logger } from "scripts/logger.js";
 
 (async () => {
   // Path to local raw folder
@@ -16,11 +17,11 @@ import path from "path";
     .sort((a, b) => b.time - a.time)[0]?.name;
 
   if (!newestFile) {
-    console.error("❌ No files found in test-assets/raw/");
+    logger.error("❌ No files found in test-assets/raw/");
     process.exit(1);
   }
 
-  console.log(`🧪 Using newest raw file: ${newestFile}`);
+  logger.info(`🧪 Using newest raw file: ${newestFile}`);
 
   const event = {
     Records: [
@@ -35,8 +36,8 @@ import path from "path";
 
   try {
     await handler(event);
-    console.log("✅ Local run complete");
+    logger.info("✅ Local run complete");
   } catch (err) {
-    console.error("🔥 Error during local run:", err);
+    logger.error("🔥 Error during local run:", err);
   }
 })();

@@ -24,16 +24,20 @@ jobs:
     - name: Lint
       run: |
         if [ -f package.json ]; then
-          npx eslint . || true
-          npx prettier -c . || true
+          npm run lint
         fi
     - name: Check ES Module Compliance
       run: |
-        if [ -f scripts/check-es-modules.sh ]; then
-          bash scripts/check-es-modules.sh
+        if [ -f package.json ]; then
+          npm run check-es-modules
         else
           echo "ES module check script not found"
           exit 1
+        fi
+    - name: Check Code Formatting
+      run: |
+        if [ -f package.json ]; then
+          npm run format:check
         fi
     - name: Tests
       run: |

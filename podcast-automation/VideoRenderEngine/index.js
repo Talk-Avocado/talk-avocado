@@ -5,6 +5,7 @@ import { execSync } from "child_process";
 import path from "path";
 import os from "os";
 import dotenv from "dotenv";
+import { logger } from "scripts/logger.js";
 
 // Load .env for local mode from project root
 if (process.env.LOCAL_MODE === "true") {
@@ -16,7 +17,7 @@ const s3 = new S3Client({ region: "eu-west-2" });
 export const handler = async (event) => {
   const record = event.Records?.[0];
   if (!record) {
-    console.error("❌ No event record found");
+    logger.error("❌ No event record found");
     return;
   }
 
@@ -24,7 +25,7 @@ export const handler = async (event) => {
   const key = decodeURIComponent(record.s3.object.key.replace(/\+/g, " "));
 
   if (!key.endsWith(".cutplan.json")) {
-    console.log("⏭ Skipped non-cutplan file:", key);
+    logger.info("⏭ Skipped non-cutplan file:", key);
     return;
   }
 
@@ -51,12 +52,12 @@ try {
     
   }
 } catch (err) {
-  console.error(`❌ Failed to load cutplan: ${err.message}. Copying original video instead.`);
+  logger.error(`❌ Failed to load cutplan: ${err.message}. Copying original video instead.`);
   return await copyOriginalVideo(bucket, key);
 }
 
 
-    console.log("📄 Cutplan loaded:", JSON.stringify(cutplan, null, 2));
+    logger.info("📄 Cutplan loaded:", JSON.stringify(cutplan, null, 2));
 
     // Sanitize cuts to prevent invalid times from crashing
 const minDuration = 0.05; // seconds
@@ -72,7 +73,7 @@ cutplan.cuts = cutplan.cuts
       !isNaN(cut.endSec) &&
       cut.endSec - cut.startSec >= minDuration
     );
-    if (!valid) console.warn(`⚠️ Skipping invalid cut: ${cut.start} → ${cut.end} (${cut.reason})`);
+    if (!valid) logger.warn(`⚠️ Skipping invalid cut: ${cut.start} → ${cut.end} (${cut.reason})`);
     return valid;
   })
   .sort((a, b) => a.startSec - b.startSec)
@@ -89,17 +90,17 @@ cutplan.cuts = cutplan.cuts
         if (existsSync(localPath)) {
           polishedMd = readFileSync(localPath, "utf8");
         } else {
-          console.warn("⚠️ No polished transcript found for this cutplan");
+          logger.warn("⚠️ No polished transcript found for this cutplan");
         }
       } else {
         const polishedRes = await s3.send(new GetObjectCommand({ Bucket: bucket, Key: polishedKey }));
         polishedMd = await polishedRes.Body.transformToString();
       }
       if (polishedMd) {
-        console.log("📝 Polished transcript preview:\n", polishedMd.substring(0, 500) + (polishedMd.length > 500 ? "..." : ""));
+        logger.info("📝 Polished transcript preview:\n", polishedMd.substring(0, 500) + (polishedMd.length > 500 ? "..." : ""));
       }
     } catch {
-      console.warn("⚠️ No polished transcript found for this cutplan");
+      logger.warn("⚠️ No polished transcript found for this cutplan");
     }
 
     // 📥 Prepare input/output keys
@@ -117,13 +118,13 @@ cutplan.cuts = cutplan.cuts
       const { copyFileSync } = await import("fs");
       const { resolve } = await import("path");
       const localSource = resolve(__dirname, "..", "test-assets", inputKey);
-      console.log(`🧪 [Local Mode] Copying video from ${localSource}`);
+      logger.info(`🧪 [Local Mode] Copying video from ${localSource}`);
       copyFileSync(localSource, inputPath);
     } else {
-      console.log("🔍 Checking source video exists:", inputKey);
+      logger.info("🔍 Checking source video exists:", inputKey);
       await s3.send(new HeadObjectCommand({ Bucket: bucket, Key: inputKey }));
 
-      console.log(`⬇️ Streaming download from S3: ${inputKey}`);
+      logger.info(`⬇️ Streaming download from S3: ${inputKey}`);
       await streamS3ToFile(bucket, inputKey, inputPath);
     }
 
@@ -133,9 +134,9 @@ cutplan.cuts = cutplan.cuts
       const ffprobeCmd = `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${inputPath}"`;
       const result = execSync(ffprobeCmd).toString().trim();
       videoDurationSec = parseFloat(result);
-      console.log(`⏱ Video duration detected: ${videoDurationSec.toFixed(2)} seconds`);
+      logger.info(`⏱ Video duration detected: ${videoDurationSec.toFixed(2)} seconds`);
     } catch (err) {
-      console.warn("⚠️ Failed to detect video duration with ffprobe, will use fallback logic");
+      logger.warn("⚠️ Failed to detect video duration with ffprobe, will use fallback logic");
     }
 
     // 🚨 Safety check: prevent producing a mostly empty video
@@ -146,7 +147,7 @@ const keepTime = videoDurationSec - totalCutTime;
 const keepRatio = keepTime / videoDurationSec;
 
 if (keepRatio < 0.20) { // Less than 20% keep time
-  console.warn(`⚠️ Cutplan would keep only ${(keepRatio * 100).toFixed(1)}% of the video. Reverting to original.`);
+  logger.warn(`⚠️ Cutplan would keep only ${(keepRatio * 100).toFixed(1)}% of the video. Reverting to original.`);
   return await copyOriginalVideo(bucket, key);
 }
 
@@ -155,9 +156,9 @@ if (keepRatio < 0.20) { // Less than 20% keep time
       throw new Error(`❌ Cutplan has no cuts. Aborting render.`);
     } else {
     
-      console.log(`✂️ Applying ${cutplan.cuts.length} cuts:`);
+      logger.info(`✂️ Applying ${cutplan.cuts.length} cuts:`);
       cutplan.cuts.forEach((cut, i) => {
-        console.log(`  Cut ${i + 1}: ${cut.start} → ${cut.end} (${cut.reason})`);
+        logger.info(`  Cut ${i + 1}: ${cut.start} → ${cut.end} (${cut.reason})`);
       });
 
       let segments = [];
@@ -186,7 +187,7 @@ if (segments.length > 0) {
   }
   // Prevent negative/zero-length segment
   if (segStart >= segEnd) {
-    console.warn(`⚠️ Skipping zero/negative-length segment at ${segStart.toFixed(3)}s`);
+    logger.warn(`⚠️ Skipping zero/negative-length segment at ${segStart.toFixed(3)}s`);
     return; // skip pushing this segment
   }
 }
@@ -214,7 +215,7 @@ if (segments.length > 0) {
   }
   // Prevent negative/zero-length segment
   if (segStart >= segEnd) {
-    console.warn(`⚠️ Skipping zero/negative-length segment at ${segStart.toFixed(3)}s`);
+    logger.warn(`⚠️ Skipping zero/negative-length segment at ${segStart.toFixed(3)}s`);
     return; // skip pushing this segment
   }
 }
@@ -226,7 +227,7 @@ segments.push({
 
       }
 
-      console.log("📌 Segments to keep:", segments);
+      logger.info("📌 Segments to keep:", segments);
 
       if (segments.length === 0) {
         throw new Error("❌ No valid keep segments generated after processing cuts. Aborting render.");
@@ -259,10 +260,10 @@ await Promise.all(segments.map((seg, i) => limit(async () => {
   const segFile = path.join(os.tmpdir(), `segment-${i}.mp4`);
   const ffmpegSegCmd = `ffmpeg -y -ss ${seg.start} -to ${seg.end} -i "${inputPath}" -c:v libx264 -crf 12 -preset slow -pix_fmt yuv420p -c:a aac -b:a 256k -movflags +faststart "${segFile}"`;
   try {
-    console.log(`🎬 Extracting segment ${i + 1}: ${ffmpegSegCmd}`);
+    logger.info(`🎬 Extracting segment ${i + 1}: ${ffmpegSegCmd}`);
     execSync(ffmpegSegCmd, { stdio: "inherit" });
   } catch (err) {
-    console.warn(`⚠️ Extraction failed for segment ${i + 1}, re-encoding...`);
+    logger.warn(`⚠️ Extraction failed for segment ${i + 1}, re-encoding...`);
     const reencodeCmd = `ffmpeg -y -ss ${seg.start} -to ${seg.end} -i "${inputPath}" -c:v libx264 -crf 12 -preset slow -pix_fmt yuv420p -c:a aac -b:a 256k -movflags +faststart "${segFile}"`;
     execSync(reencodeCmd, { stdio: "inherit" });
   }
@@ -282,7 +283,7 @@ await Promise.all(segments.map((seg, i) => limit(async () => {
 const ffmpegConcatCmd = `ffmpeg -f concat -safe 0 -i "${concatListPath}" -c:v libx264 -crf 12 -preset slow -pix_fmt yuv420p -c:a aac -b:a 256k -movflags +faststart -y "${outputPath}"`;
 
 
-console.log("🎬 Concatenating segments into final file:", ffmpegConcatCmd);
+logger.info("🎬 Concatenating segments into final file:", ffmpegConcatCmd);
 let concatSucceeded = false;
 
 try {
@@ -297,13 +298,13 @@ try {
 
   concatSucceeded = true;
 } catch (err) {
-  console.warn(`⚠️ Direct concat failed: ${err.message}`);
+  logger.warn(`⚠️ Direct concat failed: ${err.message}`);
 }
 
 // If concat failed or is missing video, re-encode entire output
 if (!concatSucceeded) {
   const ffmpegConcatReencodeCmd = `ffmpeg -f concat -safe 0 -i "${concatListPath}" -c:v libx264 -crf 12 -preset slow -pix_fmt yuv420p -c:a aac -b:a 256k -movflags +faststart -y "${outputPath}"`;
-  console.log("🎬 Re-encoding with high quality:", ffmpegConcatReencodeCmd);
+  logger.info("🎬 Re-encoding with high quality:", ffmpegConcatReencodeCmd);
   execSync(ffmpegConcatReencodeCmd, { stdio: "inherit" });
 }
 
@@ -321,7 +322,7 @@ if (!concatSucceeded) {
       const localDest = resolve(__dirname, "..", "test-assets", outputKey);
       mkdirSync(dirname(localDest), { recursive: true });
       copyFileSync(outputPath, localDest);
-      console.log(`🧪 [Local Mode] Final video saved to: ${localDest}`);
+      logger.info(`🧪 [Local Mode] Final video saved to: ${localDest}`);
     } else {
       await s3.send(new PutObjectCommand({
         Bucket: bucket,
@@ -329,13 +330,13 @@ if (!concatSucceeded) {
         Body: readFileSync(outputPath),
         ContentType: "video/mp4"
       }));
-      console.log(`✅ Final video uploaded as: ${outputKey}`);
+      logger.info(`✅ Final video uploaded as: ${outputKey}`);
     }
 
     // 🧹 Cleanup
     [inputPath, outputPath].forEach(p => existsSync(p) && unlinkSync(p));
   } catch (err) {
-    console.error("🔥 VideoRenderEngine failed:", err);
+    logger.error("🔥 VideoRenderEngine failed:", err);
   }
 };
 
@@ -398,7 +399,7 @@ async function copyOriginalVideo(bucket, cutplanKey) {
     const localDest = resolve(__dirname, "..", "test-assets", outputKey);
     mkdirSync(dirname(localDest), { recursive: true });
     copyFileSync(localSource, localDest);
-    console.log(`🧪 [Local Mode] Original video copied to: ${localDest}`);
+    logger.info(`🧪 [Local Mode] Original video copied to: ${localDest}`);
   } else {
     const { Body } = await s3.send(new GetObjectCommand({ Bucket: bucket, Key: originalKey }));
     await s3.send(new PutObjectCommand({
@@ -407,6 +408,6 @@ async function copyOriginalVideo(bucket, cutplanKey) {
       Body,
       ContentType: "video/mp4"
     }));
-    console.log(`✅ Original video copied to: ${outputKey}`);
+    logger.info(`✅ Original video copied to: ${outputKey}`);
   }
 }
