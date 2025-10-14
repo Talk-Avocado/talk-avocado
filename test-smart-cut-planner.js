@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 // test-smart-cut-planner.js
 import { handler } from './backend/services/smart-cut-planner/handler.js';
-import { keyFor, pathFor, writeFileAtKey, ensureDirForFile } from './backend/dist/storage.js';
+import { keyFor, pathFor, ensureDirForFile } from './backend/dist/storage.js';
 import { saveManifest } from './backend/dist/manifest.js';
 import fs from 'node:fs';
-import path from 'node:path';
+// path import removed as it's not used
 
 async function testSmartCutPlanner() {
   const env = 'dev';

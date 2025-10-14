@@ -15,11 +15,11 @@ NC='\033[0m' # No Color
 
 # Check for CommonJS require statements
 echo "Checking for require() statements..."
-REQUIRE_COUNT=$(grep -r "require(" --include="*.js" --include="*.ts" --exclude-dir=node_modules --exclude-dir=dist . | wc -l)
+REQUIRE_COUNT=$(grep -r "require(" --include="*.js" --include="*.ts" --exclude-dir=node_modules --exclude-dir=dist --exclude="*.cjs" . | wc -l)
 
 if [ "$REQUIRE_COUNT" -gt 0 ]; then
     echo -e "${RED}❌ Found $REQUIRE_COUNT require() statements:${NC}"
-    grep -r "require(" --include="*.js" --include="*.ts" --exclude-dir=node_modules --exclude-dir=dist .
+    grep -r "require(" --include="*.js" --include="*.ts" --exclude-dir=node_modules --exclude-dir=dist --exclude="*.cjs" .
     echo ""
     echo -e "${YELLOW}💡 Convert these to import statements${NC}"
     echo -e "${YELLOW}   Example: const fs = require('fs') → import { readFile } from 'fs'${NC}"
@@ -28,11 +28,11 @@ fi
 
 # Check for module.exports statements
 echo "Checking for module.exports statements..."
-MODULE_EXPORTS_COUNT=$(grep -r "module\.exports" --include="*.js" --include="*.ts" --exclude-dir=node_modules --exclude-dir=dist . | wc -l)
+MODULE_EXPORTS_COUNT=$(grep -r "module\.exports" --include="*.js" --include="*.ts" --exclude-dir=node_modules --exclude-dir=dist --exclude="*.cjs" . | wc -l)
 
 if [ "$MODULE_EXPORTS_COUNT" -gt 0 ]; then
     echo -e "${RED}❌ Found $MODULE_EXPORTS_COUNT module.exports statements:${NC}"
-    grep -r "module\.exports" --include="*.js" --include="*.ts" --exclude-dir=node_modules --exclude-dir=dist .
+    grep -r "module\.exports" --include="*.js" --include="*.ts" --exclude-dir=node_modules --exclude-dir=dist --exclude="*.cjs" .
     echo ""
     echo -e "${YELLOW}💡 Convert these to export statements${NC}"
     echo -e "${YELLOW}   Example: module.exports = { func } → export { func }${NC}"
@@ -52,11 +52,11 @@ done
 
 # Check for missing .js extensions in relative imports
 echo "Checking for missing .js extensions in relative imports..."
-MISSING_EXT_COUNT=$(grep -r "from ['\"]\\./" --include="*.js" --include="*.ts" --exclude-dir=node_modules --exclude-dir=dist . | grep -v "\.js['\"]" | wc -l)
+MISSING_EXT_COUNT=$(grep -r "from ['\"]\\./" --include="*.js" --include="*.ts" --exclude-dir=node_modules --exclude-dir=dist --exclude="*.cjs" . | grep -v "\.js['\"]" | wc -l)
 
 if [ "$MISSING_EXT_COUNT" -gt 0 ]; then
     echo -e "${YELLOW}⚠️  Found $MISSING_EXT_COUNT relative imports without .js extension:${NC}"
-    grep -r "from ['\"]\\./" --include="*.js" --include="*.ts" --exclude-dir=node_modules --exclude-dir=dist . | grep -v "\.js['\"]"
+    grep -r "from ['\"]\\./" --include="*.js" --include="*.ts" --exclude-dir=node_modules --exclude-dir=dist --exclude="*.cjs" . | grep -v "\.js['\"]"
     echo ""
     echo -e "${YELLOW}💡 Add .js extension to relative imports${NC}"
     echo -e "${YELLOW}   Example: import { func } from './utils' → import { func } from './utils.js'${NC}"

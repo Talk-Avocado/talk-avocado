@@ -2,7 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { LoggingWrapper } from '../../lib/logging.js';
 import { currentEnv, keyFor } from '../../lib/storage.js';
 import { saveManifest, manifestKey } from '../../lib/manifest.js';
-import { Manifest, ManifestInput } from '../../lib/types.js';
+import { Manifest } from '../../lib/types.js';
 
 // Mock DynamoDB client for Phase 1 (local mode)
 // In production, this would be AWS SDK DynamoDB client
