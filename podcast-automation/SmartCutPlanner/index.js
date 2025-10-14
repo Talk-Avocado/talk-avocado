@@ -153,8 +153,8 @@ if (process.env.LOCAL_MODE === "true") {
 
     let whisperJsonRaw;
 if (process.env.LOCAL_MODE === "true") {
-  const { readFileSync } = require("fs");
-  const { resolve } = require("path");
+  const { readFileSync } = await import("fs");
+  const { resolve } = await import("path");
   const localPath = resolve(__dirname, "..", "test-assets", key);
   whisperJsonRaw = readFileSync(localPath, "utf8");
 } else {
@@ -813,7 +813,8 @@ if (!Array.isArray(validatedCuts) || !validatedCuts.every(cut =>
       
           // LOCAL_MODE only — check background sound
           if (process.env.LOCAL_MODE === "true") {
-            const audioPath = require("path").resolve(__dirname, "..", "test-assets", `mp4/${base}.mp4`);
+            const { resolve } = await import("path");
+            const audioPath = resolve(__dirname, "..", "test-assets", `mp4/${base}.mp4`);
             const hasSound = !isMostlySilent(audioPath, cutStart, cutEnd);
             if (hasSound) {
               console.warn(`❌ Rejected dead-air cut ${cut.start}-${cut.end} — contains background sound`);
@@ -906,7 +907,7 @@ cutRanges = validatedCuts.map(cut => ({
 
       // === VERIFY AUDIO SILENCE FOR WORDLESS CUTS ===
 if (process.env.LOCAL_MODE === "true") {
-  const { resolve } = require("path");
+  const { resolve } = await import("path");
   const audioPath = resolve(__dirname, "..", "test-assets", `mp4/${base}.mp4`);
   console.log(`🔍 Running waveform silence verification on ${audioPath}`);
 
@@ -975,8 +976,8 @@ const cleanedMd = `### PolishedTranscript\n${fullPolishedTranscript.trim()}\n\n#
 
 
       if (process.env.LOCAL_MODE === "true") {
-        const { writeFileSync, mkdirSync } = require("fs");
-        const { resolve, dirname } = require("path");
+        const { writeFileSync, mkdirSync } = await import("fs");
+        const { resolve, dirname } = await import("path");
         const localPath = resolve(__dirname, "..", "test-assets", polishedKey);
         mkdirSync(dirname(localPath), { recursive: true });
         writeFileSync(localPath, cleanedMd);
@@ -1031,8 +1032,8 @@ cutRanges = finalFailSafe(cutRanges, vidDuration);
       }, null, 2);
       
       if (process.env.LOCAL_MODE === "true") {
-        const { writeFileSync, mkdirSync } = require("fs");
-        const { resolve, dirname } = require("path");
+        const { writeFileSync, mkdirSync } = await import("fs");
+        const { resolve, dirname } = await import("path");
         const localPath = resolve(__dirname, "..", "test-assets", cutplanKey);
         mkdirSync(dirname(localPath), { recursive: true });
         writeFileSync(localPath, cutPlanJson);

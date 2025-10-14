@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-const { writeFileSync, mkdirSync } = require('node:fs');
-const { join, dirname } = require('node:path');
+import { writeFileSync, mkdirSync } from 'node:fs';
+import { join, dirname } from 'node:path';
 
 const ENV = process.env.TALKAVOCADO_ENV || 'dev';
 const ROOT = process.env.MEDIA_STORAGE_PATH || './storage';

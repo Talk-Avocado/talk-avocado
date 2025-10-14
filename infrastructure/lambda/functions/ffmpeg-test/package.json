@@ -2,6 +2,7 @@
   "name": "ffmpeg-test-function",
   "version": "1.0.0",
   "description": "FFmpeg runtime validation function for Lambda",
+  "type": "module",
   "main": "handler.js",
   "scripts": {
     "test": "node handler.js"
