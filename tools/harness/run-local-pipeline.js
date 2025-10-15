@@ -8,7 +8,7 @@ import path from 'node:path';
 // Import storage and manifest helpers
 import { keyFor, pathFor, ensureDirForFile } from '../../backend/dist/storage.js';
 import { saveManifest, loadManifest } from '../../backend/dist/manifest.js';
-import { logger } from "scripts/logger.js";
+import { logger } from "../../scripts/logger.js";
 
 async function main() {
   // Parse CLI arguments

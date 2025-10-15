@@ -17,34 +17,34 @@ class SimpleLogger {
 
   info(message, data = null) {
     if (this.isDevelopment) {
-      logger.info(this._formatMessage('INFO', message, data));
+      console.log(this._formatMessage('INFO', message, data));
     }
   }
 
   error(message, data = null) {
-    logger.error(this._formatMessage('ERROR', message, data));
+    console.error(this._formatMessage('ERROR', message, data));
   }
 
   warn(message, data = null) {
     if (this.isDevelopment) {
-      logger.warn(this._formatMessage('WARN', message, data));
+      console.warn(this._formatMessage('WARN', message, data));
     }
   }
 
   debug(message, data = null) {
     if (this.isDevelopment) {
-      logger.info(this._formatMessage('DEBUG', message, data));
+      console.log(this._formatMessage('DEBUG', message, data));
     }
   }
 
   // For workflow scripts that need user interaction
   user(message) {
-    logger.info(message);
+    console.log(message);
   }
 
   // For test files - always show
   test(message, data = null) {
-    logger.info(`[TEST] ${message}`, data || '');
+    console.log(`[TEST] ${message}`, data || '');
   }
 }
 
