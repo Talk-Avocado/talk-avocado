@@ -66,6 +66,14 @@ function checkRequireStatements() {
       
       lines.forEach((line, index) => {
         if (line.includes('require(') && !line.trim().startsWith('//')) {
+          // Skip lines that are part of the checker's own logic
+          if (line.includes('line.includes(\'require(\')') || 
+              line.includes('log(\'Checking for require() statements\')') ||
+              line.includes('log(`❌ Found ${violations.length} require() statements:`)') ||
+              line.includes('log(\'   Example: const fs = require(\\\'fs\\\') → import { readFile } from \\\'fs\\\'\')')) {
+            return;
+          }
+          
           violations.push({
             file,
             line: index + 1,
