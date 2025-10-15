@@ -1,7 +1,7 @@
 // tools/harness/compare-goldens.js
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { logger } from "scripts/logger.js";
+import { logger } from "../../scripts/logger.js";
 
 function loadJSON(path) {
   if (!existsSync(path)) return null;
