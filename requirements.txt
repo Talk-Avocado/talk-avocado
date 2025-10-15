@@ -1,5 +1,0 @@
-# Transcription (WP01-02) - Whisper dependencies
-openai-whisper>=20230314
-
-# Alternative faster option with CTranslate2 backend
-# whisper-ctranslate2>=0.4.0
