@@ -991,6 +991,7 @@ Rules:
     } else {
       logger.warn("⚠️ Pacing merge returned no cuts — keeping validated list");
     }
+    
   } catch (err) {
     logger.error("⚠️ Pacing merge GPT step failed:", err);
   }

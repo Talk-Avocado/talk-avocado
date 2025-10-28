@@ -2,38 +2,43 @@
 // Provides consistent logging interface across the codebase
 
 class SimpleLogger {
-  constructor(serviceName = 'TalkAvocado', context = {}) {
+  constructor(serviceName = "TalkAvocado", context = {}) {
     this.serviceName = serviceName;
     this.context = context;
-    this.isDevelopment = process.env.NODE_ENV === 'development' || process.env.LOCAL_MODE === 'true';
+    this.isDevelopment =
+      process.env.NODE_ENV === "development" ||
+      process.env.LOCAL_MODE === "true";
   }
 
   _formatMessage(level, message, data = null) {
     const timestamp = new Date().toISOString();
-    const contextStr = Object.keys(this.context).length > 0 ? ` [${JSON.stringify(this.context)}]` : '';
-    const dataStr = data ? ` ${JSON.stringify(data)}` : '';
+    const contextStr =
+      Object.keys(this.context).length > 0
+        ? ` [${JSON.stringify(this.context)}]`
+        : "";
+    const dataStr = data ? ` ${JSON.stringify(data)}` : "";
     return `[${timestamp}] [${this.serviceName}] [${level}]${contextStr} ${message}${dataStr}`;
   }
 
   info(message, data = null) {
     if (this.isDevelopment) {
-      console.log(this._formatMessage('INFO', message, data));
+      console.log(this._formatMessage("INFO", message, data));
     }
   }
 
   error(message, data = null) {
-    console.error(this._formatMessage('ERROR', message, data));
+    console.error(this._formatMessage("ERROR", message, data));
   }
 
   warn(message, data = null) {
     if (this.isDevelopment) {
-      console.warn(this._formatMessage('WARN', message, data));
+      console.warn(this._formatMessage("WARN", message, data));
     }
   }
 
   debug(message, data = null) {
     if (this.isDevelopment) {
-      console.log(this._formatMessage('DEBUG', message, data));
+      console.log(this._formatMessage("DEBUG", message, data));
     }
   }
 
@@ -44,7 +49,7 @@ class SimpleLogger {
 
   // For test files - always show
   test(message, data = null) {
-    console.log(`[TEST] ${message}`, data || '');
+    console.log(`[TEST] ${message}`, data || "");
   }
 }
 

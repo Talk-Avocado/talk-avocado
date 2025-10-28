@@ -1,5 +1,5 @@
 // backend/lib/logging.ts
-import { Logger } from '@aws-lambda-powertools/logger';
+import { Logger } from "@aws-lambda-powertools/logger";
 
 /**
  * Thin wrapper around Powertools Logger providing context fields
@@ -8,10 +8,14 @@ import { Logger } from '@aws-lambda-powertools/logger';
 class LoggingWrapper {
   private logger: any;
 
-  constructor(serviceName: string, persistentAttributes: Record<string, any> = {}) {
+  constructor(
+    serviceName: string,
+    persistentAttributes: Record<string, any> = {}
+  ) {
     this.logger = new Logger({
-      serviceName: process.env.POWERTOOLS_SERVICE_NAME || 'TalkAvocado/MediaProcessing',
-      logLevel: (process.env.LOG_LEVEL || 'INFO') as any,
+      serviceName:
+        process.env.POWERTOOLS_SERVICE_NAME || "TalkAvocado/MediaProcessing",
+      logLevel: (process.env.LOG_LEVEL || "INFO") as any,
       persistentLogAttributes: persistentAttributes,
     });
   }
