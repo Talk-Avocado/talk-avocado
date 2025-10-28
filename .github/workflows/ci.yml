@@ -46,6 +46,7 @@ jobs:
         fi
 
   python:
+    if: ${{ hashFiles('**/requirements.txt', '**/pyproject.toml') != '' }}
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
