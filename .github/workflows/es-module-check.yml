@@ -1,10 +1,7 @@
 name: ES Module Compliance Check
 
 on:
-  push:
-    branches: [ main, develop ]
   pull_request:
-    branches: [ main, develop ]
 
 jobs:
   es-module-check:
@@ -29,8 +26,4 @@ jobs:
         node scripts/check-es-modules.js
         echo "✅ ES module compliance check passed"
         
-    - name: Run ESLint
-      run: npm run lint
-      
-    - name: Run tests
-      run: npm test
+    # ESLint and tests are covered in main CI; keep this workflow focused on ESM
