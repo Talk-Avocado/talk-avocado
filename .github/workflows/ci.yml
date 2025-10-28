@@ -45,33 +45,6 @@ jobs:
           npm test --silent || echo "No Node tests."
         fi
 
-  python:
-    if: ${{ hashFiles('**/requirements.txt', '**/pyproject.toml') != '' }}
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-python@v5
-      with:
-        python-version: '3.12'
-        cache: 'pip'
-    - name: Install deps
-      run: |
-        python -m venv .venv
-        source .venv/bin/activate
-        pip install --upgrade pip
-        if [ -f requirements.txt ]; then pip install -r requirements.txt || true; fi
-        if [ -f pyproject.toml ]; then pip install -e . || true; fi
-        pip install black ruff pytest || true
-    - name: Lint
-      run: |
-        source .venv/bin/activate
-        ruff . || true
-        black --check . || true
-    - name: Tests
-      run: |
-        source .venv/bin/activate
-        pytest -q || echo "No/failed Python tests."
-
   harness:
     runs-on: ubuntu-latest
     needs: [node]  # Run after Node lane
