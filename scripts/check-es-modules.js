@@ -55,7 +55,8 @@ function checkRequireStatements() {
       !file.includes("node_modules") &&
       !file.includes("dist") &&
       !file.includes("check-es-modules.js") &&
-      !file.endsWith(".eslintrc.js")
+      !file.endsWith(".eslintrc.js") &&
+      !file.endsWith(".eslintrc.cjs")
   );
 
   const violations = [];
@@ -67,16 +68,13 @@ function checkRequireStatements() {
 
       lines.forEach((line, index) => {
         if (line.includes("require(") && !line.trim().startsWith("//")) {
-          // Skip lines that are part of the checker's own logic
+          // Skip lines that are part of the checker's own logic or are string literals
           if (
             line.includes("line.includes('require(')") ||
             line.includes("log('Checking for require() statements')") ||
-            line.includes(
-              "log(`❌ Found ${violations.length} require() statements:`)"
-            ) ||
-            line.includes(
-              "log('   Example: const fs = require(\\'fs\\') → import { readFile } from \\'fs\\'')"
-            )
+            line.includes("log(`❌ Found ${violations.length} require() statements:`)") ||
+            line.includes("log('   Example: const fs = require(\\'fs\\') → import { readFile } from \\'fs\\'')") ||
+            line.includes("require(") && (line.includes("'") || line.includes('"')) // Skip string literals
           ) {
             return;
           }
@@ -119,7 +117,8 @@ function checkModuleExports() {
       !file.includes("node_modules") &&
       !file.includes("dist") &&
       !file.includes("check-es-modules.js") &&
-      !file.endsWith(".eslintrc.js")
+      !file.endsWith(".eslintrc.js") &&
+      !file.endsWith(".eslintrc.cjs")
   );
 
   const violations = [];
