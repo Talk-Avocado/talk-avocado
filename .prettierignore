@@ -19,6 +19,7 @@
 # Tooling and harness scripts
 /tools/
 /scripts/dev-tools/
+scripts/check-es-modules.js
 
 # GitHub metadata
 /.github/
