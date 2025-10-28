@@ -1,7 +1,7 @@
 // backend/lib/init-observability.ts
-import { Logger } from '@aws-lambda-powertools/logger';
-import { Metrics } from '@aws-lambda-powertools/metrics';
-import { Tracer } from '@aws-lambda-powertools/tracer';
+import { Logger } from "@aws-lambda-powertools/logger";
+import { Metrics } from "@aws-lambda-powertools/metrics";
+import { Tracer } from "@aws-lambda-powertools/tracer";
 
 /**
  * Initialize observability stack for a Lambda handler
@@ -27,8 +27,9 @@ function initObservability({
   step: string;
 }) {
   const logger = new Logger({
-    serviceName: process.env.POWERTOOLS_SERVICE_NAME || 'TalkAvocado/MediaProcessing',
-    logLevel: (process.env.LOG_LEVEL || 'INFO') as any,
+    serviceName:
+      process.env.POWERTOOLS_SERVICE_NAME || "TalkAvocado/MediaProcessing",
+    logLevel: (process.env.LOG_LEVEL || "INFO") as any,
     persistentLogAttributes: {
       correlationId,
       tenantId,
@@ -38,18 +39,18 @@ function initObservability({
   });
 
   const metrics = new Metrics({
-    namespace: process.env.POWERTOOLS_METRICS_NAMESPACE || 'TalkAvocado',
+    namespace: process.env.POWERTOOLS_METRICS_NAMESPACE || "TalkAvocado",
     serviceName,
     defaultDimensions: {
       Service: serviceName,
-      Environment: process.env.TALKAVOCADO_ENV || 'dev',
-      TenantId: tenantId || 'unknown',
+      Environment: process.env.TALKAVOCADO_ENV || "dev",
+      TenantId: tenantId || "unknown",
     },
   });
 
   const tracer = new Tracer({
     serviceName,
-    enabled: process.env.ENABLE_XRAY === 'true',
+    enabled: process.env.ENABLE_XRAY === "true",
   });
 
   return { logger, metrics, tracer };
