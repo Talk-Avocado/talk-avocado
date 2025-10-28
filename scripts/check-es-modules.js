@@ -72,9 +72,14 @@ function checkRequireStatements() {
           if (
             line.includes("line.includes('require(')") ||
             line.includes("log('Checking for require() statements')") ||
-            line.includes("log(`❌ Found ${violations.length} require() statements:`)") ||
-            line.includes("log('   Example: const fs = require(\\'fs\\') → import { readFile } from \\'fs\\'')") ||
-            line.includes("require(") && (line.includes("'") || line.includes('"')) // Skip string literals
+            line.includes(
+              "log(`❌ Found ${violations.length} require() statements:`)"
+            ) ||
+            line.includes(
+              "log('   Example: const fs = require(\\'fs\\') → import { readFile } from \\'fs\\'')"
+            ) ||
+            (line.includes("require(") &&
+              (line.includes("'") || line.includes('"'))) // Skip string literals
           ) {
             return;
           }
