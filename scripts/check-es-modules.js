@@ -59,6 +59,8 @@ function checkRequireStatements() {
       !file.endsWith(".eslintrc.cjs")
   );
 
+  log(`Found ${jsFiles.length} JS/TS files to check`, "blue");
+
   const violations = [];
 
   for (const file of jsFiles) {
@@ -78,8 +80,7 @@ function checkRequireStatements() {
             line.includes(
               "log('   Example: const fs = require(\\'fs\\') → import { readFile } from \\'fs\\'')"
             ) ||
-            (line.includes("require(") &&
-              (line.includes("'") || line.includes('"'))) // Skip string literals
+            line.includes("require(") && (line.includes("'require(") || line.includes('"require(')) // Skip string literals containing require
           ) {
             return;
           }
