@@ -46,7 +46,7 @@ export function readFileAtKey(k: string) {
 export function currentEnv(): Env {
   // Allow "test" for unit tests in addition to normal envs
   const e = String(process.env.TALKAVOCADO_ENV || "dev");
-  return (e === "dev" || e === "stage" || e === "prod" || e === "test")
+  return e === "dev" || e === "stage" || e === "prod" || e === "test"
     ? (e as Env)
     : "dev";
 }

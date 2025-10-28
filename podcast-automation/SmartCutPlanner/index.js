@@ -397,43 +397,7 @@ ${JSON.stringify(wordlessRanges, null, 2)}
     system: refinementRules,
     user: refinementPrompt
   });
-  
-      
- // ===== LAYER 3: JSON Translator & Finalizer (Conditional Execution) =====
-  // Attempt strict parse & schema validation first
-  const parsed = safeParseJSON(rawOutput, null);
-  if (isValidCutSchema(parsed)) {
-    logger.info(`✅ Layer 2 output passed strict JSON/schema validation — skipping Layer 3`);
-    return parsed.cuts;
-  }
-
-  // If invalid, run GPT repair
-  logger.warn("⚠️ Layer 2 output invalid — running Layer 3 JSON translation.");
-  const { output: fixedRaw } = await callOpenAI(apiKey, {
-    system: `
-      You are a JSON repair engine.
-      Your job is to take possibly broken JSON describing video cuts and return valid JSON in this exact schema:
-      {
-        "cuts": [
-          { "start": "SS.SS", "end": "SS.SS", "reason": "string", "confidence": 0.xx }
-        ]
-      }
-      Do not add, remove, or change the cut meanings.
-      If any required field is missing, fill it from provided context.
-      Output ONLY valid JSON. No commentary, no markdown fences.
-    `,
-    user: JSON.stringify({ broken_output: rawOutput, context_cuts: fallbackCuts })
-  });
-
-  const fixedParsed = safeParseJSON(fixedRaw, null);
-  if (isValidCutSchema(fixedParsed)) {
-    logger.info(`✅ Layer 3 fixed JSON — ${fixedParsed.cuts.length} cuts.`);
-    return fixedParsed.cuts;
-  } else {
-    logger.warn("⚠️ Layer 3 failed — falling back to Layer 1 cuts WITH context.");
-    return fallbackCuts;
-  }
-}
+  // (Layer 3 translation handled by layer3TranslateToValidJSON below)
 
 
 // Apply Layer 3 translation immediately after Layer 2
@@ -441,10 +405,6 @@ let chunkCutRanges = await layer3TranslateToValidJSON(layer2Raw, cutsWithContext
 
 // Merge into global cut list
 allCutRanges.push(...chunkCutRanges);
-
-    
-        // Merge into global cut list — old downstream filters will handle the rest
-        allCutRanges.push(...chunkCutRanges);
       } // end for-loop
 
       // Continue outer try — do NOT close it here
@@ -1005,6 +965,8 @@ Rules:
   } catch (err) {
     logger.error("⚠️ Safety net GPT validation failed:", err);
   }
+
+}
 
 // Build final markdown
 const cleanedMd = `### PolishedTranscript\n${fullPolishedTranscript.trim()}\n\n### TimestampsToCut\n` +
