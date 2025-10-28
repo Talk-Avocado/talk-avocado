@@ -21,6 +21,11 @@ jobs:
         else
           echo "No package.json, skipping Node lane."
         fi
+    - name: Install backend deps
+      run: |
+        if [ -d backend ] && [ -f backend/package.json ]; then
+          cd backend && npm ci || npm install
+        fi
     - name: Lint
       run: |
         if [ -f package.json ]; then
@@ -39,10 +44,18 @@ jobs:
         if [ -f package.json ]; then
           npm run format:check
         fi
+    - name: Build backend
+      run: |
+        if [ -d backend ] && [ -f backend/package.json ]; then
+          cd backend && npm run build
+        fi
     - name: Tests
       run: |
         if [ -f package.json ]; then
           npm test --silent || echo "No Node tests."
+        fi
+        if [ -d backend ] && [ -f backend/package.json ]; then
+          cd backend && npm test --silent || echo "No backend tests."
         fi
 
   python:
