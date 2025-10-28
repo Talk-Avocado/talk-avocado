@@ -19,6 +19,17 @@ module.exports = {
     'no-empty': 'warn',
     'no-duplicate-imports': 'error',
   },
+  overrides: [
+    {
+      files: [
+        'scripts/**/*.js',
+        'tools/**/*.js',
+      ],
+      rules: {
+        'no-console': 'off',
+      },
+    },
+  ],
   ignorePatterns: [
     'node_modules/',
     'dist/',
