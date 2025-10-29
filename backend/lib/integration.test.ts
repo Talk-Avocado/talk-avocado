@@ -10,22 +10,70 @@ describe("Integration: End-to-end local flow", () => {
   const originalEnv = process.env.TALKAVOCADO_ENV;
   const originalStoragePath = process.env.MEDIA_STORAGE_PATH;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     // Set test environment
     process.env.TALKAVOCADO_ENV = "test";
-    process.env.MEDIA_STORAGE_PATH = "./test-storage";
-  });
-
-  afterEach(() => {
-    // Clean up test storage - use a more robust method for Windows
+    process.env.MEDIA_STORAGE_PATH = "./test-storage-integration";
+    
+    // Ensure test storage directory is clean and ready
     try {
-      if (fs.existsSync("./test-storage")) {
-        fs.rmSync("./test-storage", {
+      if (fs.existsSync("./test-storage-integration")) {
+        // Force garbage collection to close any open file handles
+        if (global.gc) {
+          global.gc();
+        }
+        
+        // Wait a bit for file handles to be released
+        await new Promise(resolve => setTimeout(resolve, 50));
+        
+        fs.rmSync("./test-storage-integration", {
           recursive: true,
           force: true,
           maxRetries: 3,
           retryDelay: 100,
         });
+      }
+    } catch (error) {
+      // Ignore cleanup errors - directory might not exist
+      console.warn("Pre-test cleanup warning:", error);
+    }
+  });
+
+  afterEach(async () => {
+    // Clean up test storage - use a more robust method for Windows
+    try {
+      if (fs.existsSync("./test-storage-integration")) {
+        // Force garbage collection to close any open file handles
+        if (global.gc) {
+          global.gc();
+        }
+        
+        // Wait a bit for file handles to be released
+        await new Promise(resolve => setTimeout(resolve, 50));
+        
+        // Try multiple times with increasing delays for Windows
+        let attempts = 0;
+        const maxAttempts = 5;
+        
+        while (attempts < maxAttempts) {
+          try {
+            fs.rmSync("./test-storage-integration", {
+              recursive: true,
+              force: true,
+              maxRetries: 3,
+              retryDelay: 100,
+            });
+            break; // Success, exit the retry loop
+          } catch (error: any) {
+            attempts++;
+            if (attempts >= maxAttempts) {
+              console.warn("Cleanup warning after", maxAttempts, "attempts:", error.message);
+              break;
+            }
+            // Wait longer between attempts
+            await new Promise(resolve => setTimeout(resolve, 100 * attempts));
+          }
+        }
       }
     } catch (error) {
       // Ignore cleanup errors on Windows
@@ -36,7 +84,7 @@ describe("Integration: End-to-end local flow", () => {
     process.env.MEDIA_STORAGE_PATH = originalStoragePath;
   });
 
-  test("Complete job workflow: create job → write artifacts → update manifest → read back", () => {
+  test("Complete job workflow: create job → write artifacts → update manifest → read back", async () => {
     const env = "test";
     const tenantId = "test-tenant";
     const jobId = "00000000-0000-0000-0000-000000000000";
@@ -60,6 +108,9 @@ describe("Integration: End-to-end local flow", () => {
     const audioContent = "fake audio content";
     writeFileAtKey(audioKey, audioContent);
     console.log("✓ Wrote audio file");
+    
+    // Small delay to ensure file operations complete on Windows
+    await new Promise(resolve => setTimeout(resolve, 10));
 
     // Step 3: Update manifest with audio info
     const updatedManifest: Manifest = {
@@ -100,6 +151,9 @@ describe("Integration: End-to-end local flow", () => {
     );
     writeFileAtKey(transcriptKey, transcriptContent);
     console.log("✓ Wrote transcript file");
+    
+    // Small delay to ensure file operations complete on Windows
+    await new Promise(resolve => setTimeout(resolve, 10));
 
     // Step 5: Update manifest with transcript info
     const finalManifest: Manifest = {
