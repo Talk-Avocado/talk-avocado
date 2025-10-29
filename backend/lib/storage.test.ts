@@ -20,14 +20,14 @@ describe("Storage utilities", () => {
   beforeEach(() => {
     // Set test environment
     process.env.TALKAVOCADO_ENV = "test";
-    process.env.MEDIA_STORAGE_PATH = "./test-storage";
+    process.env.MEDIA_STORAGE_PATH = "./test-storage-storage";
   });
 
   afterEach(() => {
     // Clean up test storage - use a more robust method for Windows
     try {
-      if (fs.existsSync("./test-storage")) {
-        fs.rmSync("./test-storage", {
+      if (fs.existsSync("./test-storage-storage")) {
+        fs.rmSync("./test-storage-storage", {
           recursive: true,
           force: true,
           maxRetries: 3,
@@ -64,13 +64,13 @@ describe("Storage utilities", () => {
 
   test("pathFor() creates absolute paths", () => {
     const key = "dev/tenant1/job1/manifest.json";
-    const expected = path.resolve("./test-storage", key);
+    const expected = path.resolve("./test-storage-storage", key);
     assert.strictEqual(pathFor(key), expected);
   });
 
   test("storageRoot() returns resolved path", () => {
     const root = storageRoot();
-    assert.strictEqual(root, path.resolve("./test-storage"));
+    assert.strictEqual(root, path.resolve("./test-storage-storage"));
   });
 
   test("currentEnv() returns environment", () => {
@@ -78,9 +78,9 @@ describe("Storage utilities", () => {
   });
 
   test("ensureDirForFile() creates directories", () => {
-    const filePath = "./test-storage/test/dir/file.txt";
+    const filePath = "./test-storage-storage/test/dir/file.txt";
     ensureDirForFile(filePath);
-    assert(fs.existsSync("./test-storage/test/dir"));
+    assert(fs.existsSync("./test-storage-storage/test/dir"));
   });
 
   test("writeFileAtKey() and readFileAtKey() work together", () => {
