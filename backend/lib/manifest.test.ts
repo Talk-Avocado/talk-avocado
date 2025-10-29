@@ -12,14 +12,14 @@ describe("Manifest utilities", () => {
   beforeEach(() => {
     // Set test environment
     process.env.TALKAVOCADO_ENV = "test";
-    process.env.MEDIA_STORAGE_PATH = "./test-storage";
+    process.env.MEDIA_STORAGE_PATH = "./test-storage-manifest";
   });
 
   afterEach(() => {
     // Clean up test storage - use a more robust method for Windows
     try {
-      if (fs.existsSync("./test-storage")) {
-        fs.rmSync("./test-storage", {
+      if (fs.existsSync("./test-storage-manifest")) {
+        fs.rmSync("./test-storage-manifest", {
           recursive: true,
           force: true,
           maxRetries: 3,
@@ -102,7 +102,7 @@ describe("Manifest utilities", () => {
       "test-tenant",
       "00000000-0000-0000-0000-000000000000"
     );
-    const filePath = path.resolve("./test-storage", key);
+    const filePath = path.resolve("./test-storage-manifest", key);
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
     fs.writeFileSync(filePath, JSON.stringify(invalidManifest, null, 2));
 
