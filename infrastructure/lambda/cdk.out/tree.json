@@ -313,9 +313,7 @@
                 "attributes": {
                   "aws:cdk:cloudformation:type": "AWS::Lambda::Function",
                   "aws:cdk:cloudformation:props": {
-                    "architectures": [
-                      "x86_64"
-                    ],
+                    "architectures": ["x86_64"],
                     "code": {
                       "imageUri": {
                         "Fn::Join": [
@@ -335,10 +333,7 @@
                     },
                     "deadLetterConfig": {
                       "targetArn": {
-                        "Fn::GetAtt": [
-                          "audioextractionDLQ0C46B90B",
-                          "Arn"
-                        ]
+                        "Fn::GetAtt": ["audioextractionDLQ0C46B90B", "Arn"]
                       }
                     },
                     "description": "Extracts audio from video files using FFmpeg",
@@ -362,10 +357,7 @@
                     "packageType": "Image",
                     "reservedConcurrentExecutions": 10,
                     "role": {
-                      "Fn::GetAtt": [
-                        "audioextractionRole6E44E43D",
-                        "Arn"
-                      ]
+                      "Fn::GetAtt": ["audioextractionRole6E44E43D", "Arn"]
                     },
                     "timeout": 300,
                     "tracingConfig": {
@@ -720,9 +712,7 @@
                 "attributes": {
                   "aws:cdk:cloudformation:type": "AWS::Lambda::Function",
                   "aws:cdk:cloudformation:props": {
-                    "architectures": [
-                      "x86_64"
-                    ],
+                    "architectures": ["x86_64"],
                     "code": {
                       "imageUri": {
                         "Fn::Join": [
@@ -742,10 +732,7 @@
                     },
                     "deadLetterConfig": {
                       "targetArn": {
-                        "Fn::GetAtt": [
-                          "transcriptionDLQ1F951097",
-                          "Arn"
-                        ]
+                        "Fn::GetAtt": ["transcriptionDLQ1F951097", "Arn"]
                       }
                     },
                     "description": "Transcribes audio using Whisper AI model",
@@ -769,10 +756,7 @@
                     "packageType": "Image",
                     "reservedConcurrentExecutions": 10,
                     "role": {
-                      "Fn::GetAtt": [
-                        "transcriptionRole5E89C3CA",
-                        "Arn"
-                      ]
+                      "Fn::GetAtt": ["transcriptionRole5E89C3CA", "Arn"]
                     },
                     "timeout": 600,
                     "tracingConfig": {
@@ -984,9 +968,7 @@
                 "attributes": {
                   "aws:cdk:cloudformation:type": "AWS::Lambda::Function",
                   "aws:cdk:cloudformation:props": {
-                    "architectures": [
-                      "x86_64"
-                    ],
+                    "architectures": ["x86_64"],
                     "code": {
                       "imageUri": {
                         "Fn::Join": [
@@ -1006,10 +988,7 @@
                     },
                     "deadLetterConfig": {
                       "targetArn": {
-                        "Fn::GetAtt": [
-                          "smartcutplannerDLQ0834FCC1",
-                          "Arn"
-                        ]
+                        "Fn::GetAtt": ["smartcutplannerDLQ0834FCC1", "Arn"]
                       }
                     },
                     "description": "Analyzes content and creates cut plans",
@@ -1033,10 +1012,7 @@
                     "packageType": "Image",
                     "reservedConcurrentExecutions": 10,
                     "role": {
-                      "Fn::GetAtt": [
-                        "smartcutplannerRoleE5E0B743",
-                        "Arn"
-                      ]
+                      "Fn::GetAtt": ["smartcutplannerRoleE5E0B743", "Arn"]
                     },
                     "timeout": 300,
                     "tracingConfig": {
@@ -1248,9 +1224,7 @@
                 "attributes": {
                   "aws:cdk:cloudformation:type": "AWS::Lambda::Function",
                   "aws:cdk:cloudformation:props": {
-                    "architectures": [
-                      "x86_64"
-                    ],
+                    "architectures": ["x86_64"],
                     "code": {
                       "imageUri": {
                         "Fn::Join": [
@@ -1270,10 +1244,7 @@
                     },
                     "deadLetterConfig": {
                       "targetArn": {
-                        "Fn::GetAtt": [
-                          "videorenderengineDLQ00DFF0BB",
-                          "Arn"
-                        ]
+                        "Fn::GetAtt": ["videorenderengineDLQ00DFF0BB", "Arn"]
                       }
                     },
                     "description": "Renders final video with cuts and transitions",
@@ -1297,10 +1268,7 @@
                     "packageType": "Image",
                     "reservedConcurrentExecutions": 10,
                     "role": {
-                      "Fn::GetAtt": [
-                        "videorenderengineRole5F9CA79E",
-                        "Arn"
-                      ]
+                      "Fn::GetAtt": ["videorenderengineRole5F9CA79E", "Arn"]
                     },
                     "timeout": 900,
                     "tracingConfig": {
@@ -1460,10 +1428,7 @@
                               "Action": "sqs:SendMessage",
                               "Effect": "Allow",
                               "Resource": {
-                                "Fn::GetAtt": [
-                                  "ffmpegtestDLQ11D6222A",
-                                  "Arn"
-                                ]
+                                "Fn::GetAtt": ["ffmpegtestDLQ11D6222A", "Arn"]
                               }
                             },
                             {
@@ -1512,9 +1477,7 @@
                 "attributes": {
                   "aws:cdk:cloudformation:type": "AWS::Lambda::Function",
                   "aws:cdk:cloudformation:props": {
-                    "architectures": [
-                      "x86_64"
-                    ],
+                    "architectures": ["x86_64"],
                     "code": {
                       "imageUri": {
                         "Fn::Join": [
@@ -1534,10 +1497,7 @@
                     },
                     "deadLetterConfig": {
                       "targetArn": {
-                        "Fn::GetAtt": [
-                          "ffmpegtestDLQ11D6222A",
-                          "Arn"
-                        ]
+                        "Fn::GetAtt": ["ffmpegtestDLQ11D6222A", "Arn"]
                       }
                     },
                     "description": "Validates FFmpeg runtime functionality",
@@ -1561,10 +1521,7 @@
                     "packageType": "Image",
                     "reservedConcurrentExecutions": 10,
                     "role": {
-                      "Fn::GetAtt": [
-                        "ffmpegtestRole8E3DD582",
-                        "Arn"
-                      ]
+                      "Fn::GetAtt": ["ffmpegtestRole8E3DD582", "Arn"]
                     },
                     "timeout": 60,
                     "tracingConfig": {
@@ -2212,10 +2169,7 @@
                       {
                         "name": "QueueName",
                         "value": {
-                          "Fn::GetAtt": [
-                            "ffmpegtestDLQ11D6222A",
-                            "QueueName"
-                          ]
+                          "Fn::GetAtt": ["ffmpegtestDLQ11D6222A", "QueueName"]
                         }
                       }
                     ],
