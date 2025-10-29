@@ -9,7 +9,12 @@
   },
   "dependencies": {},
   "devDependencies": {},
-  "keywords": ["ffmpeg", "lambda", "validation", "runtime"],
+  "keywords": [
+    "ffmpeg",
+    "lambda",
+    "validation",
+    "runtime"
+  ],
   "author": "Talk Avocado Team",
   "license": "MIT"
 }

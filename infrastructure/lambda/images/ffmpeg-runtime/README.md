@@ -34,7 +34,7 @@ bash build.sh
 # Test FFmpeg availability
 docker run --rm ffmpeg-runtime:latest ffmpeg -version
 
-# Test FFprobe availability  
+# Test FFprobe availability
 docker run --rm ffmpeg-runtime:latest ffprobe -version
 ```
 

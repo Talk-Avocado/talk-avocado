@@ -1,0 +1,130 @@
+# Lambda Configuration for TalkAvocado Media Processing Services
+# This file defines memory, timeout, and ephemeral storage settings for each service
+
+services:
+  audio-extraction:
+    memory: 1769 # MB - optimized for audio processing
+    timeout: 300 # seconds - 5 minutes
+    ephemeral_storage:
+      size: 6 # GB - sufficient for audio files
+    environment:
+      FFMPEG_PATH: "/opt/bin/ffmpeg"
+      FFPROBE_PATH: "/opt/bin/ffprobe"
+    description: "Extracts audio from video files using FFmpeg"
+    retry_policy:
+      max_attempts: 5
+      base_delay_ms: 2000
+      max_delay_ms: 60000
+      backoff_multiplier: 2
+      jitter_ms: 2000
+
+  transcription:
+    memory: 3008 # MB - higher memory for Whisper model
+    timeout: 600 # seconds - 10 minutes
+    ephemeral_storage:
+      size: 6 # GB - for audio files and transcripts
+    environment:
+      FFMPEG_PATH: "/opt/bin/ffmpeg"
+      FFPROBE_PATH: "/opt/bin/ffprobe"
+    description: "Transcribes audio using Whisper AI model"
+    retry_policy:
+      max_attempts: 3
+      base_delay_ms: 1000
+      max_delay_ms: 30000
+      backoff_multiplier: 2
+      jitter_ms: 1000
+
+  smart-cut-planner:
+    memory: 1769 # MB - CPU-intensive analysis
+    timeout: 300 # seconds - 5 minutes
+    ephemeral_storage:
+      size: 4 # GB - for analysis data
+    environment:
+      FFMPEG_PATH: "/opt/bin/ffmpeg"
+      FFPROBE_PATH: "/opt/bin/ffprobe"
+    description: "Analyzes content and creates cut plans"
+    retry_policy:
+      max_attempts: 3
+      base_delay_ms: 1000
+      max_delay_ms: 30000
+      backoff_multiplier: 2
+      jitter_ms: 1000
+
+  video-render-engine:
+    memory: 5120 # MB - highest memory for video rendering
+    timeout: 900 # seconds - 15 minutes
+    ephemeral_storage:
+      size: 8 # GB - for video files and renders
+    environment:
+      FFMPEG_PATH: "/opt/bin/ffmpeg"
+      FFPROBE_PATH: "/opt/bin/ffprobe"
+    description: "Renders final video with cuts and transitions"
+    retry_policy:
+      max_attempts: 5
+      base_delay_ms: 2000
+      max_delay_ms: 60000
+      backoff_multiplier: 2
+      jitter_ms: 2000
+
+  ffmpeg-test:
+    memory: 1769 # MB - validation function
+    timeout: 60 # seconds - 1 minute
+    ephemeral_storage:
+      size: 2 # GB - minimal for testing
+    environment:
+      FFMPEG_PATH: "/opt/bin/ffmpeg"
+      FFPROBE_PATH: "/opt/bin/ffprobe"
+    description: "Validates FFmpeg runtime functionality"
+    retry_policy:
+      max_attempts: 3
+      base_delay_ms: 500
+      max_delay_ms: 10000
+      backoff_multiplier: 1.5
+      jitter_ms: 500
+
+# Common configuration for all services
+common:
+  runtime: "nodejs20.x"
+  architecture: "x86_64"
+  handler: "handler.handler"
+  reserved_concurrency: 10 # Prevent overwhelming downstream services
+  provisioned_concurrency: 2 # Reduce cold starts for critical services
+
+  # VPC configuration (if needed)
+  vpc_config:
+    enabled: false # Set to true if VPC access required
+
+  # Dead Letter Queue configuration
+  dead_letter_queue:
+    enabled: true
+    max_receive_count: 3
+
+  # Retry configuration
+  retry_policy:
+    max_attempts: 3
+    retry_on_errors:
+      - "Lambda.ServiceException"
+      - "Lambda.AWSLambdaException"
+      - "Lambda.SdkClientException"
+    retry_backoff:
+      base_delay: 1000 # milliseconds
+      max_delay: 10000 # milliseconds
+      multiplier: 2
+
+# Memory tiers for power tuning
+memory_tiers:
+  - 128
+  - 256
+  - 512
+  - 1024
+  - 1536
+  - 1769 # Audio extraction optimal
+  - 2048
+  - 3008 # Transcription optimal
+  - 4096
+  - 5120 # Video rendering optimal
+  - 6144
+  - 7168
+  - 8192
+  - 9216
+  - 10240
