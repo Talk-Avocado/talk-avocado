@@ -1,0 +1,2298 @@
+{
+  "version": "tree-0.1",
+  "tree": {
+    "id": "App",
+    "path": "",
+    "children": {
+      "TalkAvocado-Lambda-dev": {
+        "id": "TalkAvocado-Lambda-dev",
+        "path": "TalkAvocado-Lambda-dev",
+        "children": {
+          "FFmpegRuntimeRepository": {
+            "id": "FFmpegRuntimeRepository",
+            "path": "TalkAvocado-Lambda-dev/FFmpegRuntimeRepository",
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.aws_ecr.RepositoryBase",
+              "version": "2.100.0"
+            }
+          },
+          "audio-extraction-DLQ": {
+            "id": "audio-extraction-DLQ",
+            "path": "TalkAvocado-Lambda-dev/audio-extraction-DLQ",
+            "children": {
+              "Resource": {
+                "id": "Resource",
+                "path": "TalkAvocado-Lambda-dev/audio-extraction-DLQ/Resource",
+                "attributes": {
+                  "aws:cdk:cloudformation:type": "AWS::SQS::Queue",
+                  "aws:cdk:cloudformation:props": {
+                    "messageRetentionPeriod": 1209600,
+                    "queueName": "talk-avocado-audio-extraction-dlq-dev",
+                    "visibilityTimeout": 900
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_sqs.CfnQueue",
+                  "version": "2.100.0"
+                }
+              }
+            },
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.aws_sqs.Queue",
+              "version": "2.100.0"
+            }
+          },
+          "transcription-DLQ": {
+            "id": "transcription-DLQ",
+            "path": "TalkAvocado-Lambda-dev/transcription-DLQ",
+            "children": {
+              "Resource": {
+                "id": "Resource",
+                "path": "TalkAvocado-Lambda-dev/transcription-DLQ/Resource",
+                "attributes": {
+                  "aws:cdk:cloudformation:type": "AWS::SQS::Queue",
+                  "aws:cdk:cloudformation:props": {
+                    "messageRetentionPeriod": 1209600,
+                    "queueName": "talk-avocado-transcription-dlq-dev",
+                    "visibilityTimeout": 900
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_sqs.CfnQueue",
+                  "version": "2.100.0"
+                }
+              }
+            },
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.aws_sqs.Queue",
+              "version": "2.100.0"
+            }
+          },
+          "smart-cut-planner-DLQ": {
+            "id": "smart-cut-planner-DLQ",
+            "path": "TalkAvocado-Lambda-dev/smart-cut-planner-DLQ",
+            "children": {
+              "Resource": {
+                "id": "Resource",
+                "path": "TalkAvocado-Lambda-dev/smart-cut-planner-DLQ/Resource",
+                "attributes": {
+                  "aws:cdk:cloudformation:type": "AWS::SQS::Queue",
+                  "aws:cdk:cloudformation:props": {
+                    "messageRetentionPeriod": 1209600,
+                    "queueName": "talk-avocado-smart-cut-planner-dlq-dev",
+                    "visibilityTimeout": 900
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_sqs.CfnQueue",
+                  "version": "2.100.0"
+                }
+              }
+            },
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.aws_sqs.Queue",
+              "version": "2.100.0"
+            }
+          },
+          "video-render-engine-DLQ": {
+            "id": "video-render-engine-DLQ",
+            "path": "TalkAvocado-Lambda-dev/video-render-engine-DLQ",
+            "children": {
+              "Resource": {
+                "id": "Resource",
+                "path": "TalkAvocado-Lambda-dev/video-render-engine-DLQ/Resource",
+                "attributes": {
+                  "aws:cdk:cloudformation:type": "AWS::SQS::Queue",
+                  "aws:cdk:cloudformation:props": {
+                    "messageRetentionPeriod": 1209600,
+                    "queueName": "talk-avocado-video-render-engine-dlq-dev",
+                    "visibilityTimeout": 900
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_sqs.CfnQueue",
+                  "version": "2.100.0"
+                }
+              }
+            },
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.aws_sqs.Queue",
+              "version": "2.100.0"
+            }
+          },
+          "ffmpeg-test-DLQ": {
+            "id": "ffmpeg-test-DLQ",
+            "path": "TalkAvocado-Lambda-dev/ffmpeg-test-DLQ",
+            "children": {
+              "Resource": {
+                "id": "Resource",
+                "path": "TalkAvocado-Lambda-dev/ffmpeg-test-DLQ/Resource",
+                "attributes": {
+                  "aws:cdk:cloudformation:type": "AWS::SQS::Queue",
+                  "aws:cdk:cloudformation:props": {
+                    "messageRetentionPeriod": 1209600,
+                    "queueName": "talk-avocado-ffmpeg-test-dlq-dev",
+                    "visibilityTimeout": 900
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_sqs.CfnQueue",
+                  "version": "2.100.0"
+                }
+              }
+            },
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.aws_sqs.Queue",
+              "version": "2.100.0"
+            }
+          },
+          "audio-extraction-Role": {
+            "id": "audio-extraction-Role",
+            "path": "TalkAvocado-Lambda-dev/audio-extraction-Role",
+            "children": {
+              "Importaudio-extraction-Role": {
+                "id": "Importaudio-extraction-Role",
+                "path": "TalkAvocado-Lambda-dev/audio-extraction-Role/Importaudio-extraction-Role",
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.Resource",
+                  "version": "2.100.0"
+                }
+              },
+              "Resource": {
+                "id": "Resource",
+                "path": "TalkAvocado-Lambda-dev/audio-extraction-Role/Resource",
+                "attributes": {
+                  "aws:cdk:cloudformation:type": "AWS::IAM::Role",
+                  "aws:cdk:cloudformation:props": {
+                    "assumeRolePolicyDocument": {
+                      "Statement": [
+                        {
+                          "Action": "sts:AssumeRole",
+                          "Effect": "Allow",
+                          "Principal": {
+                            "Service": "lambda.amazonaws.com"
+                          }
+                        }
+                      ],
+                      "Version": "2012-10-17"
+                    },
+                    "managedPolicyArns": [
+                      {
+                        "Fn::Join": [
+                          "",
+                          [
+                            "arn:",
+                            {
+                              "Ref": "AWS::Partition"
+                            },
+                            ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+                          ]
+                        ]
+                      }
+                    ],
+                    "policies": [
+                      {
+                        "policyName": "MediaProcessingPolicy",
+                        "policyDocument": {
+                          "Statement": [
+                            {
+                              "Action": [
+                                "s3:DeleteObject",
+                                "s3:GetObject",
+                                "s3:PutObject"
+                              ],
+                              "Effect": "Allow",
+                              "Resource": "arn:aws:s3:::talk-avocado-*-dev/*"
+                            },
+                            {
+                              "Action": [
+                                "dynamodb:GetItem",
+                                "dynamodb:PutItem",
+                                "dynamodb:Query",
+                                "dynamodb:UpdateItem"
+                              ],
+                              "Effect": "Allow",
+                              "Resource": {
+                                "Fn::Join": [
+                                  "",
+                                  [
+                                    "arn:aws:dynamodb:us-east-1:",
+                                    {
+                                      "Ref": "AWS::AccountId"
+                                    },
+                                    ":table/talk-avocado-jobs-dev"
+                                  ]
+                                ]
+                              }
+                            },
+                            {
+                              "Action": [
+                                "xray:PutTelemetryRecords",
+                                "xray:PutTraceSegments"
+                              ],
+                              "Effect": "Allow",
+                              "Resource": "*"
+                            }
+                          ],
+                          "Version": "2012-10-17"
+                        }
+                      }
+                    ]
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_iam.CfnRole",
+                  "version": "2.100.0"
+                }
+              },
+              "DefaultPolicy": {
+                "id": "DefaultPolicy",
+                "path": "TalkAvocado-Lambda-dev/audio-extraction-Role/DefaultPolicy",
+                "children": {
+                  "Resource": {
+                    "id": "Resource",
+                    "path": "TalkAvocado-Lambda-dev/audio-extraction-Role/DefaultPolicy/Resource",
+                    "attributes": {
+                      "aws:cdk:cloudformation:type": "AWS::IAM::Policy",
+                      "aws:cdk:cloudformation:props": {
+                        "policyDocument": {
+                          "Statement": [
+                            {
+                              "Action": "sqs:SendMessage",
+                              "Effect": "Allow",
+                              "Resource": {
+                                "Fn::GetAtt": [
+                                  "audioextractionDLQ0C46B90B",
+                                  "Arn"
+                                ]
+                              }
+                            },
+                            {
+                              "Action": [
+                                "xray:PutTelemetryRecords",
+                                "xray:PutTraceSegments"
+                              ],
+                              "Effect": "Allow",
+                              "Resource": "*"
+                            }
+                          ],
+                          "Version": "2012-10-17"
+                        },
+                        "policyName": "audioextractionRoleDefaultPolicyF5A9EC51",
+                        "roles": [
+                          {
+                            "Ref": "audioextractionRole6E44E43D"
+                          }
+                        ]
+                      }
+                    },
+                    "constructInfo": {
+                      "fqn": "aws-cdk-lib.aws_iam.CfnPolicy",
+                      "version": "2.100.0"
+                    }
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_iam.Policy",
+                  "version": "2.100.0"
+                }
+              }
+            },
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.aws_iam.Role",
+              "version": "2.100.0"
+            }
+          },
+          "audio-extraction-Function": {
+            "id": "audio-extraction-Function",
+            "path": "TalkAvocado-Lambda-dev/audio-extraction-Function",
+            "children": {
+              "Resource": {
+                "id": "Resource",
+                "path": "TalkAvocado-Lambda-dev/audio-extraction-Function/Resource",
+                "attributes": {
+                  "aws:cdk:cloudformation:type": "AWS::Lambda::Function",
+                  "aws:cdk:cloudformation:props": {
+                    "architectures": ["x86_64"],
+                    "code": {
+                      "imageUri": {
+                        "Fn::Join": [
+                          "",
+                          [
+                            {
+                              "Ref": "AWS::AccountId"
+                            },
+                            ".dkr.ecr.us-east-1.",
+                            {
+                              "Ref": "AWS::URLSuffix"
+                            },
+                            "/talk-avocado/ffmpeg-runtime:latest"
+                          ]
+                        ]
+                      }
+                    },
+                    "deadLetterConfig": {
+                      "targetArn": {
+                        "Fn::GetAtt": ["audioextractionDLQ0C46B90B", "Arn"]
+                      }
+                    },
+                    "description": "Extracts audio from video files using FFmpeg",
+                    "environment": {
+                      "variables": {
+                        "FFMPEG_PATH": "/opt/bin/ffmpeg",
+                        "FFPROBE_PATH": "/opt/bin/ffprobe",
+                        "ENVIRONMENT": "dev",
+                        "TENANT_ID": "default",
+                        "LOG_LEVEL": "INFO",
+                        "POWERTOOLS_SERVICE_NAME": "audio-extraction",
+                        "POWERTOOLS_METRICS_NAMESPACE": "TalkAvocado",
+                        "POWERTOOLS_LOGGER_LOG_EVENT": "true"
+                      }
+                    },
+                    "ephemeralStorage": {
+                      "size": 6144
+                    },
+                    "functionName": "talk-avocado-audio-extraction-dev",
+                    "memorySize": 1769,
+                    "packageType": "Image",
+                    "reservedConcurrentExecutions": 10,
+                    "role": {
+                      "Fn::GetAtt": ["audioextractionRole6E44E43D", "Arn"]
+                    },
+                    "timeout": 300,
+                    "tracingConfig": {
+                      "mode": "Active"
+                    }
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_lambda.CfnFunction",
+                  "version": "2.100.0"
+                }
+              },
+              "LogRetention": {
+                "id": "LogRetention",
+                "path": "TalkAvocado-Lambda-dev/audio-extraction-Function/LogRetention",
+                "children": {
+                  "Resource": {
+                    "id": "Resource",
+                    "path": "TalkAvocado-Lambda-dev/audio-extraction-Function/LogRetention/Resource",
+                    "constructInfo": {
+                      "fqn": "aws-cdk-lib.CfnResource",
+                      "version": "2.100.0"
+                    }
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_logs.LogRetention",
+                  "version": "2.100.0"
+                }
+              },
+              "LogGroup": {
+                "id": "LogGroup",
+                "path": "TalkAvocado-Lambda-dev/audio-extraction-Function/LogGroup",
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.Resource",
+                  "version": "2.100.0"
+                }
+              }
+            },
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.aws_lambda.Function",
+              "version": "2.100.0"
+            }
+          },
+          "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a": {
+            "id": "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a",
+            "path": "TalkAvocado-Lambda-dev/LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a",
+            "children": {
+              "Code": {
+                "id": "Code",
+                "path": "TalkAvocado-Lambda-dev/LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a/Code",
+                "children": {
+                  "Stage": {
+                    "id": "Stage",
+                    "path": "TalkAvocado-Lambda-dev/LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a/Code/Stage",
+                    "constructInfo": {
+                      "fqn": "aws-cdk-lib.AssetStaging",
+                      "version": "2.100.0"
+                    }
+                  },
+                  "AssetBucket": {
+                    "id": "AssetBucket",
+                    "path": "TalkAvocado-Lambda-dev/LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a/Code/AssetBucket",
+                    "constructInfo": {
+                      "fqn": "aws-cdk-lib.aws_s3.BucketBase",
+                      "version": "2.100.0"
+                    }
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_s3_assets.Asset",
+                  "version": "2.100.0"
+                }
+              },
+              "ServiceRole": {
+                "id": "ServiceRole",
+                "path": "TalkAvocado-Lambda-dev/LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a/ServiceRole",
+                "children": {
+                  "ImportServiceRole": {
+                    "id": "ImportServiceRole",
+                    "path": "TalkAvocado-Lambda-dev/LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a/ServiceRole/ImportServiceRole",
+                    "constructInfo": {
+                      "fqn": "aws-cdk-lib.Resource",
+                      "version": "2.100.0"
+                    }
+                  },
+                  "Resource": {
+                    "id": "Resource",
+                    "path": "TalkAvocado-Lambda-dev/LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a/ServiceRole/Resource",
+                    "attributes": {
+                      "aws:cdk:cloudformation:type": "AWS::IAM::Role",
+                      "aws:cdk:cloudformation:props": {
+                        "assumeRolePolicyDocument": {
+                          "Statement": [
+                            {
+                              "Action": "sts:AssumeRole",
+                              "Effect": "Allow",
+                              "Principal": {
+                                "Service": "lambda.amazonaws.com"
+                              }
+                            }
+                          ],
+                          "Version": "2012-10-17"
+                        },
+                        "managedPolicyArns": [
+                          {
+                            "Fn::Join": [
+                              "",
+                              [
+                                "arn:",
+                                {
+                                  "Ref": "AWS::Partition"
+                                },
+                                ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+                              ]
+                            ]
+                          }
+                        ]
+                      }
+                    },
+                    "constructInfo": {
+                      "fqn": "aws-cdk-lib.aws_iam.CfnRole",
+                      "version": "2.100.0"
+                    }
+                  },
+                  "DefaultPolicy": {
+                    "id": "DefaultPolicy",
+                    "path": "TalkAvocado-Lambda-dev/LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a/ServiceRole/DefaultPolicy",
+                    "children": {
+                      "Resource": {
+                        "id": "Resource",
+                        "path": "TalkAvocado-Lambda-dev/LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a/ServiceRole/DefaultPolicy/Resource",
+                        "attributes": {
+                          "aws:cdk:cloudformation:type": "AWS::IAM::Policy",
+                          "aws:cdk:cloudformation:props": {
+                            "policyDocument": {
+                              "Statement": [
+                                {
+                                  "Action": [
+                                    "logs:DeleteRetentionPolicy",
+                                    "logs:PutRetentionPolicy"
+                                  ],
+                                  "Effect": "Allow",
+                                  "Resource": "*"
+                                }
+                              ],
+                              "Version": "2012-10-17"
+                            },
+                            "policyName": "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRoleDefaultPolicyADDA7DEB",
+                            "roles": [
+                              {
+                                "Ref": "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRole9741ECFB"
+                              }
+                            ]
+                          }
+                        },
+                        "constructInfo": {
+                          "fqn": "aws-cdk-lib.aws_iam.CfnPolicy",
+                          "version": "2.100.0"
+                        }
+                      }
+                    },
+                    "constructInfo": {
+                      "fqn": "aws-cdk-lib.aws_iam.Policy",
+                      "version": "2.100.0"
+                    }
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_iam.Role",
+                  "version": "2.100.0"
+                }
+              },
+              "Resource": {
+                "id": "Resource",
+                "path": "TalkAvocado-Lambda-dev/LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a/Resource",
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.CfnResource",
+                  "version": "2.100.0"
+                }
+              }
+            },
+            "constructInfo": {
+              "fqn": "constructs.Construct",
+              "version": "10.4.2"
+            }
+          },
+          "transcription-Role": {
+            "id": "transcription-Role",
+            "path": "TalkAvocado-Lambda-dev/transcription-Role",
+            "children": {
+              "Importtranscription-Role": {
+                "id": "Importtranscription-Role",
+                "path": "TalkAvocado-Lambda-dev/transcription-Role/Importtranscription-Role",
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.Resource",
+                  "version": "2.100.0"
+                }
+              },
+              "Resource": {
+                "id": "Resource",
+                "path": "TalkAvocado-Lambda-dev/transcription-Role/Resource",
+                "attributes": {
+                  "aws:cdk:cloudformation:type": "AWS::IAM::Role",
+                  "aws:cdk:cloudformation:props": {
+                    "assumeRolePolicyDocument": {
+                      "Statement": [
+                        {
+                          "Action": "sts:AssumeRole",
+                          "Effect": "Allow",
+                          "Principal": {
+                            "Service": "lambda.amazonaws.com"
+                          }
+                        }
+                      ],
+                      "Version": "2012-10-17"
+                    },
+                    "managedPolicyArns": [
+                      {
+                        "Fn::Join": [
+                          "",
+                          [
+                            "arn:",
+                            {
+                              "Ref": "AWS::Partition"
+                            },
+                            ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+                          ]
+                        ]
+                      }
+                    ],
+                    "policies": [
+                      {
+                        "policyName": "MediaProcessingPolicy",
+                        "policyDocument": {
+                          "Statement": [
+                            {
+                              "Action": [
+                                "s3:DeleteObject",
+                                "s3:GetObject",
+                                "s3:PutObject"
+                              ],
+                              "Effect": "Allow",
+                              "Resource": "arn:aws:s3:::talk-avocado-*-dev/*"
+                            },
+                            {
+                              "Action": [
+                                "dynamodb:GetItem",
+                                "dynamodb:PutItem",
+                                "dynamodb:Query",
+                                "dynamodb:UpdateItem"
+                              ],
+                              "Effect": "Allow",
+                              "Resource": {
+                                "Fn::Join": [
+                                  "",
+                                  [
+                                    "arn:aws:dynamodb:us-east-1:",
+                                    {
+                                      "Ref": "AWS::AccountId"
+                                    },
+                                    ":table/talk-avocado-jobs-dev"
+                                  ]
+                                ]
+                              }
+                            },
+                            {
+                              "Action": [
+                                "xray:PutTelemetryRecords",
+                                "xray:PutTraceSegments"
+                              ],
+                              "Effect": "Allow",
+                              "Resource": "*"
+                            }
+                          ],
+                          "Version": "2012-10-17"
+                        }
+                      }
+                    ]
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_iam.CfnRole",
+                  "version": "2.100.0"
+                }
+              },
+              "DefaultPolicy": {
+                "id": "DefaultPolicy",
+                "path": "TalkAvocado-Lambda-dev/transcription-Role/DefaultPolicy",
+                "children": {
+                  "Resource": {
+                    "id": "Resource",
+                    "path": "TalkAvocado-Lambda-dev/transcription-Role/DefaultPolicy/Resource",
+                    "attributes": {
+                      "aws:cdk:cloudformation:type": "AWS::IAM::Policy",
+                      "aws:cdk:cloudformation:props": {
+                        "policyDocument": {
+                          "Statement": [
+                            {
+                              "Action": "sqs:SendMessage",
+                              "Effect": "Allow",
+                              "Resource": {
+                                "Fn::GetAtt": [
+                                  "transcriptionDLQ1F951097",
+                                  "Arn"
+                                ]
+                              }
+                            },
+                            {
+                              "Action": [
+                                "xray:PutTelemetryRecords",
+                                "xray:PutTraceSegments"
+                              ],
+                              "Effect": "Allow",
+                              "Resource": "*"
+                            }
+                          ],
+                          "Version": "2012-10-17"
+                        },
+                        "policyName": "transcriptionRoleDefaultPolicy7D54F639",
+                        "roles": [
+                          {
+                            "Ref": "transcriptionRole5E89C3CA"
+                          }
+                        ]
+                      }
+                    },
+                    "constructInfo": {
+                      "fqn": "aws-cdk-lib.aws_iam.CfnPolicy",
+                      "version": "2.100.0"
+                    }
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_iam.Policy",
+                  "version": "2.100.0"
+                }
+              }
+            },
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.aws_iam.Role",
+              "version": "2.100.0"
+            }
+          },
+          "transcription-Function": {
+            "id": "transcription-Function",
+            "path": "TalkAvocado-Lambda-dev/transcription-Function",
+            "children": {
+              "Resource": {
+                "id": "Resource",
+                "path": "TalkAvocado-Lambda-dev/transcription-Function/Resource",
+                "attributes": {
+                  "aws:cdk:cloudformation:type": "AWS::Lambda::Function",
+                  "aws:cdk:cloudformation:props": {
+                    "architectures": ["x86_64"],
+                    "code": {
+                      "imageUri": {
+                        "Fn::Join": [
+                          "",
+                          [
+                            {
+                              "Ref": "AWS::AccountId"
+                            },
+                            ".dkr.ecr.us-east-1.",
+                            {
+                              "Ref": "AWS::URLSuffix"
+                            },
+                            "/talk-avocado/ffmpeg-runtime:latest"
+                          ]
+                        ]
+                      }
+                    },
+                    "deadLetterConfig": {
+                      "targetArn": {
+                        "Fn::GetAtt": ["transcriptionDLQ1F951097", "Arn"]
+                      }
+                    },
+                    "description": "Transcribes audio using Whisper AI model",
+                    "environment": {
+                      "variables": {
+                        "FFMPEG_PATH": "/opt/bin/ffmpeg",
+                        "FFPROBE_PATH": "/opt/bin/ffprobe",
+                        "ENVIRONMENT": "dev",
+                        "TENANT_ID": "default",
+                        "LOG_LEVEL": "INFO",
+                        "POWERTOOLS_SERVICE_NAME": "transcription",
+                        "POWERTOOLS_METRICS_NAMESPACE": "TalkAvocado",
+                        "POWERTOOLS_LOGGER_LOG_EVENT": "true"
+                      }
+                    },
+                    "ephemeralStorage": {
+                      "size": 6144
+                    },
+                    "functionName": "talk-avocado-transcription-dev",
+                    "memorySize": 3008,
+                    "packageType": "Image",
+                    "reservedConcurrentExecutions": 10,
+                    "role": {
+                      "Fn::GetAtt": ["transcriptionRole5E89C3CA", "Arn"]
+                    },
+                    "timeout": 600,
+                    "tracingConfig": {
+                      "mode": "Active"
+                    }
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_lambda.CfnFunction",
+                  "version": "2.100.0"
+                }
+              },
+              "LogRetention": {
+                "id": "LogRetention",
+                "path": "TalkAvocado-Lambda-dev/transcription-Function/LogRetention",
+                "children": {
+                  "Resource": {
+                    "id": "Resource",
+                    "path": "TalkAvocado-Lambda-dev/transcription-Function/LogRetention/Resource",
+                    "constructInfo": {
+                      "fqn": "aws-cdk-lib.CfnResource",
+                      "version": "2.100.0"
+                    }
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_logs.LogRetention",
+                  "version": "2.100.0"
+                }
+              },
+              "LogGroup": {
+                "id": "LogGroup",
+                "path": "TalkAvocado-Lambda-dev/transcription-Function/LogGroup",
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.Resource",
+                  "version": "2.100.0"
+                }
+              }
+            },
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.aws_lambda.Function",
+              "version": "2.100.0"
+            }
+          },
+          "smart-cut-planner-Role": {
+            "id": "smart-cut-planner-Role",
+            "path": "TalkAvocado-Lambda-dev/smart-cut-planner-Role",
+            "children": {
+              "Importsmart-cut-planner-Role": {
+                "id": "Importsmart-cut-planner-Role",
+                "path": "TalkAvocado-Lambda-dev/smart-cut-planner-Role/Importsmart-cut-planner-Role",
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.Resource",
+                  "version": "2.100.0"
+                }
+              },
+              "Resource": {
+                "id": "Resource",
+                "path": "TalkAvocado-Lambda-dev/smart-cut-planner-Role/Resource",
+                "attributes": {
+                  "aws:cdk:cloudformation:type": "AWS::IAM::Role",
+                  "aws:cdk:cloudformation:props": {
+                    "assumeRolePolicyDocument": {
+                      "Statement": [
+                        {
+                          "Action": "sts:AssumeRole",
+                          "Effect": "Allow",
+                          "Principal": {
+                            "Service": "lambda.amazonaws.com"
+                          }
+                        }
+                      ],
+                      "Version": "2012-10-17"
+                    },
+                    "managedPolicyArns": [
+                      {
+                        "Fn::Join": [
+                          "",
+                          [
+                            "arn:",
+                            {
+                              "Ref": "AWS::Partition"
+                            },
+                            ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+                          ]
+                        ]
+                      }
+                    ],
+                    "policies": [
+                      {
+                        "policyName": "MediaProcessingPolicy",
+                        "policyDocument": {
+                          "Statement": [
+                            {
+                              "Action": [
+                                "s3:DeleteObject",
+                                "s3:GetObject",
+                                "s3:PutObject"
+                              ],
+                              "Effect": "Allow",
+                              "Resource": "arn:aws:s3:::talk-avocado-*-dev/*"
+                            },
+                            {
+                              "Action": [
+                                "dynamodb:GetItem",
+                                "dynamodb:PutItem",
+                                "dynamodb:Query",
+                                "dynamodb:UpdateItem"
+                              ],
+                              "Effect": "Allow",
+                              "Resource": {
+                                "Fn::Join": [
+                                  "",
+                                  [
+                                    "arn:aws:dynamodb:us-east-1:",
+                                    {
+                                      "Ref": "AWS::AccountId"
+                                    },
+                                    ":table/talk-avocado-jobs-dev"
+                                  ]
+                                ]
+                              }
+                            },
+                            {
+                              "Action": [
+                                "xray:PutTelemetryRecords",
+                                "xray:PutTraceSegments"
+                              ],
+                              "Effect": "Allow",
+                              "Resource": "*"
+                            }
+                          ],
+                          "Version": "2012-10-17"
+                        }
+                      }
+                    ]
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_iam.CfnRole",
+                  "version": "2.100.0"
+                }
+              },
+              "DefaultPolicy": {
+                "id": "DefaultPolicy",
+                "path": "TalkAvocado-Lambda-dev/smart-cut-planner-Role/DefaultPolicy",
+                "children": {
+                  "Resource": {
+                    "id": "Resource",
+                    "path": "TalkAvocado-Lambda-dev/smart-cut-planner-Role/DefaultPolicy/Resource",
+                    "attributes": {
+                      "aws:cdk:cloudformation:type": "AWS::IAM::Policy",
+                      "aws:cdk:cloudformation:props": {
+                        "policyDocument": {
+                          "Statement": [
+                            {
+                              "Action": "sqs:SendMessage",
+                              "Effect": "Allow",
+                              "Resource": {
+                                "Fn::GetAtt": [
+                                  "smartcutplannerDLQ0834FCC1",
+                                  "Arn"
+                                ]
+                              }
+                            },
+                            {
+                              "Action": [
+                                "xray:PutTelemetryRecords",
+                                "xray:PutTraceSegments"
+                              ],
+                              "Effect": "Allow",
+                              "Resource": "*"
+                            }
+                          ],
+                          "Version": "2012-10-17"
+                        },
+                        "policyName": "smartcutplannerRoleDefaultPolicy34CBECBA",
+                        "roles": [
+                          {
+                            "Ref": "smartcutplannerRoleE5E0B743"
+                          }
+                        ]
+                      }
+                    },
+                    "constructInfo": {
+                      "fqn": "aws-cdk-lib.aws_iam.CfnPolicy",
+                      "version": "2.100.0"
+                    }
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_iam.Policy",
+                  "version": "2.100.0"
+                }
+              }
+            },
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.aws_iam.Role",
+              "version": "2.100.0"
+            }
+          },
+          "smart-cut-planner-Function": {
+            "id": "smart-cut-planner-Function",
+            "path": "TalkAvocado-Lambda-dev/smart-cut-planner-Function",
+            "children": {
+              "Resource": {
+                "id": "Resource",
+                "path": "TalkAvocado-Lambda-dev/smart-cut-planner-Function/Resource",
+                "attributes": {
+                  "aws:cdk:cloudformation:type": "AWS::Lambda::Function",
+                  "aws:cdk:cloudformation:props": {
+                    "architectures": ["x86_64"],
+                    "code": {
+                      "imageUri": {
+                        "Fn::Join": [
+                          "",
+                          [
+                            {
+                              "Ref": "AWS::AccountId"
+                            },
+                            ".dkr.ecr.us-east-1.",
+                            {
+                              "Ref": "AWS::URLSuffix"
+                            },
+                            "/talk-avocado/ffmpeg-runtime:latest"
+                          ]
+                        ]
+                      }
+                    },
+                    "deadLetterConfig": {
+                      "targetArn": {
+                        "Fn::GetAtt": ["smartcutplannerDLQ0834FCC1", "Arn"]
+                      }
+                    },
+                    "description": "Analyzes content and creates cut plans",
+                    "environment": {
+                      "variables": {
+                        "FFMPEG_PATH": "/opt/bin/ffmpeg",
+                        "FFPROBE_PATH": "/opt/bin/ffprobe",
+                        "ENVIRONMENT": "dev",
+                        "TENANT_ID": "default",
+                        "LOG_LEVEL": "INFO",
+                        "POWERTOOLS_SERVICE_NAME": "smart-cut-planner",
+                        "POWERTOOLS_METRICS_NAMESPACE": "TalkAvocado",
+                        "POWERTOOLS_LOGGER_LOG_EVENT": "true"
+                      }
+                    },
+                    "ephemeralStorage": {
+                      "size": 4096
+                    },
+                    "functionName": "talk-avocado-smart-cut-planner-dev",
+                    "memorySize": 1769,
+                    "packageType": "Image",
+                    "reservedConcurrentExecutions": 10,
+                    "role": {
+                      "Fn::GetAtt": ["smartcutplannerRoleE5E0B743", "Arn"]
+                    },
+                    "timeout": 300,
+                    "tracingConfig": {
+                      "mode": "Active"
+                    }
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_lambda.CfnFunction",
+                  "version": "2.100.0"
+                }
+              },
+              "LogRetention": {
+                "id": "LogRetention",
+                "path": "TalkAvocado-Lambda-dev/smart-cut-planner-Function/LogRetention",
+                "children": {
+                  "Resource": {
+                    "id": "Resource",
+                    "path": "TalkAvocado-Lambda-dev/smart-cut-planner-Function/LogRetention/Resource",
+                    "constructInfo": {
+                      "fqn": "aws-cdk-lib.CfnResource",
+                      "version": "2.100.0"
+                    }
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_logs.LogRetention",
+                  "version": "2.100.0"
+                }
+              },
+              "LogGroup": {
+                "id": "LogGroup",
+                "path": "TalkAvocado-Lambda-dev/smart-cut-planner-Function/LogGroup",
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.Resource",
+                  "version": "2.100.0"
+                }
+              }
+            },
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.aws_lambda.Function",
+              "version": "2.100.0"
+            }
+          },
+          "video-render-engine-Role": {
+            "id": "video-render-engine-Role",
+            "path": "TalkAvocado-Lambda-dev/video-render-engine-Role",
+            "children": {
+              "Importvideo-render-engine-Role": {
+                "id": "Importvideo-render-engine-Role",
+                "path": "TalkAvocado-Lambda-dev/video-render-engine-Role/Importvideo-render-engine-Role",
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.Resource",
+                  "version": "2.100.0"
+                }
+              },
+              "Resource": {
+                "id": "Resource",
+                "path": "TalkAvocado-Lambda-dev/video-render-engine-Role/Resource",
+                "attributes": {
+                  "aws:cdk:cloudformation:type": "AWS::IAM::Role",
+                  "aws:cdk:cloudformation:props": {
+                    "assumeRolePolicyDocument": {
+                      "Statement": [
+                        {
+                          "Action": "sts:AssumeRole",
+                          "Effect": "Allow",
+                          "Principal": {
+                            "Service": "lambda.amazonaws.com"
+                          }
+                        }
+                      ],
+                      "Version": "2012-10-17"
+                    },
+                    "managedPolicyArns": [
+                      {
+                        "Fn::Join": [
+                          "",
+                          [
+                            "arn:",
+                            {
+                              "Ref": "AWS::Partition"
+                            },
+                            ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+                          ]
+                        ]
+                      }
+                    ],
+                    "policies": [
+                      {
+                        "policyName": "MediaProcessingPolicy",
+                        "policyDocument": {
+                          "Statement": [
+                            {
+                              "Action": [
+                                "s3:DeleteObject",
+                                "s3:GetObject",
+                                "s3:PutObject"
+                              ],
+                              "Effect": "Allow",
+                              "Resource": "arn:aws:s3:::talk-avocado-*-dev/*"
+                            },
+                            {
+                              "Action": [
+                                "dynamodb:GetItem",
+                                "dynamodb:PutItem",
+                                "dynamodb:Query",
+                                "dynamodb:UpdateItem"
+                              ],
+                              "Effect": "Allow",
+                              "Resource": {
+                                "Fn::Join": [
+                                  "",
+                                  [
+                                    "arn:aws:dynamodb:us-east-1:",
+                                    {
+                                      "Ref": "AWS::AccountId"
+                                    },
+                                    ":table/talk-avocado-jobs-dev"
+                                  ]
+                                ]
+                              }
+                            },
+                            {
+                              "Action": [
+                                "xray:PutTelemetryRecords",
+                                "xray:PutTraceSegments"
+                              ],
+                              "Effect": "Allow",
+                              "Resource": "*"
+                            }
+                          ],
+                          "Version": "2012-10-17"
+                        }
+                      }
+                    ]
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_iam.CfnRole",
+                  "version": "2.100.0"
+                }
+              },
+              "DefaultPolicy": {
+                "id": "DefaultPolicy",
+                "path": "TalkAvocado-Lambda-dev/video-render-engine-Role/DefaultPolicy",
+                "children": {
+                  "Resource": {
+                    "id": "Resource",
+                    "path": "TalkAvocado-Lambda-dev/video-render-engine-Role/DefaultPolicy/Resource",
+                    "attributes": {
+                      "aws:cdk:cloudformation:type": "AWS::IAM::Policy",
+                      "aws:cdk:cloudformation:props": {
+                        "policyDocument": {
+                          "Statement": [
+                            {
+                              "Action": "sqs:SendMessage",
+                              "Effect": "Allow",
+                              "Resource": {
+                                "Fn::GetAtt": [
+                                  "videorenderengineDLQ00DFF0BB",
+                                  "Arn"
+                                ]
+                              }
+                            },
+                            {
+                              "Action": [
+                                "xray:PutTelemetryRecords",
+                                "xray:PutTraceSegments"
+                              ],
+                              "Effect": "Allow",
+                              "Resource": "*"
+                            }
+                          ],
+                          "Version": "2012-10-17"
+                        },
+                        "policyName": "videorenderengineRoleDefaultPolicyE908DFE4",
+                        "roles": [
+                          {
+                            "Ref": "videorenderengineRole5F9CA79E"
+                          }
+                        ]
+                      }
+                    },
+                    "constructInfo": {
+                      "fqn": "aws-cdk-lib.aws_iam.CfnPolicy",
+                      "version": "2.100.0"
+                    }
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_iam.Policy",
+                  "version": "2.100.0"
+                }
+              }
+            },
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.aws_iam.Role",
+              "version": "2.100.0"
+            }
+          },
+          "video-render-engine-Function": {
+            "id": "video-render-engine-Function",
+            "path": "TalkAvocado-Lambda-dev/video-render-engine-Function",
+            "children": {
+              "Resource": {
+                "id": "Resource",
+                "path": "TalkAvocado-Lambda-dev/video-render-engine-Function/Resource",
+                "attributes": {
+                  "aws:cdk:cloudformation:type": "AWS::Lambda::Function",
+                  "aws:cdk:cloudformation:props": {
+                    "architectures": ["x86_64"],
+                    "code": {
+                      "imageUri": {
+                        "Fn::Join": [
+                          "",
+                          [
+                            {
+                              "Ref": "AWS::AccountId"
+                            },
+                            ".dkr.ecr.us-east-1.",
+                            {
+                              "Ref": "AWS::URLSuffix"
+                            },
+                            "/talk-avocado/ffmpeg-runtime:latest"
+                          ]
+                        ]
+                      }
+                    },
+                    "deadLetterConfig": {
+                      "targetArn": {
+                        "Fn::GetAtt": ["videorenderengineDLQ00DFF0BB", "Arn"]
+                      }
+                    },
+                    "description": "Renders final video with cuts and transitions",
+                    "environment": {
+                      "variables": {
+                        "FFMPEG_PATH": "/opt/bin/ffmpeg",
+                        "FFPROBE_PATH": "/opt/bin/ffprobe",
+                        "ENVIRONMENT": "dev",
+                        "TENANT_ID": "default",
+                        "LOG_LEVEL": "INFO",
+                        "POWERTOOLS_SERVICE_NAME": "video-render-engine",
+                        "POWERTOOLS_METRICS_NAMESPACE": "TalkAvocado",
+                        "POWERTOOLS_LOGGER_LOG_EVENT": "true"
+                      }
+                    },
+                    "ephemeralStorage": {
+                      "size": 8192
+                    },
+                    "functionName": "talk-avocado-video-render-engine-dev",
+                    "memorySize": 5120,
+                    "packageType": "Image",
+                    "reservedConcurrentExecutions": 10,
+                    "role": {
+                      "Fn::GetAtt": ["videorenderengineRole5F9CA79E", "Arn"]
+                    },
+                    "timeout": 900,
+                    "tracingConfig": {
+                      "mode": "Active"
+                    }
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_lambda.CfnFunction",
+                  "version": "2.100.0"
+                }
+              },
+              "LogRetention": {
+                "id": "LogRetention",
+                "path": "TalkAvocado-Lambda-dev/video-render-engine-Function/LogRetention",
+                "children": {
+                  "Resource": {
+                    "id": "Resource",
+                    "path": "TalkAvocado-Lambda-dev/video-render-engine-Function/LogRetention/Resource",
+                    "constructInfo": {
+                      "fqn": "aws-cdk-lib.CfnResource",
+                      "version": "2.100.0"
+                    }
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_logs.LogRetention",
+                  "version": "2.100.0"
+                }
+              },
+              "LogGroup": {
+                "id": "LogGroup",
+                "path": "TalkAvocado-Lambda-dev/video-render-engine-Function/LogGroup",
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.Resource",
+                  "version": "2.100.0"
+                }
+              }
+            },
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.aws_lambda.Function",
+              "version": "2.100.0"
+            }
+          },
+          "ffmpeg-test-Role": {
+            "id": "ffmpeg-test-Role",
+            "path": "TalkAvocado-Lambda-dev/ffmpeg-test-Role",
+            "children": {
+              "Importffmpeg-test-Role": {
+                "id": "Importffmpeg-test-Role",
+                "path": "TalkAvocado-Lambda-dev/ffmpeg-test-Role/Importffmpeg-test-Role",
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.Resource",
+                  "version": "2.100.0"
+                }
+              },
+              "Resource": {
+                "id": "Resource",
+                "path": "TalkAvocado-Lambda-dev/ffmpeg-test-Role/Resource",
+                "attributes": {
+                  "aws:cdk:cloudformation:type": "AWS::IAM::Role",
+                  "aws:cdk:cloudformation:props": {
+                    "assumeRolePolicyDocument": {
+                      "Statement": [
+                        {
+                          "Action": "sts:AssumeRole",
+                          "Effect": "Allow",
+                          "Principal": {
+                            "Service": "lambda.amazonaws.com"
+                          }
+                        }
+                      ],
+                      "Version": "2012-10-17"
+                    },
+                    "managedPolicyArns": [
+                      {
+                        "Fn::Join": [
+                          "",
+                          [
+                            "arn:",
+                            {
+                              "Ref": "AWS::Partition"
+                            },
+                            ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+                          ]
+                        ]
+                      }
+                    ],
+                    "policies": [
+                      {
+                        "policyName": "MediaProcessingPolicy",
+                        "policyDocument": {
+                          "Statement": [
+                            {
+                              "Action": [
+                                "s3:DeleteObject",
+                                "s3:GetObject",
+                                "s3:PutObject"
+                              ],
+                              "Effect": "Allow",
+                              "Resource": "arn:aws:s3:::talk-avocado-*-dev/*"
+                            },
+                            {
+                              "Action": [
+                                "dynamodb:GetItem",
+                                "dynamodb:PutItem",
+                                "dynamodb:Query",
+                                "dynamodb:UpdateItem"
+                              ],
+                              "Effect": "Allow",
+                              "Resource": {
+                                "Fn::Join": [
+                                  "",
+                                  [
+                                    "arn:aws:dynamodb:us-east-1:",
+                                    {
+                                      "Ref": "AWS::AccountId"
+                                    },
+                                    ":table/talk-avocado-jobs-dev"
+                                  ]
+                                ]
+                              }
+                            },
+                            {
+                              "Action": [
+                                "xray:PutTelemetryRecords",
+                                "xray:PutTraceSegments"
+                              ],
+                              "Effect": "Allow",
+                              "Resource": "*"
+                            }
+                          ],
+                          "Version": "2012-10-17"
+                        }
+                      }
+                    ]
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_iam.CfnRole",
+                  "version": "2.100.0"
+                }
+              },
+              "DefaultPolicy": {
+                "id": "DefaultPolicy",
+                "path": "TalkAvocado-Lambda-dev/ffmpeg-test-Role/DefaultPolicy",
+                "children": {
+                  "Resource": {
+                    "id": "Resource",
+                    "path": "TalkAvocado-Lambda-dev/ffmpeg-test-Role/DefaultPolicy/Resource",
+                    "attributes": {
+                      "aws:cdk:cloudformation:type": "AWS::IAM::Policy",
+                      "aws:cdk:cloudformation:props": {
+                        "policyDocument": {
+                          "Statement": [
+                            {
+                              "Action": "sqs:SendMessage",
+                              "Effect": "Allow",
+                              "Resource": {
+                                "Fn::GetAtt": ["ffmpegtestDLQ11D6222A", "Arn"]
+                              }
+                            },
+                            {
+                              "Action": [
+                                "xray:PutTelemetryRecords",
+                                "xray:PutTraceSegments"
+                              ],
+                              "Effect": "Allow",
+                              "Resource": "*"
+                            }
+                          ],
+                          "Version": "2012-10-17"
+                        },
+                        "policyName": "ffmpegtestRoleDefaultPolicyDFDE233E",
+                        "roles": [
+                          {
+                            "Ref": "ffmpegtestRole8E3DD582"
+                          }
+                        ]
+                      }
+                    },
+                    "constructInfo": {
+                      "fqn": "aws-cdk-lib.aws_iam.CfnPolicy",
+                      "version": "2.100.0"
+                    }
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_iam.Policy",
+                  "version": "2.100.0"
+                }
+              }
+            },
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.aws_iam.Role",
+              "version": "2.100.0"
+            }
+          },
+          "ffmpeg-test-Function": {
+            "id": "ffmpeg-test-Function",
+            "path": "TalkAvocado-Lambda-dev/ffmpeg-test-Function",
+            "children": {
+              "Resource": {
+                "id": "Resource",
+                "path": "TalkAvocado-Lambda-dev/ffmpeg-test-Function/Resource",
+                "attributes": {
+                  "aws:cdk:cloudformation:type": "AWS::Lambda::Function",
+                  "aws:cdk:cloudformation:props": {
+                    "architectures": ["x86_64"],
+                    "code": {
+                      "imageUri": {
+                        "Fn::Join": [
+                          "",
+                          [
+                            {
+                              "Ref": "AWS::AccountId"
+                            },
+                            ".dkr.ecr.us-east-1.",
+                            {
+                              "Ref": "AWS::URLSuffix"
+                            },
+                            "/talk-avocado/ffmpeg-runtime:latest"
+                          ]
+                        ]
+                      }
+                    },
+                    "deadLetterConfig": {
+                      "targetArn": {
+                        "Fn::GetAtt": ["ffmpegtestDLQ11D6222A", "Arn"]
+                      }
+                    },
+                    "description": "Validates FFmpeg runtime functionality",
+                    "environment": {
+                      "variables": {
+                        "FFMPEG_PATH": "/opt/bin/ffmpeg",
+                        "FFPROBE_PATH": "/opt/bin/ffprobe",
+                        "ENVIRONMENT": "dev",
+                        "TENANT_ID": "default",
+                        "LOG_LEVEL": "INFO",
+                        "POWERTOOLS_SERVICE_NAME": "ffmpeg-test",
+                        "POWERTOOLS_METRICS_NAMESPACE": "TalkAvocado",
+                        "POWERTOOLS_LOGGER_LOG_EVENT": "true"
+                      }
+                    },
+                    "ephemeralStorage": {
+                      "size": 2048
+                    },
+                    "functionName": "talk-avocado-ffmpeg-test-dev",
+                    "memorySize": 1769,
+                    "packageType": "Image",
+                    "reservedConcurrentExecutions": 10,
+                    "role": {
+                      "Fn::GetAtt": ["ffmpegtestRole8E3DD582", "Arn"]
+                    },
+                    "timeout": 60,
+                    "tracingConfig": {
+                      "mode": "Active"
+                    }
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_lambda.CfnFunction",
+                  "version": "2.100.0"
+                }
+              },
+              "LogRetention": {
+                "id": "LogRetention",
+                "path": "TalkAvocado-Lambda-dev/ffmpeg-test-Function/LogRetention",
+                "children": {
+                  "Resource": {
+                    "id": "Resource",
+                    "path": "TalkAvocado-Lambda-dev/ffmpeg-test-Function/LogRetention/Resource",
+                    "constructInfo": {
+                      "fqn": "aws-cdk-lib.CfnResource",
+                      "version": "2.100.0"
+                    }
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_logs.LogRetention",
+                  "version": "2.100.0"
+                }
+              },
+              "LogGroup": {
+                "id": "LogGroup",
+                "path": "TalkAvocado-Lambda-dev/ffmpeg-test-Function/LogGroup",
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.Resource",
+                  "version": "2.100.0"
+                }
+              }
+            },
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.aws_lambda.Function",
+              "version": "2.100.0"
+            }
+          },
+          "audio-extraction-ErrorRate-Alarm": {
+            "id": "audio-extraction-ErrorRate-Alarm",
+            "path": "TalkAvocado-Lambda-dev/audio-extraction-ErrorRate-Alarm",
+            "children": {
+              "Resource": {
+                "id": "Resource",
+                "path": "TalkAvocado-Lambda-dev/audio-extraction-ErrorRate-Alarm/Resource",
+                "attributes": {
+                  "aws:cdk:cloudformation:type": "AWS::CloudWatch::Alarm",
+                  "aws:cdk:cloudformation:props": {
+                    "alarmDescription": "Error rate alarm for audio-extraction",
+                    "alarmName": "TalkAvocado-audio-extraction-ErrorRate",
+                    "comparisonOperator": "GreaterThanOrEqualToThreshold",
+                    "dimensions": [
+                      {
+                        "name": "FunctionName",
+                        "value": {
+                          "Ref": "audioextractionFunctionDAAD4F1A"
+                        }
+                      }
+                    ],
+                    "evaluationPeriods": 2,
+                    "metricName": "Errors",
+                    "namespace": "AWS/Lambda",
+                    "period": 300,
+                    "statistic": "Average",
+                    "threshold": 0.05,
+                    "treatMissingData": "notBreaching"
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_cloudwatch.CfnAlarm",
+                  "version": "2.100.0"
+                }
+              }
+            },
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.aws_cloudwatch.Alarm",
+              "version": "2.100.0"
+            }
+          },
+          "audio-extraction-Duration-Alarm": {
+            "id": "audio-extraction-Duration-Alarm",
+            "path": "TalkAvocado-Lambda-dev/audio-extraction-Duration-Alarm",
+            "children": {
+              "Resource": {
+                "id": "Resource",
+                "path": "TalkAvocado-Lambda-dev/audio-extraction-Duration-Alarm/Resource",
+                "attributes": {
+                  "aws:cdk:cloudformation:type": "AWS::CloudWatch::Alarm",
+                  "aws:cdk:cloudformation:props": {
+                    "alarmDescription": "Duration alarm for audio-extraction",
+                    "alarmName": "TalkAvocado-audio-extraction-Duration",
+                    "comparisonOperator": "GreaterThanOrEqualToThreshold",
+                    "dimensions": [
+                      {
+                        "name": "FunctionName",
+                        "value": {
+                          "Ref": "audioextractionFunctionDAAD4F1A"
+                        }
+                      }
+                    ],
+                    "evaluationPeriods": 2,
+                    "metricName": "Duration",
+                    "namespace": "AWS/Lambda",
+                    "period": 300,
+                    "statistic": "Average",
+                    "threshold": 270000,
+                    "treatMissingData": "notBreaching"
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_cloudwatch.CfnAlarm",
+                  "version": "2.100.0"
+                }
+              }
+            },
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.aws_cloudwatch.Alarm",
+              "version": "2.100.0"
+            }
+          },
+          "audio-extraction-DLQ-Alarm": {
+            "id": "audio-extraction-DLQ-Alarm",
+            "path": "TalkAvocado-Lambda-dev/audio-extraction-DLQ-Alarm",
+            "children": {
+              "Resource": {
+                "id": "Resource",
+                "path": "TalkAvocado-Lambda-dev/audio-extraction-DLQ-Alarm/Resource",
+                "attributes": {
+                  "aws:cdk:cloudformation:type": "AWS::CloudWatch::Alarm",
+                  "aws:cdk:cloudformation:props": {
+                    "alarmDescription": "DLQ alarm for audio-extraction",
+                    "alarmName": "TalkAvocado-audio-extraction-DLQ",
+                    "comparisonOperator": "GreaterThanThreshold",
+                    "dimensions": [
+                      {
+                        "name": "QueueName",
+                        "value": {
+                          "Fn::GetAtt": [
+                            "audioextractionDLQ0C46B90B",
+                            "QueueName"
+                          ]
+                        }
+                      }
+                    ],
+                    "evaluationPeriods": 1,
+                    "metricName": "ApproximateNumberOfVisibleMessages",
+                    "namespace": "AWS/SQS",
+                    "period": 300,
+                    "statistic": "Average",
+                    "threshold": 0,
+                    "treatMissingData": "notBreaching"
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_cloudwatch.CfnAlarm",
+                  "version": "2.100.0"
+                }
+              }
+            },
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.aws_cloudwatch.Alarm",
+              "version": "2.100.0"
+            }
+          },
+          "transcription-ErrorRate-Alarm": {
+            "id": "transcription-ErrorRate-Alarm",
+            "path": "TalkAvocado-Lambda-dev/transcription-ErrorRate-Alarm",
+            "children": {
+              "Resource": {
+                "id": "Resource",
+                "path": "TalkAvocado-Lambda-dev/transcription-ErrorRate-Alarm/Resource",
+                "attributes": {
+                  "aws:cdk:cloudformation:type": "AWS::CloudWatch::Alarm",
+                  "aws:cdk:cloudformation:props": {
+                    "alarmDescription": "Error rate alarm for transcription",
+                    "alarmName": "TalkAvocado-transcription-ErrorRate",
+                    "comparisonOperator": "GreaterThanOrEqualToThreshold",
+                    "dimensions": [
+                      {
+                        "name": "FunctionName",
+                        "value": {
+                          "Ref": "transcriptionFunctionB7A3A13A"
+                        }
+                      }
+                    ],
+                    "evaluationPeriods": 2,
+                    "metricName": "Errors",
+                    "namespace": "AWS/Lambda",
+                    "period": 300,
+                    "statistic": "Average",
+                    "threshold": 0.05,
+                    "treatMissingData": "notBreaching"
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_cloudwatch.CfnAlarm",
+                  "version": "2.100.0"
+                }
+              }
+            },
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.aws_cloudwatch.Alarm",
+              "version": "2.100.0"
+            }
+          },
+          "transcription-Duration-Alarm": {
+            "id": "transcription-Duration-Alarm",
+            "path": "TalkAvocado-Lambda-dev/transcription-Duration-Alarm",
+            "children": {
+              "Resource": {
+                "id": "Resource",
+                "path": "TalkAvocado-Lambda-dev/transcription-Duration-Alarm/Resource",
+                "attributes": {
+                  "aws:cdk:cloudformation:type": "AWS::CloudWatch::Alarm",
+                  "aws:cdk:cloudformation:props": {
+                    "alarmDescription": "Duration alarm for transcription",
+                    "alarmName": "TalkAvocado-transcription-Duration",
+                    "comparisonOperator": "GreaterThanOrEqualToThreshold",
+                    "dimensions": [
+                      {
+                        "name": "FunctionName",
+                        "value": {
+                          "Ref": "transcriptionFunctionB7A3A13A"
+                        }
+                      }
+                    ],
+                    "evaluationPeriods": 2,
+                    "metricName": "Duration",
+                    "namespace": "AWS/Lambda",
+                    "period": 300,
+                    "statistic": "Average",
+                    "threshold": 540000,
+                    "treatMissingData": "notBreaching"
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_cloudwatch.CfnAlarm",
+                  "version": "2.100.0"
+                }
+              }
+            },
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.aws_cloudwatch.Alarm",
+              "version": "2.100.0"
+            }
+          },
+          "transcription-DLQ-Alarm": {
+            "id": "transcription-DLQ-Alarm",
+            "path": "TalkAvocado-Lambda-dev/transcription-DLQ-Alarm",
+            "children": {
+              "Resource": {
+                "id": "Resource",
+                "path": "TalkAvocado-Lambda-dev/transcription-DLQ-Alarm/Resource",
+                "attributes": {
+                  "aws:cdk:cloudformation:type": "AWS::CloudWatch::Alarm",
+                  "aws:cdk:cloudformation:props": {
+                    "alarmDescription": "DLQ alarm for transcription",
+                    "alarmName": "TalkAvocado-transcription-DLQ",
+                    "comparisonOperator": "GreaterThanThreshold",
+                    "dimensions": [
+                      {
+                        "name": "QueueName",
+                        "value": {
+                          "Fn::GetAtt": [
+                            "transcriptionDLQ1F951097",
+                            "QueueName"
+                          ]
+                        }
+                      }
+                    ],
+                    "evaluationPeriods": 1,
+                    "metricName": "ApproximateNumberOfVisibleMessages",
+                    "namespace": "AWS/SQS",
+                    "period": 300,
+                    "statistic": "Average",
+                    "threshold": 0,
+                    "treatMissingData": "notBreaching"
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_cloudwatch.CfnAlarm",
+                  "version": "2.100.0"
+                }
+              }
+            },
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.aws_cloudwatch.Alarm",
+              "version": "2.100.0"
+            }
+          },
+          "smart-cut-planner-ErrorRate-Alarm": {
+            "id": "smart-cut-planner-ErrorRate-Alarm",
+            "path": "TalkAvocado-Lambda-dev/smart-cut-planner-ErrorRate-Alarm",
+            "children": {
+              "Resource": {
+                "id": "Resource",
+                "path": "TalkAvocado-Lambda-dev/smart-cut-planner-ErrorRate-Alarm/Resource",
+                "attributes": {
+                  "aws:cdk:cloudformation:type": "AWS::CloudWatch::Alarm",
+                  "aws:cdk:cloudformation:props": {
+                    "alarmDescription": "Error rate alarm for smart-cut-planner",
+                    "alarmName": "TalkAvocado-smart-cut-planner-ErrorRate",
+                    "comparisonOperator": "GreaterThanOrEqualToThreshold",
+                    "dimensions": [
+                      {
+                        "name": "FunctionName",
+                        "value": {
+                          "Ref": "smartcutplannerFunctionAC389E48"
+                        }
+                      }
+                    ],
+                    "evaluationPeriods": 2,
+                    "metricName": "Errors",
+                    "namespace": "AWS/Lambda",
+                    "period": 300,
+                    "statistic": "Average",
+                    "threshold": 0.05,
+                    "treatMissingData": "notBreaching"
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_cloudwatch.CfnAlarm",
+                  "version": "2.100.0"
+                }
+              }
+            },
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.aws_cloudwatch.Alarm",
+              "version": "2.100.0"
+            }
+          },
+          "smart-cut-planner-Duration-Alarm": {
+            "id": "smart-cut-planner-Duration-Alarm",
+            "path": "TalkAvocado-Lambda-dev/smart-cut-planner-Duration-Alarm",
+            "children": {
+              "Resource": {
+                "id": "Resource",
+                "path": "TalkAvocado-Lambda-dev/smart-cut-planner-Duration-Alarm/Resource",
+                "attributes": {
+                  "aws:cdk:cloudformation:type": "AWS::CloudWatch::Alarm",
+                  "aws:cdk:cloudformation:props": {
+                    "alarmDescription": "Duration alarm for smart-cut-planner",
+                    "alarmName": "TalkAvocado-smart-cut-planner-Duration",
+                    "comparisonOperator": "GreaterThanOrEqualToThreshold",
+                    "dimensions": [
+                      {
+                        "name": "FunctionName",
+                        "value": {
+                          "Ref": "smartcutplannerFunctionAC389E48"
+                        }
+                      }
+                    ],
+                    "evaluationPeriods": 2,
+                    "metricName": "Duration",
+                    "namespace": "AWS/Lambda",
+                    "period": 300,
+                    "statistic": "Average",
+                    "threshold": 270000,
+                    "treatMissingData": "notBreaching"
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_cloudwatch.CfnAlarm",
+                  "version": "2.100.0"
+                }
+              }
+            },
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.aws_cloudwatch.Alarm",
+              "version": "2.100.0"
+            }
+          },
+          "smart-cut-planner-DLQ-Alarm": {
+            "id": "smart-cut-planner-DLQ-Alarm",
+            "path": "TalkAvocado-Lambda-dev/smart-cut-planner-DLQ-Alarm",
+            "children": {
+              "Resource": {
+                "id": "Resource",
+                "path": "TalkAvocado-Lambda-dev/smart-cut-planner-DLQ-Alarm/Resource",
+                "attributes": {
+                  "aws:cdk:cloudformation:type": "AWS::CloudWatch::Alarm",
+                  "aws:cdk:cloudformation:props": {
+                    "alarmDescription": "DLQ alarm for smart-cut-planner",
+                    "alarmName": "TalkAvocado-smart-cut-planner-DLQ",
+                    "comparisonOperator": "GreaterThanThreshold",
+                    "dimensions": [
+                      {
+                        "name": "QueueName",
+                        "value": {
+                          "Fn::GetAtt": [
+                            "smartcutplannerDLQ0834FCC1",
+                            "QueueName"
+                          ]
+                        }
+                      }
+                    ],
+                    "evaluationPeriods": 1,
+                    "metricName": "ApproximateNumberOfVisibleMessages",
+                    "namespace": "AWS/SQS",
+                    "period": 300,
+                    "statistic": "Average",
+                    "threshold": 0,
+                    "treatMissingData": "notBreaching"
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_cloudwatch.CfnAlarm",
+                  "version": "2.100.0"
+                }
+              }
+            },
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.aws_cloudwatch.Alarm",
+              "version": "2.100.0"
+            }
+          },
+          "video-render-engine-ErrorRate-Alarm": {
+            "id": "video-render-engine-ErrorRate-Alarm",
+            "path": "TalkAvocado-Lambda-dev/video-render-engine-ErrorRate-Alarm",
+            "children": {
+              "Resource": {
+                "id": "Resource",
+                "path": "TalkAvocado-Lambda-dev/video-render-engine-ErrorRate-Alarm/Resource",
+                "attributes": {
+                  "aws:cdk:cloudformation:type": "AWS::CloudWatch::Alarm",
+                  "aws:cdk:cloudformation:props": {
+                    "alarmDescription": "Error rate alarm for video-render-engine",
+                    "alarmName": "TalkAvocado-video-render-engine-ErrorRate",
+                    "comparisonOperator": "GreaterThanOrEqualToThreshold",
+                    "dimensions": [
+                      {
+                        "name": "FunctionName",
+                        "value": {
+                          "Ref": "videorenderengineFunction50A41B0B"
+                        }
+                      }
+                    ],
+                    "evaluationPeriods": 2,
+                    "metricName": "Errors",
+                    "namespace": "AWS/Lambda",
+                    "period": 300,
+                    "statistic": "Average",
+                    "threshold": 0.05,
+                    "treatMissingData": "notBreaching"
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_cloudwatch.CfnAlarm",
+                  "version": "2.100.0"
+                }
+              }
+            },
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.aws_cloudwatch.Alarm",
+              "version": "2.100.0"
+            }
+          },
+          "video-render-engine-Duration-Alarm": {
+            "id": "video-render-engine-Duration-Alarm",
+            "path": "TalkAvocado-Lambda-dev/video-render-engine-Duration-Alarm",
+            "children": {
+              "Resource": {
+                "id": "Resource",
+                "path": "TalkAvocado-Lambda-dev/video-render-engine-Duration-Alarm/Resource",
+                "attributes": {
+                  "aws:cdk:cloudformation:type": "AWS::CloudWatch::Alarm",
+                  "aws:cdk:cloudformation:props": {
+                    "alarmDescription": "Duration alarm for video-render-engine",
+                    "alarmName": "TalkAvocado-video-render-engine-Duration",
+                    "comparisonOperator": "GreaterThanOrEqualToThreshold",
+                    "dimensions": [
+                      {
+                        "name": "FunctionName",
+                        "value": {
+                          "Ref": "videorenderengineFunction50A41B0B"
+                        }
+                      }
+                    ],
+                    "evaluationPeriods": 2,
+                    "metricName": "Duration",
+                    "namespace": "AWS/Lambda",
+                    "period": 300,
+                    "statistic": "Average",
+                    "threshold": 810000,
+                    "treatMissingData": "notBreaching"
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_cloudwatch.CfnAlarm",
+                  "version": "2.100.0"
+                }
+              }
+            },
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.aws_cloudwatch.Alarm",
+              "version": "2.100.0"
+            }
+          },
+          "video-render-engine-DLQ-Alarm": {
+            "id": "video-render-engine-DLQ-Alarm",
+            "path": "TalkAvocado-Lambda-dev/video-render-engine-DLQ-Alarm",
+            "children": {
+              "Resource": {
+                "id": "Resource",
+                "path": "TalkAvocado-Lambda-dev/video-render-engine-DLQ-Alarm/Resource",
+                "attributes": {
+                  "aws:cdk:cloudformation:type": "AWS::CloudWatch::Alarm",
+                  "aws:cdk:cloudformation:props": {
+                    "alarmDescription": "DLQ alarm for video-render-engine",
+                    "alarmName": "TalkAvocado-video-render-engine-DLQ",
+                    "comparisonOperator": "GreaterThanThreshold",
+                    "dimensions": [
+                      {
+                        "name": "QueueName",
+                        "value": {
+                          "Fn::GetAtt": [
+                            "videorenderengineDLQ00DFF0BB",
+                            "QueueName"
+                          ]
+                        }
+                      }
+                    ],
+                    "evaluationPeriods": 1,
+                    "metricName": "ApproximateNumberOfVisibleMessages",
+                    "namespace": "AWS/SQS",
+                    "period": 300,
+                    "statistic": "Average",
+                    "threshold": 0,
+                    "treatMissingData": "notBreaching"
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_cloudwatch.CfnAlarm",
+                  "version": "2.100.0"
+                }
+              }
+            },
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.aws_cloudwatch.Alarm",
+              "version": "2.100.0"
+            }
+          },
+          "ffmpeg-test-ErrorRate-Alarm": {
+            "id": "ffmpeg-test-ErrorRate-Alarm",
+            "path": "TalkAvocado-Lambda-dev/ffmpeg-test-ErrorRate-Alarm",
+            "children": {
+              "Resource": {
+                "id": "Resource",
+                "path": "TalkAvocado-Lambda-dev/ffmpeg-test-ErrorRate-Alarm/Resource",
+                "attributes": {
+                  "aws:cdk:cloudformation:type": "AWS::CloudWatch::Alarm",
+                  "aws:cdk:cloudformation:props": {
+                    "alarmDescription": "Error rate alarm for ffmpeg-test",
+                    "alarmName": "TalkAvocado-ffmpeg-test-ErrorRate",
+                    "comparisonOperator": "GreaterThanOrEqualToThreshold",
+                    "dimensions": [
+                      {
+                        "name": "FunctionName",
+                        "value": {
+                          "Ref": "ffmpegtestFunction7EA5C725"
+                        }
+                      }
+                    ],
+                    "evaluationPeriods": 2,
+                    "metricName": "Errors",
+                    "namespace": "AWS/Lambda",
+                    "period": 300,
+                    "statistic": "Average",
+                    "threshold": 0.05,
+                    "treatMissingData": "notBreaching"
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_cloudwatch.CfnAlarm",
+                  "version": "2.100.0"
+                }
+              }
+            },
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.aws_cloudwatch.Alarm",
+              "version": "2.100.0"
+            }
+          },
+          "ffmpeg-test-Duration-Alarm": {
+            "id": "ffmpeg-test-Duration-Alarm",
+            "path": "TalkAvocado-Lambda-dev/ffmpeg-test-Duration-Alarm",
+            "children": {
+              "Resource": {
+                "id": "Resource",
+                "path": "TalkAvocado-Lambda-dev/ffmpeg-test-Duration-Alarm/Resource",
+                "attributes": {
+                  "aws:cdk:cloudformation:type": "AWS::CloudWatch::Alarm",
+                  "aws:cdk:cloudformation:props": {
+                    "alarmDescription": "Duration alarm for ffmpeg-test",
+                    "alarmName": "TalkAvocado-ffmpeg-test-Duration",
+                    "comparisonOperator": "GreaterThanOrEqualToThreshold",
+                    "dimensions": [
+                      {
+                        "name": "FunctionName",
+                        "value": {
+                          "Ref": "ffmpegtestFunction7EA5C725"
+                        }
+                      }
+                    ],
+                    "evaluationPeriods": 2,
+                    "metricName": "Duration",
+                    "namespace": "AWS/Lambda",
+                    "period": 300,
+                    "statistic": "Average",
+                    "threshold": 54000,
+                    "treatMissingData": "notBreaching"
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_cloudwatch.CfnAlarm",
+                  "version": "2.100.0"
+                }
+              }
+            },
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.aws_cloudwatch.Alarm",
+              "version": "2.100.0"
+            }
+          },
+          "ffmpeg-test-DLQ-Alarm": {
+            "id": "ffmpeg-test-DLQ-Alarm",
+            "path": "TalkAvocado-Lambda-dev/ffmpeg-test-DLQ-Alarm",
+            "children": {
+              "Resource": {
+                "id": "Resource",
+                "path": "TalkAvocado-Lambda-dev/ffmpeg-test-DLQ-Alarm/Resource",
+                "attributes": {
+                  "aws:cdk:cloudformation:type": "AWS::CloudWatch::Alarm",
+                  "aws:cdk:cloudformation:props": {
+                    "alarmDescription": "DLQ alarm for ffmpeg-test",
+                    "alarmName": "TalkAvocado-ffmpeg-test-DLQ",
+                    "comparisonOperator": "GreaterThanThreshold",
+                    "dimensions": [
+                      {
+                        "name": "QueueName",
+                        "value": {
+                          "Fn::GetAtt": ["ffmpegtestDLQ11D6222A", "QueueName"]
+                        }
+                      }
+                    ],
+                    "evaluationPeriods": 1,
+                    "metricName": "ApproximateNumberOfVisibleMessages",
+                    "namespace": "AWS/SQS",
+                    "period": 300,
+                    "statistic": "Average",
+                    "threshold": 0,
+                    "treatMissingData": "notBreaching"
+                  }
+                },
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.aws_cloudwatch.CfnAlarm",
+                  "version": "2.100.0"
+                }
+              }
+            },
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.aws_cloudwatch.Alarm",
+              "version": "2.100.0"
+            }
+          },
+          "FFmpegRuntimeRepositoryURI": {
+            "id": "FFmpegRuntimeRepositoryURI",
+            "path": "TalkAvocado-Lambda-dev/FFmpegRuntimeRepositoryURI",
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.CfnOutput",
+              "version": "2.100.0"
+            }
+          },
+          "audio-extractionFunctionArn": {
+            "id": "audio-extractionFunctionArn",
+            "path": "TalkAvocado-Lambda-dev/audio-extractionFunctionArn",
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.CfnOutput",
+              "version": "2.100.0"
+            }
+          },
+          "transcriptionFunctionArn": {
+            "id": "transcriptionFunctionArn",
+            "path": "TalkAvocado-Lambda-dev/transcriptionFunctionArn",
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.CfnOutput",
+              "version": "2.100.0"
+            }
+          },
+          "smart-cut-plannerFunctionArn": {
+            "id": "smart-cut-plannerFunctionArn",
+            "path": "TalkAvocado-Lambda-dev/smart-cut-plannerFunctionArn",
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.CfnOutput",
+              "version": "2.100.0"
+            }
+          },
+          "video-render-engineFunctionArn": {
+            "id": "video-render-engineFunctionArn",
+            "path": "TalkAvocado-Lambda-dev/video-render-engineFunctionArn",
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.CfnOutput",
+              "version": "2.100.0"
+            }
+          },
+          "ffmpeg-testFunctionArn": {
+            "id": "ffmpeg-testFunctionArn",
+            "path": "TalkAvocado-Lambda-dev/ffmpeg-testFunctionArn",
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.CfnOutput",
+              "version": "2.100.0"
+            }
+          },
+          "CDKMetadata": {
+            "id": "CDKMetadata",
+            "path": "TalkAvocado-Lambda-dev/CDKMetadata",
+            "children": {
+              "Default": {
+                "id": "Default",
+                "path": "TalkAvocado-Lambda-dev/CDKMetadata/Default",
+                "constructInfo": {
+                  "fqn": "aws-cdk-lib.CfnResource",
+                  "version": "2.100.0"
+                }
+              }
+            },
+            "constructInfo": {
+              "fqn": "constructs.Construct",
+              "version": "10.4.2"
+            }
+          },
+          "BootstrapVersion": {
+            "id": "BootstrapVersion",
+            "path": "TalkAvocado-Lambda-dev/BootstrapVersion",
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.CfnParameter",
+              "version": "2.100.0"
+            }
+          },
+          "CheckBootstrapVersion": {
+            "id": "CheckBootstrapVersion",
+            "path": "TalkAvocado-Lambda-dev/CheckBootstrapVersion",
+            "constructInfo": {
+              "fqn": "aws-cdk-lib.CfnRule",
+              "version": "2.100.0"
+            }
+          }
+        },
+        "constructInfo": {
+          "fqn": "aws-cdk-lib.Stack",
+          "version": "2.100.0"
+        }
+      },
+      "Tree": {
+        "id": "Tree",
+        "path": "Tree",
+        "constructInfo": {
+          "fqn": "constructs.Construct",
+          "version": "10.4.2"
+        }
+      }
+    },
+    "constructInfo": {
+      "fqn": "aws-cdk-lib.App",
+      "version": "2.100.0"
+    }
+  }
+}

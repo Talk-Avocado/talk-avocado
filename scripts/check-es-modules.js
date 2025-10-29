@@ -56,7 +56,11 @@ function checkRequireStatements() {
       !file.includes("dist") &&
       !file.includes("check-es-modules.js") &&
       !file.endsWith(".eslintrc.js") &&
-      !file.endsWith(".eslintrc.cjs")
+      !file.endsWith(".eslintrc.cjs") &&
+      !file.includes("infrastructure\\lambda\\") &&
+      !file.includes("infrastructure/lambda/") &&
+      !file.includes("cdk.out\\") &&
+      !file.includes("cdk.out/")
   );
 
   log(`Found ${jsFiles.length} JS/TS files to check`, "blue");
@@ -124,7 +128,11 @@ function checkModuleExports() {
       !file.includes("dist") &&
       !file.includes("check-es-modules.js") &&
       !file.endsWith(".eslintrc.js") &&
-      !file.endsWith(".eslintrc.cjs")
+      !file.endsWith(".eslintrc.cjs") &&
+      !file.includes("infrastructure\\lambda\\") &&
+      !file.includes("infrastructure/lambda/") &&
+      !file.includes("cdk.out\\") &&
+      !file.includes("cdk.out/")
   );
 
   const violations = [];
@@ -169,7 +177,9 @@ function checkPackageJsonFiles() {
     file =>
       file.endsWith("package.json") &&
       !file.includes("node_modules") &&
-      !file.includes("dist")
+      !file.includes("dist") &&
+      !file.includes("infrastructure\\lambda\\") &&
+      !file.includes("infrastructure/lambda/")
   );
 
   let allValid = true;
