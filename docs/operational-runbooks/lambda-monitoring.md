@@ -1,11 +1,13 @@
 # Lambda Monitoring Operational Runbook
 
 ## Overview
+
 This runbook provides operational guidance for monitoring and maintaining the TalkAvocado Lambda functions deployed as part of MFU-WP00-03.
 
 ## Lambda Functions Deployed
 
 ### Services
+
 - **audio-extraction**: Extracts audio from video files using FFmpeg
 - **transcription**: Transcribes audio using Whisper AI model
 - **smart-cut-planner**: Analyzes content and creates cut plans
@@ -13,6 +15,7 @@ This runbook provides operational guidance for monitoring and maintaining the Ta
 - **ffmpeg-test**: Validates FFmpeg runtime functionality
 
 ### Configuration
+
 - **Memory**: 1769MB (audio-extraction, smart-cut-planner, ffmpeg-test), 3008MB (transcription), 5120MB (video-render-engine)
 - **Timeout**: 300s (audio-extraction, smart-cut-planner), 600s (transcription), 900s (video-render-engine), 60s (ffmpeg-test)
 - **Ephemeral Storage**: 2-8GB depending on service
@@ -21,9 +24,11 @@ This runbook provides operational guidance for monitoring and maintaining the Ta
 ## Monitoring Dashboard
 
 ### CloudWatch Dashboard: `TalkAvocado-MediaProcessing`
+
 Access via AWS Console → CloudWatch → Dashboards → TalkAvocado-MediaProcessing
 
 #### Key Metrics
+
 1. **Invocations**: Total function invocations per service
 2. **Errors**: Error count and error rate per service
 3. **Duration**: P95, P99, and average execution time
@@ -34,6 +39,7 @@ Access via AWS Console → CloudWatch → Dashboards → TalkAvocado-MediaProces
 ## Alarms and Alerting
 
 ### Critical Alarms
+
 1. **Error Rate Alarm**
    - **Name**: `TalkAvocado-{service}-ErrorRate`
    - **Threshold**: > 5% error rate over 5 minutes
@@ -52,6 +58,7 @@ Access via AWS Console → CloudWatch → Dashboards → TalkAvocado-MediaProces
 ### Alarm Response Procedures
 
 #### Error Rate > 5%
+
 1. **Immediate Actions**:
    - Check CloudWatch Logs for error patterns
    - Review recent deployments or configuration changes
@@ -68,6 +75,7 @@ Access via AWS Console → CloudWatch → Dashboards → TalkAvocado-MediaProces
    - Implement additional error handling
 
 #### Duration > 90% of Timeout
+
 1. **Immediate Actions**:
    - Check function memory utilization
    - Review input data size and complexity
@@ -84,6 +92,7 @@ Access via AWS Console → CloudWatch → Dashboards → TalkAvocado-MediaProces
    - Implement input validation and size limits
 
 #### DLQ Messages Present
+
 1. **Immediate Actions**:
    - Check DLQ message content and error details
    - Identify the root cause of failures
@@ -102,6 +111,7 @@ Access via AWS Console → CloudWatch → Dashboards → TalkAvocado-MediaProces
 ## Performance Monitoring
 
 ### Key Performance Indicators (KPIs)
+
 1. **Cold Start Duration**: < 10 seconds for all services
 2. **Warm Execution Time**: < 50% of timeout for normal operations
 3. **Memory Utilization**: < 80% of allocated memory
@@ -109,6 +119,7 @@ Access via AWS Console → CloudWatch → Dashboards → TalkAvocado-MediaProces
 5. **DLQ Count**: 0 under normal operations
 
 ### Performance Optimization
+
 1. **Memory Tuning**:
    - Use `infrastructure/lambda/power-tuning.js` for optimization
    - Test different memory configurations
@@ -129,26 +140,31 @@ Access via AWS Console → CloudWatch → Dashboards → TalkAvocado-MediaProces
 ### Common Issues
 
 #### Function Timeout
+
 - **Symptoms**: Duration alarm triggered, function times out
 - **Causes**: Large input files, inefficient FFmpeg commands, insufficient memory
 - **Solutions**: Increase timeout, optimize FFmpeg commands, increase memory
 
 #### Memory Issues
+
 - **Symptoms**: Out of memory errors, high memory utilization
 - **Causes**: Large input files, memory leaks, insufficient allocation
 - **Solutions**: Increase memory allocation, optimize code, add input validation
 
 #### FFmpeg Errors
+
 - **Symptoms**: FFmpeg execution failures, codec errors
 - **Causes**: Unsupported formats, missing codecs, invalid parameters
 - **Solutions**: Update FFmpeg version, add format validation, fix command parameters
 
 #### DLQ Messages
+
 - **Symptoms**: Messages in Dead Letter Queue
 - **Causes**: Permanent failures, retry exhaustion, invalid input
 - **Solutions**: Fix underlying issues, adjust retry policies, validate input
 
 ### Debugging Steps
+
 1. **Check CloudWatch Logs**:
    - Look for error patterns and stack traces
    - Check correlation IDs for request tracing
@@ -167,6 +183,7 @@ Access via AWS Console → CloudWatch → Dashboards → TalkAvocado-MediaProces
 ## Maintenance Procedures
 
 ### Regular Maintenance
+
 1. **Weekly**:
    - Review alarm history and resolution times
    - Check performance trends and optimization opportunities
@@ -183,6 +200,7 @@ Access via AWS Console → CloudWatch → Dashboards → TalkAvocado-MediaProces
    - Conduct disaster recovery testing
 
 ### Deployment Procedures
+
 1. **Pre-deployment**:
    - Run performance tests
    - Validate configuration changes
@@ -196,6 +214,7 @@ Access via AWS Console → CloudWatch → Dashboards → TalkAvocado-MediaProces
 ## Emergency Procedures
 
 ### Service Outage
+
 1. **Immediate Response**:
    - Check CloudWatch alarms and logs
    - Identify affected services and scope
@@ -212,6 +231,7 @@ Access via AWS Console → CloudWatch → Dashboards → TalkAvocado-MediaProces
    - Document incident and lessons learned
 
 ### Performance Degradation
+
 1. **Immediate Response**:
    - Check duration and memory utilization
    - Review recent changes
@@ -230,11 +250,13 @@ Access via AWS Console → CloudWatch → Dashboards → TalkAvocado-MediaProces
 ## Contact Information
 
 ### Escalation Path
+
 1. **Level 1**: Development Team
 2. **Level 2**: DevOps Team
 3. **Level 3**: Architecture Team
 
 ### On-Call Rotation
+
 - Primary: [To be defined]
 - Secondary: [To be defined]
 - Escalation: [To be defined]
@@ -242,6 +264,7 @@ Access via AWS Console → CloudWatch → Dashboards → TalkAvocado-MediaProces
 ## Appendix
 
 ### Useful Commands
+
 ```bash
 # Check function status
 aws lambda get-function --function-name talk-avocado-{service}-dev
@@ -258,12 +281,14 @@ npm run test:performance {service}
 ```
 
 ### Useful Links
+
 - [AWS Lambda Console](https://console.aws.amazon.com/lambda/)
 - [CloudWatch Dashboard](https://console.aws.amazon.com/cloudwatch/home#dashboards:)
 - [X-Ray Service Map](https://console.aws.amazon.com/xray/home#/service-map)
 - [SQS Console](https://console.aws.amazon.com/sqs/)
 
 ### Configuration Files
+
 - Lambda Configuration: `infrastructure/lambda/config/lambda-config.yaml`
 - CDK Stack: `infrastructure/lambda/lambda-stack.ts`
 - Retry Policy: `backend/lib/retry-policy.ts`
