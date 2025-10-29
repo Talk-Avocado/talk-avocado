@@ -5,6 +5,7 @@ This directory contains the AWS CDK infrastructure code for TalkAvocado Lambda f
 ## Overview
 
 The infrastructure includes:
+
 - Lambda functions for media processing services
 - Dead Letter Queues (DLQ) for error handling
 - CloudWatch alarms for monitoring
@@ -51,6 +52,7 @@ The infrastructure includes:
 ## Configuration
 
 The Lambda configuration is defined in `config/lambda-config.yaml`. This file contains:
+
 - Memory and timeout settings for each service
 - Ephemeral storage configuration
 - Environment variables
@@ -66,6 +68,7 @@ The Lambda configuration is defined in `config/lambda-config.yaml`. This file co
 ## Monitoring
 
 The infrastructure automatically creates CloudWatch alarms for:
+
 - Error rates (>5% threshold)
 - Duration (90% of timeout threshold)
 - Dead Letter Queue messages (>0 threshold)
@@ -88,11 +91,13 @@ The infrastructure automatically creates CloudWatch alarms for:
 ### Logs
 
 Check CloudWatch Logs for each function:
+
 - `/aws/lambda/talk-avocado-{service}-{environment}`
 
 ### Metrics
 
 Monitor key metrics in CloudWatch:
+
 - Invocations
 - Errors
 - Duration

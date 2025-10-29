@@ -654,11 +654,13 @@ Default to Lambda container image with FFmpeg. Use Lambda layer only if image pi
 ## Outstanding Items & Completion Plan
 
 ### **Completed Items Summary:**
+
 - **Lambda Configuration**: ✅ Memory, timeout, and ephemeral storage settings configured
 - **Resilience**: ✅ DLQ configuration and retry policies implemented
 - **Performance**: ✅ Lambda Power Tuning and init duration measurement tools created
 
 ### **Implementation Summary:**
+
 All acceptance criteria have been successfully implemented:
 
 1. **Lambda Configuration**: Created comprehensive configuration system with `lambda-config.yaml` defining memory, timeout, and ephemeral storage for all services. CDK infrastructure code automatically applies these configurations.
@@ -675,6 +677,7 @@ All acceptance criteria have been successfully implemented:
 5. **Testing**: Created automated testing scripts for performance validation and optimization recommendations.
 
 **Files Created/Modified:**
+
 - `infrastructure/lambda/config/lambda-config.yaml` - Service configurations
 - `infrastructure/lambda/lambda-stack.ts` - CDK infrastructure
 - `infrastructure/lambda/app.ts` - CDK application entry point
@@ -688,76 +691,89 @@ All acceptance criteria have been successfully implemented:
 
 #### **1. Lambda Configuration Setup** (Estimated: 2-3 hours)
 
-**Step 1.1: Create Lambda Configuration Files**
+*Step 1.1: Create Lambda Configuration Files**
+
 - [ ] Create `infrastructure/lambda/config/lambda-config.yaml` with memory/timeout presets
 - [ ] Define three memory tiers: 1769MB, 3008MB, 5120MB
 - [ ] Set appropriate timeouts: 300s for audio extraction, 600s for transcription, 900s for video rendering
 - [ ] Configure ephemeral storage: 6GB for audio, 8GB for video processing
 
-**Step 1.2: Create CDK/Terraform Infrastructure Code**
+*Step 1.2: Create CDK/Terraform Infrastructure Code**
+
 - [ ] Create `infrastructure/lambda/lambda-stack.ts` (CDK) or `infrastructure/lambda/main.tf` (Terraform)
 - [ ] Define Lambda functions with proper configuration
 - [ ] Set up IAM roles with required permissions
 - [ ] Configure environment variables and VPC settings
 
-**Step 1.3: Deploy and Test Configuration**
+*Step 1.3: Deploy and Test Configuration**
+
 - [ ] Deploy infrastructure using `cdk deploy` or `terraform apply`
 - [ ] Test each Lambda function with appropriate memory/timeout settings
 - [ ] Verify ephemeral storage is accessible and has correct size
 
 #### **2. Resilience Implementation** (Estimated: 1-2 hours)
 
-**Step 2.1: Dead Letter Queue (DLQ) Setup**
+*Step 2.1: Dead Letter Queue (DLQ) Setup**
+
 - [ ] Create SQS DLQ for each Lambda function
 - [ ] Configure Lambda function to send failed messages to DLQ
 - [ ] Set up DLQ monitoring and alerting
 
-**Step 2.2: Retry Policy Configuration**
+*Step 2.2: Retry Policy Configuration**
+
 - [ ] Implement exponential backoff retry logic in Lambda functions
 - [ ] Configure retry attempts based on error type (3 for transient, 1 for permanent)
 - [ ] Add retry metrics and logging
 
-**Step 2.3: Error Classification Enhancement**
+*Step 2.3: Error Classification Enhancement**
+
 - [ ] Expand error types in existing services
 - [ ] Add error classification logic based on FFmpeg exit codes
 - [ ] Implement error-specific retry strategies
 
 #### **3. Performance Optimization** (Estimated: 2-3 hours)
 
-**Step 3.1: Lambda Power Tuning**
+*Step 3.1: Lambda Power Tuning**
+
 - [ ] Install AWS Lambda Power Tuning tool
 - [ ] Create test payloads for each service type
 - [ ] Run power tuning for audio extraction, transcription, and video rendering
 - [ ] Document optimal memory/timeout configurations
 
-**Step 3.2: Init Duration Measurement**
+*Step 3.2: Init Duration Measurement**
+
 - [ ] Add init duration logging to FFmpeg runtime
 - [ ] Create performance test harness
 - [ ] Measure cold start times with different memory configurations
 - [ ] Document p95 init duration for each service
 
-**Step 3.3: Performance Monitoring**
+*Step 3.3: Performance Monitoring**
+
 - [ ] Add custom metrics for init duration
 - [ ] Create performance dashboard widgets
 - [ ] Set up alerts for performance degradation
 
 #### **4. Testing and Validation** (Estimated: 1 hour)
 
-**Step 4.1: End-to-End Testing**
+*Step 4.1: End-to-End Testing**
+
 - [ ] Test complete pipeline with new configurations
 - [ ] Verify DLQ functionality with intentional failures
 - [ ] Validate retry policies work correctly
 - [ ] Test performance under load
 
-**Step 4.2: Documentation Update**
+*Step 4.2: Documentation Update**
+
 - [ ] Update MFU document with final configurations
 - [ ] Document performance benchmarks
 - [ ] Create operational runbooks for monitoring
 
 ### **Implementation Priority:**
+
 1. **High Priority**: Lambda Configuration (blocks other MFUs)
 2. **Medium Priority**: Resilience (improves reliability)
 3. **Low Priority**: Performance Optimization (optimization)
 
 ### **Estimated Total Time**: 6-9 hours
+
 ### **Target Completion**: 2-3 days
