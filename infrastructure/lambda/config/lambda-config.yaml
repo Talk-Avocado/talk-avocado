@@ -3,10 +3,10 @@
 
 services:
   audio-extraction:
-    memory: 1769  # MB - optimized for audio processing
-    timeout: 300  # seconds - 5 minutes
+    memory: 1769 # MB - optimized for audio processing
+    timeout: 300 # seconds - 5 minutes
     ephemeral_storage:
-      size: 6  # GB - sufficient for audio files
+      size: 6 # GB - sufficient for audio files
     environment:
       FFMPEG_PATH: "/opt/bin/ffmpeg"
       FFPROBE_PATH: "/opt/bin/ffprobe"
@@ -19,10 +19,10 @@ services:
       jitter_ms: 2000
 
   transcription:
-    memory: 3008  # MB - higher memory for Whisper model
-    timeout: 600  # seconds - 10 minutes
+    memory: 3008 # MB - higher memory for Whisper model
+    timeout: 600 # seconds - 10 minutes
     ephemeral_storage:
-      size: 6  # GB - for audio files and transcripts
+      size: 6 # GB - for audio files and transcripts
     environment:
       FFMPEG_PATH: "/opt/bin/ffmpeg"
       FFPROBE_PATH: "/opt/bin/ffprobe"
@@ -35,10 +35,10 @@ services:
       jitter_ms: 1000
 
   smart-cut-planner:
-    memory: 1769  # MB - CPU-intensive analysis
-    timeout: 300  # seconds - 5 minutes
+    memory: 1769 # MB - CPU-intensive analysis
+    timeout: 300 # seconds - 5 minutes
     ephemeral_storage:
-      size: 4  # GB - for analysis data
+      size: 4 # GB - for analysis data
     environment:
       FFMPEG_PATH: "/opt/bin/ffmpeg"
       FFPROBE_PATH: "/opt/bin/ffprobe"
@@ -51,10 +51,10 @@ services:
       jitter_ms: 1000
 
   video-render-engine:
-    memory: 5120  # MB - highest memory for video rendering
-    timeout: 900  # seconds - 15 minutes
+    memory: 5120 # MB - highest memory for video rendering
+    timeout: 900 # seconds - 15 minutes
     ephemeral_storage:
-      size: 8  # GB - for video files and renders
+      size: 8 # GB - for video files and renders
     environment:
       FFMPEG_PATH: "/opt/bin/ffmpeg"
       FFPROBE_PATH: "/opt/bin/ffprobe"
@@ -67,10 +67,10 @@ services:
       jitter_ms: 2000
 
   ffmpeg-test:
-    memory: 1769  # MB - validation function
-    timeout: 60   # seconds - 1 minute
+    memory: 1769 # MB - validation function
+    timeout: 60 # seconds - 1 minute
     ephemeral_storage:
-      size: 2  # GB - minimal for testing
+      size: 2 # GB - minimal for testing
     environment:
       FFMPEG_PATH: "/opt/bin/ffmpeg"
       FFPROBE_PATH: "/opt/bin/ffprobe"
@@ -87,18 +87,18 @@ common:
   runtime: "nodejs20.x"
   architecture: "x86_64"
   handler: "handler.handler"
-  reserved_concurrency: 10  # Prevent overwhelming downstream services
-  provisioned_concurrency: 2  # Reduce cold starts for critical services
-  
+  reserved_concurrency: 10 # Prevent overwhelming downstream services
+  provisioned_concurrency: 2 # Reduce cold starts for critical services
+
   # VPC configuration (if needed)
   vpc_config:
-    enabled: false  # Set to true if VPC access required
-    
+    enabled: false # Set to true if VPC access required
+
   # Dead Letter Queue configuration
   dead_letter_queue:
     enabled: true
     max_receive_count: 3
-    
+
   # Retry configuration
   retry_policy:
     max_attempts: 3
@@ -107,8 +107,8 @@ common:
       - "Lambda.AWSLambdaException"
       - "Lambda.SdkClientException"
     retry_backoff:
-      base_delay: 1000  # milliseconds
-      max_delay: 10000  # milliseconds
+      base_delay: 1000 # milliseconds
+      max_delay: 10000 # milliseconds
       multiplier: 2
 
 # Memory tiers for power tuning
@@ -118,11 +118,11 @@ memory_tiers:
   - 512
   - 1024
   - 1536
-  - 1769  # Audio extraction optimal
+  - 1769 # Audio extraction optimal
   - 2048
-  - 3008  # Transcription optimal
+  - 3008 # Transcription optimal
   - 4096
-  - 5120  # Video rendering optimal
+  - 5120 # Video rendering optimal
   - 6144
   - 7168
   - 8192

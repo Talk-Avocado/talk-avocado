@@ -27,18 +27,14 @@
         "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-${AWS::AccountId}-us-east-1/43f7182848e493872a22d90095e6c4d9af95aae7e713f2182fd00ada81727e11.json",
         "requiresBootstrapStackVersion": 6,
         "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version",
-        "additionalDependencies": [
-          "TalkAvocado-Lambda-dev.assets"
-        ],
+        "additionalDependencies": ["TalkAvocado-Lambda-dev.assets"],
         "lookupRole": {
           "arn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-lookup-role-${AWS::AccountId}-us-east-1",
           "requiresBootstrapStackVersion": 8,
           "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version"
         }
       },
-      "dependencies": [
-        "TalkAvocado-Lambda-dev.assets"
-      ],
+      "dependencies": ["TalkAvocado-Lambda-dev.assets"],
       "metadata": {
         "/TalkAvocado-Lambda-dev": [
           {
