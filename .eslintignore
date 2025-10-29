@@ -1,0 +1,14 @@
+# CDK generated files
+infrastructure/lambda/cdk.out/
+infrastructure/lambda/dist/
+infrastructure/lambda/lib/
+
+# Node modules
+node_modules/
+
+# Build outputs
+*.min.js
+*.bundle.js
+
+# Generated files
+*.generated.*

@@ -1,0 +1,388 @@
+{
+  "version": "34.0.0",
+  "artifacts": {
+    "TalkAvocado-Lambda-dev.assets": {
+      "type": "cdk:asset-manifest",
+      "properties": {
+        "file": "TalkAvocado-Lambda-dev.assets.json",
+        "requiresBootstrapStackVersion": 6,
+        "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version"
+      }
+    },
+    "TalkAvocado-Lambda-dev": {
+      "type": "aws:cloudformation:stack",
+      "environment": "aws://unknown-account/us-east-1",
+      "properties": {
+        "templateFile": "TalkAvocado-Lambda-dev.template.json",
+        "terminationProtection": false,
+        "tags": {
+          "Component": "Lambda",
+          "Environment": "dev",
+          "Service": "TalkAvocado",
+          "TenantId": "default"
+        },
+        "validateOnSynth": false,
+        "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-deploy-role-${AWS::AccountId}-us-east-1",
+        "cloudFormationExecutionRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-cfn-exec-role-${AWS::AccountId}-us-east-1",
+        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-${AWS::AccountId}-us-east-1/43f7182848e493872a22d90095e6c4d9af95aae7e713f2182fd00ada81727e11.json",
+        "requiresBootstrapStackVersion": 6,
+        "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version",
+        "additionalDependencies": [
+          "TalkAvocado-Lambda-dev.assets"
+        ],
+        "lookupRole": {
+          "arn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-lookup-role-${AWS::AccountId}-us-east-1",
+          "requiresBootstrapStackVersion": 8,
+          "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version"
+        }
+      },
+      "dependencies": [
+        "TalkAvocado-Lambda-dev.assets"
+      ],
+      "metadata": {
+        "/TalkAvocado-Lambda-dev": [
+          {
+            "type": "aws:cdk:stack-tags",
+            "data": [
+              {
+                "Key": "Component",
+                "Value": "Lambda"
+              },
+              {
+                "Key": "Environment",
+                "Value": "dev"
+              },
+              {
+                "Key": "Service",
+                "Value": "TalkAvocado"
+              },
+              {
+                "Key": "TenantId",
+                "Value": "default"
+              }
+            ]
+          }
+        ],
+        "/TalkAvocado-Lambda-dev/audio-extraction-DLQ/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "audioextractionDLQ0C46B90B"
+          }
+        ],
+        "/TalkAvocado-Lambda-dev/transcription-DLQ/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "transcriptionDLQ1F951097"
+          }
+        ],
+        "/TalkAvocado-Lambda-dev/smart-cut-planner-DLQ/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "smartcutplannerDLQ0834FCC1"
+          }
+        ],
+        "/TalkAvocado-Lambda-dev/video-render-engine-DLQ/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "videorenderengineDLQ00DFF0BB"
+          }
+        ],
+        "/TalkAvocado-Lambda-dev/ffmpeg-test-DLQ/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ffmpegtestDLQ11D6222A"
+          }
+        ],
+        "/TalkAvocado-Lambda-dev/audio-extraction-Role/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "audioextractionRole6E44E43D"
+          }
+        ],
+        "/TalkAvocado-Lambda-dev/audio-extraction-Role/DefaultPolicy/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "audioextractionRoleDefaultPolicyF5A9EC51"
+          }
+        ],
+        "/TalkAvocado-Lambda-dev/audio-extraction-Function/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "audioextractionFunctionDAAD4F1A"
+          }
+        ],
+        "/TalkAvocado-Lambda-dev/audio-extraction-Function/LogRetention/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "audioextractionFunctionLogRetentionD9F6B434"
+          }
+        ],
+        "/TalkAvocado-Lambda-dev/LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a/ServiceRole/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRole9741ECFB"
+          }
+        ],
+        "/TalkAvocado-Lambda-dev/LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a/ServiceRole/DefaultPolicy/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aServiceRoleDefaultPolicyADDA7DEB"
+          }
+        ],
+        "/TalkAvocado-Lambda-dev/LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8a/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "LogRetentionaae0aa3c5b4d4f87b02d85b201efdd8aFD4BFC8A"
+          }
+        ],
+        "/TalkAvocado-Lambda-dev/transcription-Role/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "transcriptionRole5E89C3CA"
+          }
+        ],
+        "/TalkAvocado-Lambda-dev/transcription-Role/DefaultPolicy/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "transcriptionRoleDefaultPolicy7D54F639"
+          }
+        ],
+        "/TalkAvocado-Lambda-dev/transcription-Function/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "transcriptionFunctionB7A3A13A"
+          }
+        ],
+        "/TalkAvocado-Lambda-dev/transcription-Function/LogRetention/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "transcriptionFunctionLogRetention188B75B7"
+          }
+        ],
+        "/TalkAvocado-Lambda-dev/smart-cut-planner-Role/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "smartcutplannerRoleE5E0B743"
+          }
+        ],
+        "/TalkAvocado-Lambda-dev/smart-cut-planner-Role/DefaultPolicy/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "smartcutplannerRoleDefaultPolicy34CBECBA"
+          }
+        ],
+        "/TalkAvocado-Lambda-dev/smart-cut-planner-Function/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "smartcutplannerFunctionAC389E48"
+          }
+        ],
+        "/TalkAvocado-Lambda-dev/smart-cut-planner-Function/LogRetention/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "smartcutplannerFunctionLogRetention91FD79D5"
+          }
+        ],
+        "/TalkAvocado-Lambda-dev/video-render-engine-Role/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "videorenderengineRole5F9CA79E"
+          }
+        ],
+        "/TalkAvocado-Lambda-dev/video-render-engine-Role/DefaultPolicy/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "videorenderengineRoleDefaultPolicyE908DFE4"
+          }
+        ],
+        "/TalkAvocado-Lambda-dev/video-render-engine-Function/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "videorenderengineFunction50A41B0B"
+          }
+        ],
+        "/TalkAvocado-Lambda-dev/video-render-engine-Function/LogRetention/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "videorenderengineFunctionLogRetention693AB436"
+          }
+        ],
+        "/TalkAvocado-Lambda-dev/ffmpeg-test-Role/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ffmpegtestRole8E3DD582"
+          }
+        ],
+        "/TalkAvocado-Lambda-dev/ffmpeg-test-Role/DefaultPolicy/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ffmpegtestRoleDefaultPolicyDFDE233E"
+          }
+        ],
+        "/TalkAvocado-Lambda-dev/ffmpeg-test-Function/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ffmpegtestFunction7EA5C725"
+          }
+        ],
+        "/TalkAvocado-Lambda-dev/ffmpeg-test-Function/LogRetention/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ffmpegtestFunctionLogRetention13832550"
+          }
+        ],
+        "/TalkAvocado-Lambda-dev/audio-extraction-ErrorRate-Alarm/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "audioextractionErrorRateAlarm9B4E44FE"
+          }
+        ],
+        "/TalkAvocado-Lambda-dev/audio-extraction-Duration-Alarm/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "audioextractionDurationAlarm13508CF8"
+          }
+        ],
+        "/TalkAvocado-Lambda-dev/audio-extraction-DLQ-Alarm/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "audioextractionDLQAlarm382D4A32"
+          }
+        ],
+        "/TalkAvocado-Lambda-dev/transcription-ErrorRate-Alarm/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "transcriptionErrorRateAlarm9DF2DFA9"
+          }
+        ],
+        "/TalkAvocado-Lambda-dev/transcription-Duration-Alarm/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "transcriptionDurationAlarm4CF0B41B"
+          }
+        ],
+        "/TalkAvocado-Lambda-dev/transcription-DLQ-Alarm/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "transcriptionDLQAlarmE892E08C"
+          }
+        ],
+        "/TalkAvocado-Lambda-dev/smart-cut-planner-ErrorRate-Alarm/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "smartcutplannerErrorRateAlarm88885F82"
+          }
+        ],
+        "/TalkAvocado-Lambda-dev/smart-cut-planner-Duration-Alarm/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "smartcutplannerDurationAlarmA27DD152"
+          }
+        ],
+        "/TalkAvocado-Lambda-dev/smart-cut-planner-DLQ-Alarm/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "smartcutplannerDLQAlarm93715000"
+          }
+        ],
+        "/TalkAvocado-Lambda-dev/video-render-engine-ErrorRate-Alarm/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "videorenderengineErrorRateAlarm6594A795"
+          }
+        ],
+        "/TalkAvocado-Lambda-dev/video-render-engine-Duration-Alarm/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "videorenderengineDurationAlarm4CEF68D7"
+          }
+        ],
+        "/TalkAvocado-Lambda-dev/video-render-engine-DLQ-Alarm/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "videorenderengineDLQAlarm561AEF70"
+          }
+        ],
+        "/TalkAvocado-Lambda-dev/ffmpeg-test-ErrorRate-Alarm/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ffmpegtestErrorRateAlarm7C9567FB"
+          }
+        ],
+        "/TalkAvocado-Lambda-dev/ffmpeg-test-Duration-Alarm/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ffmpegtestDurationAlarmA94995C5"
+          }
+        ],
+        "/TalkAvocado-Lambda-dev/ffmpeg-test-DLQ-Alarm/Resource": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ffmpegtestDLQAlarmD3A952DE"
+          }
+        ],
+        "/TalkAvocado-Lambda-dev/FFmpegRuntimeRepositoryURI": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "FFmpegRuntimeRepositoryURI"
+          }
+        ],
+        "/TalkAvocado-Lambda-dev/audio-extractionFunctionArn": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "audioextractionFunctionArn"
+          }
+        ],
+        "/TalkAvocado-Lambda-dev/transcriptionFunctionArn": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "transcriptionFunctionArn"
+          }
+        ],
+        "/TalkAvocado-Lambda-dev/smart-cut-plannerFunctionArn": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "smartcutplannerFunctionArn"
+          }
+        ],
+        "/TalkAvocado-Lambda-dev/video-render-engineFunctionArn": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "videorenderengineFunctionArn"
+          }
+        ],
+        "/TalkAvocado-Lambda-dev/ffmpeg-testFunctionArn": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "ffmpegtestFunctionArn"
+          }
+        ],
+        "/TalkAvocado-Lambda-dev/CDKMetadata/Default": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "CDKMetadata"
+          }
+        ],
+        "/TalkAvocado-Lambda-dev/BootstrapVersion": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "BootstrapVersion"
+          }
+        ],
+        "/TalkAvocado-Lambda-dev/CheckBootstrapVersion": [
+          {
+            "type": "aws:cdk:logicalId",
+            "data": "CheckBootstrapVersion"
+          }
+        ]
+      },
+      "displayName": "TalkAvocado-Lambda-dev"
+    },
+    "Tree": {
+      "type": "cdk:tree",
+      "properties": {
+        "file": "tree.json"
+      }
+    }
+  }
+}

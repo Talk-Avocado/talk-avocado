@@ -1,0 +1,36 @@
+{
+  "name": "talk-avocado-lambda-infrastructure",
+  "version": "1.0.0",
+  "description": "CDK infrastructure for TalkAvocado Lambda functions",
+  "main": "app.js",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "cdk": "cdk",
+    "deploy": "cdk deploy",
+    "deploy:dev": "cdk deploy --context environment=dev",
+    "deploy:staging": "cdk deploy --context environment=staging",
+    "deploy:prod": "cdk deploy --context environment=prod",
+    "destroy": "cdk destroy",
+    "diff": "cdk diff",
+    "synth": "cdk synth",
+    "bootstrap": "cdk bootstrap",
+    "test:power": "node power-tuning.js",
+    "test:init": "node init-duration-test.js",
+    "test:performance": "node performance-test.js",
+    "test:all": "npm run test:performance audio-extraction && npm run test:performance transcription && npm run test:performance smart-cut-planner && npm run test:performance video-render-engine && npm run test:performance ffmpeg-test"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "20.10.0",
+    "aws-cdk": "2.100.0",
+    "ts-node": "^10.9.0",
+    "typescript": "~5.3.0"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "2.100.0",
+    "constructs": "^10.0.0",
+    "js-yaml": "^4.1.0",
+    "source-map-support": "^0.5.21"
+  }
+}
