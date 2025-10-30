@@ -5,6 +5,7 @@ import https from "https";
 import { execSync } from "child_process";
 import path from "path";
 import dotenv from "dotenv";
+import { logger } from "scripts/logger.js";
 
 // Load .env for local mode from project root
 if (process.env.LOCAL_MODE === "true") {
@@ -66,12 +67,12 @@ async function layer3TranslateToValidJSON(rawOutput, fallbackCuts) {
   // Attempt strict parse & schema validation first
   const parsed = safeParseJSON(rawOutput, null);
   if (isValidCutSchema(parsed)) {
-    console.log(`✅ Layer 2 output passed strict JSON/schema validation — skipping Layer 3`);
+    logger.info(`✅ Layer 2 output passed strict JSON/schema validation — skipping Layer 3`);
     return parsed.cuts;
   }
   
   // Fallback to provided cuts if parsing fails
-  console.warn(`⚠️ Layer 2 output failed validation — using fallback cuts`);
+  logger.warn(`⚠️ Layer 2 output failed validation — using fallback cuts`);
   return fallbackCuts || [];
 }
 
@@ -149,7 +150,7 @@ function mergeCutsWithSnapping(cutRanges, structuredWords) {
 
     // === Rule 2: Merge any short cut (<0.25s) into nearest neighbor, snapping to word boundaries
     if (dur < 0.25) {
-      console.warn(`↔️ Merging short cut ${cut.start}–${cut.end} (${dur.toFixed(2)}s) into neighbor`);
+      logger.warn(`↔️ Merging short cut ${cut.start}–${cut.end} (${dur.toFixed(2)}s) into neighbor`);
 
       // Try previous matching reason
       if (merged.length > 0) {
@@ -201,30 +202,30 @@ export const handler = async (event) => {
   const key = decodeURIComponent(record?.s3?.object?.key.replace(/\+/g, " "));
 
   if (!key.endsWith(".json")) {
-    console.log("⏭ Skipped non-json file:", key);
+    logger.info("⏭ Skipped non-json file:", key);
     return;
   }
 
   try {
     let apiKey;
-if (process.env.LOCAL_MODE === "true") {
-  apiKey = process.env.OPENAI_API_KEY;
-} else {
-  const secret = await secrets.send(new GetSecretValueCommand({ SecretId: "OpenAIWhisperAPIKey" }));
-  apiKey = JSON.parse(secret.SecretString).OPENAI_API_KEY;
-}
+    if (process.env.LOCAL_MODE === "true") {
+      apiKey = process.env.OPENAI_API_KEY;
+    } else {
+      const secret = await secrets.send(new GetSecretValueCommand({ SecretId: "OpenAIWhisperAPIKey" }));
+      apiKey = JSON.parse(secret.SecretString).OPENAI_API_KEY;
+    }
 
 
     let whisperJsonRaw;
-if (process.env.LOCAL_MODE === "true") {
-  const { readFileSync } = await import("fs");
-  const { resolve } = await import("path");
-  const localPath = resolve(__dirname, "..", "test-assets", key);
-  whisperJsonRaw = readFileSync(localPath, "utf8");
-} else {
-  const response = await s3.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
-  whisperJsonRaw = await response.Body.transformToString();
-}
+    if (process.env.LOCAL_MODE === "true") {
+      const { readFileSync } = await import("fs");
+      const { resolve } = await import("path");
+      const localPath = resolve(__dirname, "..", "test-assets", key);
+      whisperJsonRaw = readFileSync(localPath, "utf8");
+    } else {
+      const response = await s3.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+      whisperJsonRaw = await response.Body.transformToString();
+    }
 
     const whisperJson = JSON.parse(whisperJsonRaw);
 
@@ -238,7 +239,7 @@ if (process.env.LOCAL_MODE === "true") {
       if (Array.isArray(whisperJson.segments)) {
         const recovered = whisperJson.segments.flatMap(s => s.words || []);
         if (recovered.length) {
-          console.warn(`⚠️ Recovered ${recovered.length} words from segments[].words`);
+          logger.warn(`⚠️ Recovered ${recovered.length} words from segments[].words`);
           structuredWords = recovered.map(w => ({
             start: parseFloat(Number(w.start).toFixed(2)),
             end: parseFloat(Number(w.end).toFixed(2)),
@@ -249,8 +250,8 @@ if (process.env.LOCAL_MODE === "true") {
     }
 
     if (!Array.isArray(structuredWords) || structuredWords.length === 0) {
-      console.error(`❌ No usable word-level data found in transcript for ${base}`);
-      console.error("📄 Raw Whisper JSON dump (truncated to 5000 chars):\n", whisperJsonRaw.slice(0, 5000));
+      logger.error(`❌ No usable word-level data found in transcript for ${base}`);
+      logger.error("📄 Raw Whisper JSON dump (truncated to 5000 chars):\n", whisperJsonRaw.slice(0, 5000));
       // Instead of throwing, still proceed with dummy cut for debug continuity
       structuredWords = [{ start: 0.0, end: 0.2, word: "[NO_WORDS_FOUND]" }];
     }
@@ -261,35 +262,35 @@ if (process.env.LOCAL_MODE === "true") {
 
 
     // === Detect wordless time ranges ===
-// Reduced to catch shorter natural pauses
-const WORDLESS_THRESHOLD = 0.5; // seconds with no transcript words
+    // Reduced to catch shorter natural pauses
+    const WORDLESS_THRESHOLD = 0.5; // seconds with no transcript words
 
-let wordlessRanges = [];
+    let wordlessRanges = [];
 
-for (let i = 1; i < structuredWords.length; i++) {
-  const prevEnd = structuredWords[i - 1].end;
-  const nextStart = structuredWords[i].start;
-  const gap = nextStart - prevEnd;
+    for (let i = 1; i < structuredWords.length; i++) {
+      const prevEnd = structuredWords[i - 1].end;
+      const nextStart = structuredWords[i].start;
+      const gap = nextStart - prevEnd;
 
-  if (gap >= WORDLESS_THRESHOLD) {
-    wordlessRanges.push({
-      start: parseFloat(prevEnd.toFixed(2)),
-      end: parseFloat(nextStart.toFixed(2)),
-      duration: parseFloat(gap.toFixed(2))
-    });
-  }
-}
+      if (gap >= WORDLESS_THRESHOLD) {
+        wordlessRanges.push({
+          start: parseFloat(prevEnd.toFixed(2)),
+          end: parseFloat(nextStart.toFixed(2)),
+          duration: parseFloat(gap.toFixed(2))
+        });
+      }
+    }
 
-console.log(`🕳 Detected ${wordlessRanges.length} wordless ranges >= ${WORDLESS_THRESHOLD}s`);
+    logger.info(`🕳 Detected ${wordlessRanges.length} wordless ranges >= ${WORDLESS_THRESHOLD}s`);
 
     // --- Chunked processing to avoid token limit ---
-const maxWordsPerChunk = 1200; // safe size for GPT-4o TPM limits
-let allCutRanges = [];
-let fullPolishedTranscript = "";
+    const maxWordsPerChunk = 1200; // safe size for GPT-4o TPM limits
+    let allCutRanges = [];
+    let fullPolishedTranscript = "";
 
-let parsedJson = null; // Holds parsed JSON results for later fallback check
+    let parsedJson = null; // Holds parsed JSON results for later fallback check
 
-for (let i = 0; i < structuredWords.length; i += maxWordsPerChunk) {
+    for (let i = 0; i < structuredWords.length; i += maxWordsPerChunk) {
   const contextWindowStart = Math.max(0, i - 200); // ~15s worth of words for context
   const chunkWords = structuredWords.slice(contextWindowStart, i + maxWordsPerChunk);
 
@@ -320,7 +321,7 @@ ${JSON.stringify(wordlessRanges, null, 2)}
 `;
 
 
-  console.log(`📤 [Layer 1] Sending detection request for chunk ${Math.floor(i / maxWordsPerChunk) + 1}`);
+  logger.info(`📤 [Layer 1] Sending detection request for chunk ${Math.floor(i / maxWordsPerChunk) + 1}`);
   let { output: layer1Raw } = await callOpenAI(apiKey, detectionPrompt);
   let layer1Cuts = [];
   layer1Cuts = safeParseJSON(layer1Raw, { cuts: [] }).cuts || [];
@@ -391,48 +392,12 @@ ${JSON.stringify(wordlessRanges, null, 2)}
 
 
 
-  console.log(`📤 [Layer 2] Sending refinement request for chunk ${Math.floor(i / maxWordsPerChunk) + 1}`);
+  logger.info(`📤 [Layer 2] Sending refinement request for chunk ${Math.floor(i / maxWordsPerChunk) + 1}`);
   let { output: layer2Raw } = await callOpenAI(apiKey, {
     system: refinementRules,
     user: refinementPrompt
   });
-  
-      
- // ===== LAYER 3: JSON Translator & Finalizer (Conditional Execution) =====
-  // Attempt strict parse & schema validation first
-  const parsed = safeParseJSON(rawOutput, null);
-  if (isValidCutSchema(parsed)) {
-    console.log(`✅ Layer 2 output passed strict JSON/schema validation — skipping Layer 3`);
-    return parsed.cuts;
-  }
-
-  // If invalid, run GPT repair
-  console.warn("⚠️ Layer 2 output invalid — running Layer 3 JSON translation.");
-  const { output: fixedRaw } = await callOpenAI(apiKey, {
-    system: `
-      You are a JSON repair engine.
-      Your job is to take possibly broken JSON describing video cuts and return valid JSON in this exact schema:
-      {
-        "cuts": [
-          { "start": "SS.SS", "end": "SS.SS", "reason": "string", "confidence": 0.xx }
-        ]
-      }
-      Do not add, remove, or change the cut meanings.
-      If any required field is missing, fill it from provided context.
-      Output ONLY valid JSON. No commentary, no markdown fences.
-    `,
-    user: JSON.stringify({ broken_output: rawOutput, context_cuts: fallbackCuts })
-  });
-
-  const fixedParsed = safeParseJSON(fixedRaw, null);
-  if (isValidCutSchema(fixedParsed)) {
-    console.log(`✅ Layer 3 fixed JSON — ${fixedParsed.cuts.length} cuts.`);
-    return fixedParsed.cuts;
-  } else {
-    console.warn("⚠️ Layer 3 failed — falling back to Layer 1 cuts WITH context.");
-    return fallbackCuts;
-  }
-}
+  // (Layer 3 translation handled by layer3TranslateToValidJSON below)
 
 
 // Apply Layer 3 translation immediately after Layer 2
@@ -440,10 +405,6 @@ let chunkCutRanges = await layer3TranslateToValidJSON(layer2Raw, cutsWithContext
 
 // Merge into global cut list
 allCutRanges.push(...chunkCutRanges);
-
-    
-        // Merge into global cut list — old downstream filters will handle the rest
-        allCutRanges.push(...chunkCutRanges);
       } // end for-loop
 
       // Continue outer try — do NOT close it here
@@ -471,13 +432,13 @@ cutRanges = cutRanges.map(cut => ({
 
 // scoreCut function moved to top level
 
-console.log("📉 Before scoring filter:", JSON.stringify(cutRanges, null, 2));
+logger.info("📉 Before scoring filter:", JSON.stringify(cutRanges, null, 2));
 cutRanges = cutRanges.filter(cut => {
   const score = scoreCut(cut, structuredWords);
-  console.log(`   📝 Cut ${cut.start}–${cut.end} [reason: ${cut.reason}] → score=${score.toFixed(2)}`);
+  logger.info(`   📝 Cut ${cut.start}–${cut.end} [reason: ${cut.reason}] → score=${score.toFixed(2)}`);
   return score >= 0.3;
 });
-console.log("✅ After scoring filter:", JSON.stringify(cutRanges, null, 2));
+logger.info("✅ After scoring filter:", JSON.stringify(cutRanges, null, 2));
 
 
 
@@ -499,7 +460,7 @@ cutRanges = cutRanges.map(cut => {
     }
 
     if (!allowLongSilence) {
-      console.warn(`⚠️ Trimming oversized cut (${duration.toFixed(2)}s): ${cut.reason}`);
+      logger.warn(`⚠️ Trimming oversized cut (${duration.toFixed(2)}s): ${cut.reason}`);
       cut.endSec = cut.startSec + 3.0;
       cut.end = secondsToTimestamp(cut.endSec);
     }
@@ -522,7 +483,7 @@ cutRanges = cutRanges
       !isNaN(cut.endSec) &&
       cut.endSec > cut.startSec
     );
-    if (!valid) console.warn(`⚠️ Dropping invalid cut: ${cut.start} → ${cut.end} (${cut.reason})`);
+    if (!valid) logger.warn(`⚠️ Dropping invalid cut: ${cut.start} → ${cut.end} (${cut.reason})`);
     return valid;
   })
 
@@ -608,7 +569,7 @@ cutRanges = cutRanges.filter(cut => {
 
 
 if (cutRanges.length === 0) {
-  console.warn("⚠️ No valid cuts found — skipping cut plan, will copy original video.");
+  logger.warn("⚠️ No valid cuts found — skipping cut plan, will copy original video.");
   return; // Let VideoRenderEngine copy original
 }
 
@@ -617,14 +578,14 @@ if (cutRanges.length === 0) {
 const totalDuration = structuredWords.length > 0 ? structuredWords[structuredWords.length - 1].end - structuredWords[0].start : 0;
 const totalCutDur = cutRanges.reduce((sum, c) => sum + (toSeconds(c.end) - toSeconds(c.start)), 0);
 if (totalDuration > 0 && (totalCutDur / totalDuration) > 0.3) {
-  console.warn("⚠️ Cut density > 30% — enabling STRICT refinement mode instead of skipping.");
+  logger.warn("⚠️ Cut density > 30% — enabling STRICT refinement mode instead of skipping.");
   strictMode = true;
 
   const STRICT_MAX_CUT_LENGTH = 5.0; // seconds
   cutRanges = cutRanges.map(cut => {
     const dur = toSeconds(cut.end) - toSeconds(cut.start);
     if (dur > STRICT_MAX_CUT_LENGTH) {
-      console.warn(`   ✂️ Trimming long cut for strict mode: ${cut.start}–${cut.end} (${dur.toFixed(2)}s)`);
+      logger.warn(`   ✂️ Trimming long cut for strict mode: ${cut.start}–${cut.end} (${dur.toFixed(2)}s)`);
       return {
         ...cut,
         end: secondsToTimestamp(toSeconds(cut.start) + STRICT_MAX_CUT_LENGTH),
@@ -659,7 +620,7 @@ cutRanges.forEach(cut => {
 });
 
 if (overcutFlag) {
-  console.warn("⚠️ High cut density detected — marking for manual review");
+  logger.warn("⚠️ High cut density detected — marking for manual review");
   cutRanges.push({ start: "00:00.0", end: "00:00.2", reason: "manual-review" });
 }
 
@@ -715,7 +676,7 @@ ${JSON.stringify(wordlessRanges, null, 2)}
     
     // 🚨 Safety Net Output Guard — prevent crash if GPT output is malformed
 if (typeof validatedCutsRaw !== "string") {
-  console.warn("⚠️ Safety Net GPT output is not a string — forcing empty JSON object");
+  logger.warn("⚠️ Safety Net GPT output is not a string — forcing empty JSON object");
   validatedCutsRaw = '{"cuts": []}';
 } else {
   // Remove markdown fences and stray text before parse
@@ -737,7 +698,7 @@ const schemaValid = Array.isArray(validatedCuts) && validatedCuts.every(cut =>
 );
 
 if (!schemaValid) {
-  console.warn("⚠️ Safety Net output invalid — running Layer 3 repair.");
+  logger.warn("⚠️ Safety Net output invalid — running Layer 3 repair.");
   validatedCuts = await layer3TranslateToValidJSON(validatedCutsRaw, cutsWithSafetyContext);
 }
 
@@ -748,7 +709,7 @@ if (!Array.isArray(validatedCuts) || !validatedCuts.every(cut =>
   typeof cut.reason === "string" &&
   typeof cut.confidence === "number"
 )) {
-  console.error("❌ Safety Net still invalid after Layer 3 repair — forcing empty cut list");
+  logger.error("❌ Safety Net still invalid after Layer 3 repair — forcing empty cut list");
   validatedCuts = [];
 }
 
@@ -760,11 +721,11 @@ if (!Array.isArray(validatedCuts) || !validatedCuts.every(cut =>
   typeof cut.reason === "string" &&
   typeof cut.confidence === "number"
 )) {
-  console.warn("⚠️ Safety Net output invalid — running Layer 3 repair on Safety Net result.");
+  logger.warn("⚠️ Safety Net output invalid — running Layer 3 repair on Safety Net result.");
   validatedCuts = await layer3TranslateToValidJSON(validatedCutsRaw, cutsWithSafetyContext);
 
-  console.log("🔍 Safety Net after Layer 3 repair:", JSON.stringify(validatedCuts, null, 2));
-  console.log("🔍 Schema validation after repair:",
+  logger.info("🔍 Safety Net after Layer 3 repair:", JSON.stringify(validatedCuts, null, 2));
+  logger.info("🔍 Schema validation after repair:",
     Array.isArray(validatedCuts) && validatedCuts.every(cut =>
       typeof cut.start === "string" &&
       typeof cut.end === "string" &&
@@ -781,8 +742,8 @@ validatedCuts = (parsedSafetyNet && Array.isArray(parsedSafetyNet.cuts))
   ? parsedSafetyNet.cuts
   : [];
 
-console.log("🔍 Safety Net raw parsed object:", JSON.stringify(parsedSafetyNet, null, 2));
-console.log("🔍 Safety Net schema validation:",
+logger.info("🔍 Safety Net raw parsed object:", JSON.stringify(parsedSafetyNet, null, 2));
+logger.info("🔍 Safety Net schema validation:",
   Array.isArray(validatedCuts) && validatedCuts.every(cut =>
     typeof cut.start === "string" &&
     typeof cut.end === "string" &&
@@ -798,11 +759,11 @@ if (!Array.isArray(validatedCuts) || !validatedCuts.every(cut =>
   typeof cut.reason === "string" &&
   typeof cut.confidence === "number"
 )) {
-  console.warn("⚠️ Safety Net output invalid — running Layer 3 repair on Safety Net result.");
+  logger.warn("⚠️ Safety Net output invalid — running Layer 3 repair on Safety Net result.");
   validatedCuts = await layer3TranslateToValidJSON(cleaned, cutsWithSafetyContext);
 
-  console.log("🔍 Safety Net after Layer 3 repair:", JSON.stringify(validatedCuts, null, 2));
-  console.log("🔍 Schema validation after repair:",
+  logger.info("🔍 Safety Net after Layer 3 repair:", JSON.stringify(validatedCuts, null, 2));
+  logger.info("🔍 Schema validation after repair:",
     Array.isArray(validatedCuts) && validatedCuts.every(cut =>
       typeof cut.start === "string" &&
       typeof cut.end === "string" &&
@@ -820,7 +781,7 @@ if (!Array.isArray(validatedCuts) || !validatedCuts.every(cut =>
   typeof cut.reason === "string" &&
   typeof cut.confidence === "number"
 )) {
-  console.warn("⚠️ Safety Net output invalid — running Layer 3 repair on Safety Net result.");
+  logger.warn("⚠️ Safety Net output invalid — running Layer 3 repair on Safety Net result.");
   validatedCuts = await layer3TranslateToValidJSON(cleaned, cutsWithSafetyContext);
 }
 
@@ -843,7 +804,7 @@ if (!Array.isArray(validatedCuts) || !validatedCuts.every(cut =>
           }
           const overlapRatio = cutDur > 0 ? (maxOverlap / cutDur) : 0;
           if (overlapRatio < 0.5) {
-            console.warn(`❌ Rejected dead-air cut ${cut.start}-${cut.end} — only ${(overlapRatio*100).toFixed(1)}% overlap with wordless time`);
+            logger.warn(`❌ Rejected dead-air cut ${cut.start}-${cut.end} — only ${(overlapRatio*100).toFixed(1)}% overlap with wordless time`);
             return false;
           }
       
@@ -852,7 +813,7 @@ if (!Array.isArray(validatedCuts) || !validatedCuts.every(cut =>
             const audioPath = path.resolve(__dirname, "..", "test-assets", `mp4/${base}.mp4`);
             const hasSound = !isMostlySilent(audioPath, cutStart, cutEnd);
             if (hasSound) {
-              console.warn(`❌ Rejected dead-air cut ${cut.start}-${cut.end} — contains background sound`);
+              logger.warn(`❌ Rejected dead-air cut ${cut.start}-${cut.end} — contains background sound`);
               return false;
             }
           }
@@ -866,13 +827,13 @@ validatedCuts = validatedCuts.filter(cut => {
   const cutEnd = toSeconds(cut.end);
   const segWords = structuredWords.filter(w => w.start >= cutStart && w.end <= cutEnd);
   if (segWords.length === 0) {
-    console.warn(`⚠️ Empty segment for ${cut.start}-${cut.end} — discarding`);
+    logger.warn(`⚠️ Empty segment for ${cut.start}-${cut.end} — discarding`);
     return false;
   }
   const hasNonFiller = segWords.some(w => !FILLERS.includes(w.word.toLowerCase().trim()));
   
   if (hasNonFiller) {
-    console.warn(`❌ Rejected cut ${cut.start}-${cut.end} — contains non-filler speech: ${segWords.map(w => w.word).join(" ")}`);
+    logger.warn(`❌ Rejected cut ${cut.start}-${cut.end} — contains non-filler speech: ${segWords.map(w => w.word).join(" ")}`);
     return false;
   }
   return true;
@@ -881,23 +842,23 @@ validatedCuts = validatedCuts.filter(cut => {
       const rejectedCuts = cutRanges.filter(
         c => !validatedCuts.some(v => v.start === c.start && v.end === c.end)
       );
-      console.log(`✅ Safety net reduced cuts from ${cutRanges.length} to ${validatedCuts.length}`);
+      logger.info(`✅ Safety net reduced cuts from ${cutRanges.length} to ${validatedCuts.length}`);
       
       if (rejectedCuts.length > 0) {
-        console.log("🧐 Safety net rejected cuts:");
+        logger.info("🧐 Safety net rejected cuts:");
         rejectedCuts.forEach(rc => {
           const matchInGPT = (validatedCuts.gptReasons || []).find(
             r => r.start === rc.start && r.end === rc.end
           );
           if (matchInGPT) {
-            console.log(`   ❌ ${rc.start}–${rc.end} (${rc.reason}) → GPT reason: ${matchInGPT.reason}`);
+            logger.info(`   ❌ ${rc.start}–${rc.end} (${rc.reason}) → GPT reason: ${matchInGPT.reason}`);
           } else {
-            console.log(`   ❌ ${rc.start}–${rc.end} (${rc.reason}) → GPT reason: Not explicitly given`);
+            logger.info(`   ❌ ${rc.start}–${rc.end} (${rc.reason}) → GPT reason: Not explicitly given`);
           }
         });
       }
     
-      console.log("🔍 After safety net validation — kept cuts:", JSON.stringify(validatedCuts, null, 2));
+      logger.info("🔍 After safety net validation — kept cuts:", JSON.stringify(validatedCuts, null, 2));
 
 // 📊 Confidence Histogram AFTER Safety Net
 const confBucketsAfter = {};
@@ -905,7 +866,7 @@ validatedCuts.forEach(cut => {
   const bucket = Math.floor((cut.confidence || 0) * 10) / 10;
   confBucketsAfter[bucket] = (confBucketsAfter[bucket] || 0) + 1;
 });
-console.log("📊 Confidence Score Histogram (After Safety Net):", confBucketsAfter);
+logger.info("📊 Confidence Score Histogram (After Safety Net):", confBucketsAfter);
 
 // 📋 Track reasons for low-confidence cuts (after safety net)
 const lowConfidenceReasonsAfter = {};
@@ -915,7 +876,7 @@ validatedCuts.forEach(cut => {
     lowConfidenceReasonsAfter[reasonKey] = (lowConfidenceReasonsAfter[reasonKey] || 0) + 1;
   }
 });
-console.log("📋 Low Confidence Reasons (After Safety Net):", lowConfidenceReasonsAfter);
+logger.info("📋 Low Confidence Reasons (After Safety Net):", lowConfidenceReasonsAfter);
 
 // 🚀 Auto-bump after safety net too
 const SAFE_CONFIDENCE_REASONS_AFTER = ["long pause", "dead-air", "silence"];
@@ -923,7 +884,7 @@ validatedCuts = validatedCuts.map(cut => {
   const loweredReason = cut.reason.toLowerCase();
   if (SAFE_CONFIDENCE_REASONS_AFTER.some(r => loweredReason.includes(r))) {
     if (cut.confidence < 0.9) {
-      console.log(`⬆️ Bumping confidence (after safety net) for "${cut.reason}" from ${cut.confidence} → 0.95`);
+      logger.info(`⬆️ Bumping confidence (after safety net) for "${cut.reason}" from ${cut.confidence} → 0.95`);
       return { ...cut, confidence: 0.95 };
     }
   }
@@ -944,7 +905,7 @@ cutRanges = validatedCuts.map(cut => ({
 if (process.env.LOCAL_MODE === "true") {
   const { resolve } = await import("path");
   const audioPath = resolve(__dirname, "..", "test-assets", `mp4/${base}.mp4`);
-  console.log(`🔍 Running waveform silence verification on ${audioPath}`);
+  logger.info(`🔍 Running waveform silence verification on ${audioPath}`);
 
   cutRanges = cutRanges.filter(cut => {
     if (/(dead-air|pause|wordless)/i.test(cut.reason)) {
@@ -952,14 +913,14 @@ if (process.env.LOCAL_MODE === "true") {
       const endSec = toSeconds(cut.end);
       const silent = isMostlySilent(audioPath, startSec, endSec);
       if (!silent) {
-        console.warn(`❌ Rejected cut ${cut.start}-${cut.end} — audio not fully silent`);
+        logger.warn(`❌ Rejected cut ${cut.start}-${cut.end} — audio not fully silent`);
         return false;
       }
     }
     return true;
   });
 } else {
-  console.warn("⚠️ Skipping waveform silence verification in cloud mode (requires ffmpeg build)");
+  logger.warn("⚠️ Skipping waveform silence verification in cloud mode (requires ffmpeg build)");
 }
 
 
@@ -985,24 +946,27 @@ Rules:
     let { output: pacingCutsRaw } = await callOpenAI(apiKey, pacingPrompt);
     const pacingCuts = JSON.parse(pacingCutsRaw);
     if (Array.isArray(pacingCuts) && pacingCuts.length > 0) {
-      console.log(`🎯 Pacing merge adjusted cuts from ${cutRanges.length} to ${pacingCuts.length}`);
+      logger.info(`🎯 Pacing merge adjusted cuts from ${cutRanges.length} to ${pacingCuts.length}`);
       cutRanges = pacingCuts;
     } else {
-      console.warn("⚠️ Pacing merge returned no cuts — keeping validated list");
+      logger.warn("⚠️ Pacing merge returned no cuts — keeping validated list");
     }
+    
   } catch (err) {
-    console.error("⚠️ Pacing merge GPT step failed:", err);
+    logger.error("⚠️ Pacing merge GPT step failed:", err);
   }
 }
 
     } else {
-      console.warn("⚠️ Safety net returned no cuts — keeping original cut list");
+      logger.warn("⚠️ Safety net returned no cuts — keeping original cut list");
     }
     
     
   } catch (err) {
-    console.error("⚠️ Safety net GPT validation failed:", err);
+    logger.error("⚠️ Safety net GPT validation failed:", err);
   }
+
+}
 
 // Build final markdown
 const cleanedMd = `### PolishedTranscript\n${fullPolishedTranscript.trim()}\n\n### TimestampsToCut\n` +
@@ -1028,7 +992,7 @@ const cleanedMd = `### PolishedTranscript\n${fullPolishedTranscript.trim()}\n\n#
 cutRanges = cutRanges.filter(cut => {
   const dur = toSeconds(cut.end) - toSeconds(cut.start);
   if (dur <= 0) {
-    console.warn(`⚠️ Dropping invalid cut before save: ${cut.start} → ${cut.end} (${cut.reason})`);
+    logger.warn(`⚠️ Dropping invalid cut before save: ${cut.start} → ${cut.end} (${cut.reason})`);
     return false;
   }
   return true;
@@ -1063,12 +1027,12 @@ cutRanges = finalFailSafe(cutRanges, vidDuration);
       }
       
 
-      console.log("📦 FINAL cutRanges to output:", JSON.stringify(cutRanges, null, 2));
-      console.log(`✅ SmartCutPlanner output saved for: ${base}`);
+      logger.info("📦 FINAL cutRanges to output:", JSON.stringify(cutRanges, null, 2));
+      logger.info(`✅ SmartCutPlanner output saved for: ${base}`);
       
-  } catch (err) {
-    console.error("🔥 SmartCutPlanner failed:", err);
-  }
+    } catch (err) {
+      logger.error("🔥 SmartCutPlanner failed:", err);
+    }
 };
 
 
@@ -1112,7 +1076,7 @@ function toSeconds(ts) {
 
 function extractWordData(json) {
   if (Array.isArray(json.words) && json.words.length > 0) {
-    console.log(`📦 Found ${json.words.length} words in top-level words[]`);
+    logger.info(`📦 Found ${json.words.length} words in top-level words[]`);
     return json.words
       .filter(w => w.start !== undefined && w.end !== undefined && w.word)
       .map(w => ({
@@ -1135,12 +1099,12 @@ function extractWordData(json) {
         : []
     );
     if (recoveredWords.length > 0) {
-      console.warn(`⚠️ Recovered ${recoveredWords.length} words from segments[].words[]`);
+      logger.warn(`⚠️ Recovered ${recoveredWords.length} words from segments[].words[]`);
       return recoveredWords;
     }
   }
 
-  console.warn("⚠️ No word-level data found in transcript JSON");
+  logger.warn("⚠️ No word-level data found in transcript JSON");
   return [];
 }
 
@@ -1166,7 +1130,7 @@ function extractTimestamps(md) {
         reason: match[3]
       });
     } else {
-      console.warn("❌ Could not parse line in TimestampsToCut:", line);
+      logger.warn("❌ Could not parse line in TimestampsToCut:", line);
     }
   }
   return results;
@@ -1214,14 +1178,14 @@ const data = JSON.stringify({
           output = parsed?.choices?.[0]?.message?.content || "";
           usage = parsed?.usage;
         } catch (e) {
-          console.error("⚠️ Failed to parse OpenAI response JSON");
+          logger.error("⚠️ Failed to parse OpenAI response JSON");
         }
         resolve({ output, usage, rawBody: body });
       });
     });
 
     req.on("error", (err) => {
-      console.error("❌ OpenAI API request failed:", err);
+      logger.error("❌ OpenAI API request failed:", err);
       resolve({ output: "", usage: null, rawBody: "" });
     });
 
@@ -1272,7 +1236,7 @@ function isMostlySilent(audioPath, startSec, endSec) {
 
     return !nonSilentDetected; // true = silent, false = not silent
   } catch (err) {
-    console.warn(`⚠️ Audio silence check failed for ${startSec}-${endSec}:`, err.message);
+    logger.warn(`⚠️ Audio silence check failed for ${startSec}-${endSec}:`, err.message);
     // Fail-safe: treat as not silent to avoid accidental over-cut
     return false;
   }

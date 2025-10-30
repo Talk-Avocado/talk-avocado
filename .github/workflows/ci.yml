@@ -21,51 +21,42 @@ jobs:
         else
           echo "No package.json, skipping Node lane."
         fi
+    - name: Install backend deps
+      run: |
+        if [ -d backend ] && [ -f backend/package.json ]; then
+          cd backend && npm ci || npm install
+        fi
     - name: Lint
       run: |
         if [ -f package.json ]; then
-          npx eslint . || true
-          npx prettier -c . || true
+          npm run lint
         fi
     - name: Check ES Module Compliance
       run: |
-        if [ -f scripts/check-es-modules.sh ]; then
-          bash scripts/check-es-modules.sh
+        if [ -f package.json ]; then
+          npm run check-es-modules
         else
           echo "ES module check script not found"
           exit 1
+        fi
+    - name: Check Code Formatting
+      run: |
+        if [ -f package.json ]; then
+          npm run format:check
+        fi
+    - name: Build backend
+      run: |
+        if [ -d backend ] && [ -f backend/package.json ]; then
+          cd backend && npm run build
         fi
     - name: Tests
       run: |
         if [ -f package.json ]; then
           npm test --silent || echo "No Node tests."
         fi
-
-  python:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - uses: actions/setup-python@v5
-      with:
-        python-version: '3.12'
-        cache: 'pip'
-    - name: Install deps
-      run: |
-        python -m venv .venv
-        source .venv/bin/activate
-        pip install --upgrade pip
-        if [ -f requirements.txt ]; then pip install -r requirements.txt || true; fi
-        if [ -f pyproject.toml ]; then pip install -e . || true; fi
-        pip install black ruff pytest || true
-    - name: Lint
-      run: |
-        source .venv/bin/activate
-        ruff . || true
-        black --check . || true
-    - name: Tests
-      run: |
-        source .venv/bin/activate
-        pytest -q || echo "No/failed Python tests."
+        if [ -d backend ] && [ -f backend/package.json ]; then
+          cd backend && npm test --silent || echo "No backend tests."
+        fi
 
   harness:
     runs-on: ubuntu-latest

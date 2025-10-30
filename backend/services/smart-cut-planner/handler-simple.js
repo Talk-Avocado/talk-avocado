@@ -3,6 +3,7 @@
 import { planCuts } from './planner-logic.js';
 import fs from 'node:fs';
 import path from 'node:path';
+import { logger } from "scripts/logger.js";
 
 class PlannerError extends Error {
   constructor(message, type, details = {}) {
@@ -76,8 +77,8 @@ export const handler = async (event, context) => {
   const { env, tenantId, jobId, transcriptKey } = event;
   const correlationId = event.correlationId || context.awsRequestId;
   
-  console.log(`[SmartCutPlanner] Processing: env=${env}, tenant=${tenantId}, job=${jobId}`);
-  console.log(`[SmartCutPlanner] Transcript key: ${transcriptKey}`);
+  logger.info(`[SmartCutPlanner] Processing: env=${env}, tenant=${tenantId}, job=${jobId}`);
+  logger.info(`[SmartCutPlanner] Transcript key: ${transcriptKey}`);
 
   const transcriptPath = pathFor(transcriptKey);
 
@@ -97,13 +98,13 @@ export const handler = async (event, context) => {
       throw new PlannerError(`Transcript invalid: missing segments`, ERROR_TYPES.TRANSCRIPT_INVALID);
     }
 
-    console.log(`[SmartCutPlanner] Found ${transcriptData.segments.length} segments`);
+    logger.info(`[SmartCutPlanner] Found ${transcriptData.segments.length} segments`);
 
     const start = Date.now();
     const cutPlan = planCuts(transcriptData);
     cutPlan.metadata.processingTimeMs = Date.now() - start;
 
-    console.log(`[SmartCutPlanner] Generated cut plan with ${cutPlan.cuts.length} segments`);
+    logger.info(`[SmartCutPlanner] Generated cut plan with ${cutPlan.cuts.length} segments`);
 
     if (!validateCutPlan(cutPlan)) {
       throw new PlannerError(`Cut plan schema invalid`, ERROR_TYPES.SCHEMA_VALIDATION);
@@ -128,15 +129,15 @@ export const handler = async (event, context) => {
       throw new PlannerError(`Manifest update failed: ${e.message}`, ERROR_TYPES.MANIFEST_UPDATE);
     }
 
-    console.log(`[SmartCutPlanner] Planning completed successfully`);
-    console.log(`[SmartCutPlanner] Plan key: ${planKey}`);
-    console.log(`[SmartCutPlanner] Total cuts: ${cutPlan.cuts?.length || 0}`);
+    logger.info(`[SmartCutPlanner] Planning completed successfully`);
+    logger.info(`[SmartCutPlanner] Plan key: ${planKey}`);
+    logger.info(`[SmartCutPlanner] Total cuts: ${cutPlan.cuts?.length || 0}`);
 
     return { ok: true, planKey, correlationId };
   } catch (err) {
-    console.error(`[SmartCutPlanner] Planning failed:`, err.message);
-    console.error(`[SmartCutPlanner] Error type:`, err.type);
-    console.error(`[SmartCutPlanner] Error details:`, err.details);
+    logger.error(`[SmartCutPlanner] Planning failed:`, err.message);
+    logger.error(`[SmartCutPlanner] Error type:`, err.type);
+    logger.error(`[SmartCutPlanner] Error details:`, err.details);
     
     try {
       const manifest = loadManifest(env, tenantId, jobId);

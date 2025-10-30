@@ -1,9 +1,7 @@
 {
   "version": "0.2",
   "language": "en",
-  "enableFiletypes": [
-    "markdown"
-  ],
+  "enableFiletypes": ["markdown"],
   "ignorePaths": [
     "node_modules/**",
     ".git/**",
@@ -20,9 +18,7 @@
     "*.toml",
     "package-lock.json"
   ],
-  "files": [
-    "**/*.md"
-  ],
+  "files": ["**/*.md"],
   "words": [
     "adrs",
     "avocado",

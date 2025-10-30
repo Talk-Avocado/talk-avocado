@@ -58,17 +58,34 @@ ensure_frontend_context() {
 
 # Ensure we're in the backend context
 ensure_backend_context() {
+  # Case 1: Already inside a Python backend (legacy pattern)
   if [[ -f "pyproject.toml" ]] && [[ -d "app" ]]; then
     echo -e "${GREEN}✓ Already in backend context${NC}"
     return 0
-  elif [[ -d "backend" ]] && [[ -f "backend/pyproject.toml" ]] && [[ -d "backend/app" ]]; then
-    echo -e "${BLUE}Switching to backend directory...${NC}"
-    cd backend || return 1
-    return 0
-  else
-    echo -e "${RED}❌ Backend directory not found. Please run this command from the project root or backend directory${NC}"
-    return 1
   fi
+
+  # Case 2: Already inside a Node backend (this repo pattern)
+  if [[ -f "package.json" ]] && ([[ -f "tsconfig.json" ]] || [[ -d "lib" ]] || [[ -d "dist" ]]); then
+    echo -e "${GREEN}✓ Already in backend context${NC}"
+    return 0
+  fi
+
+  # Case 3: From project root – switch into backend for Python or Node layout
+  if [[ -d "backend" ]]; then
+    if [[ -f "backend/pyproject.toml" ]] && [[ -d "backend/app" ]]; then
+      echo -e "${BLUE}Switching to backend directory...${NC}"
+      cd backend || return 1
+      return 0
+    fi
+    if [[ -f "backend/package.json" ]]; then
+      echo -e "${BLUE}Switching to backend directory...${NC}"
+      cd backend || return 1
+      return 0
+    fi
+  fi
+
+  echo -e "${RED}❌ Backend directory not found or unrecognized. Run from project root or backend dir (${YELLOW}Node backend expected at backend/package.json${NC})${NC}"
+  return 1
 }
 
 # Ensure we're in the project root
@@ -1387,7 +1404,7 @@ classify_changed_files() {
   local seen_other=0
 
   while IFS= read -r file; do
-    if [[ "$file" == frontend/* ]]; then
+  if [[ "$file" == frontend/* ]]; then
       seen_frontend=1
     fi
     if [[ "$file" == backend/* ]]; then

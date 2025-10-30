@@ -1,4 +1,4 @@
-export type Env = 'dev' | 'stage' | 'prod' | 'test';
+export type Env = "dev" | "stage" | "prod" | "test";
 
 export interface ManifestInput {
   sourceKey: string;
@@ -13,7 +13,7 @@ export interface ManifestTranscript {
   jsonKey?: string;
   srtKey?: string;
   language?: string;
-  model?: 'tiny' | 'base' | 'small' | 'medium' | 'large';
+  model?: "tiny" | "base" | "small" | "medium" | "large";
   confidence?: number;
   transcribedAt?: string;
 }
@@ -28,8 +28,8 @@ export interface ManifestPlan {
 
 export interface ManifestRender {
   key: string;
-  type: 'preview' | 'final' | 'thumbnail';
-  codec: 'h264' | 'h265' | 'vp9';
+  type: "preview" | "final" | "thumbnail";
+  codec: "h264" | "h265" | "vp9";
   durationSec?: number;
   resolution?: string;
   notes?: string;
@@ -38,8 +38,8 @@ export interface ManifestRender {
 
 export interface ManifestSubtitle {
   key: string;
-  type: 'source' | 'final';
-  format: 'srt' | 'vtt';
+  type: "source" | "final";
+  format: "srt" | "vtt";
   durationSec?: number;
   wordCount?: number;
   generatedAt?: string;
@@ -47,7 +47,7 @@ export interface ManifestSubtitle {
 
 export interface ManifestLog {
   key?: string;
-  type?: 'pipeline' | 'error' | 'debug';
+  type?: "pipeline" | "error" | "debug";
   createdAt?: string;
 }
 
@@ -58,18 +58,18 @@ export interface ManifestMetadata {
 }
 
 export interface Manifest {
-  schemaVersion: '1.0.0';
+  schemaVersion: "1.0.0";
   env: Env;
   tenantId: string;
   jobId: string;
-  status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
+  status: "pending" | "processing" | "completed" | "failed" | "cancelled";
   createdAt: string;
   updatedAt: string;
   sourceVideoKey?: string;
   input?: ManifestInput;
   audio?: {
     key?: string;
-    codec?: 'mp3' | 'wav' | 'aac';
+    codec?: "mp3" | "wav" | "aac";
     durationSec?: number;
     bitrateKbps?: number;
     sampleRate?: 16000 | 22050 | 44100 | 48000;
@@ -87,7 +87,7 @@ export interface Manifest {
 export interface CutSegment {
   start: string;
   end: string;
-  type: 'keep' | 'cut';
+  type: "keep" | "cut";
   reason?: string;
   confidence?: number;
 }
@@ -98,7 +98,7 @@ export interface CutPlanMetadata {
 }
 
 export interface CutPlan {
-  schemaVersion?: '1.0.0';
+  schemaVersion?: "1.0.0";
   source?: string;
   output?: string;
   cuts: CutSegment[];

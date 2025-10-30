@@ -5,6 +5,11 @@
     "mark-processing": {
       "Type": "Task",
       "Resource": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:talkavocado-${Env}-mark-processing",
+      "Parameters": {
+        "tenantId.$": "$.tenantId",
+        "jobId.$": "$.jobId",
+        "correlationId.$": "$.correlationId"
+      },
       "Next": "audio-extraction",
       "Retry": [
         {
@@ -25,6 +30,11 @@
     "audio-extraction": {
       "Type": "Task",
       "Resource": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:talkavocado-${Env}-audio-extraction",
+      "Parameters": {
+        "tenantId.$": "$.tenantId",
+        "jobId.$": "$.jobId",
+        "correlationId.$": "$.correlationId"
+      },
       "Next": "transcription",
       "Retry": [
         {
@@ -45,6 +55,11 @@
     "transcription": {
       "Type": "Task",
       "Resource": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:talkavocado-${Env}-transcription",
+      "Parameters": {
+        "tenantId.$": "$.tenantId",
+        "jobId.$": "$.jobId",
+        "correlationId.$": "$.correlationId"
+      },
       "Next": "smart-cut-planner",
       "Retry": [
         {
@@ -65,6 +80,11 @@
     "smart-cut-planner": {
       "Type": "Task",
       "Resource": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:talkavocado-${Env}-smart-cut-planner",
+      "Parameters": {
+        "tenantId.$": "$.tenantId",
+        "jobId.$": "$.jobId",
+        "correlationId.$": "$.correlationId"
+      },
       "Next": "video-cuts",
       "Retry": [
         {
@@ -85,6 +105,11 @@
     "video-cuts": {
       "Type": "Task",
       "Resource": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:talkavocado-${Env}-video-cuts",
+      "Parameters": {
+        "tenantId.$": "$.tenantId",
+        "jobId.$": "$.jobId",
+        "correlationId.$": "$.correlationId"
+      },
       "Next": "transitions-choice",
       "Retry": [
         {
@@ -116,6 +141,11 @@
     "video-transitions": {
       "Type": "Task",
       "Resource": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:talkavocado-${Env}-video-transitions",
+      "Parameters": {
+        "tenantId.$": "$.tenantId",
+        "jobId.$": "$.jobId",
+        "correlationId.$": "$.correlationId"
+      },
       "Next": "subtitles-post-edit",
       "Retry": [
         {
@@ -136,6 +166,11 @@
     "subtitles-post-edit": {
       "Type": "Task",
       "Resource": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:talkavocado-${Env}-subtitles-post-edit",
+      "Parameters": {
+        "tenantId.$": "$.tenantId",
+        "jobId.$": "$.jobId",
+        "correlationId.$": "$.correlationId"
+      },
       "Next": "branding-layer",
       "Retry": [
         {
@@ -156,6 +191,11 @@
     "branding-layer": {
       "Type": "Task",
       "Resource": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:talkavocado-${Env}-branding-layer",
+      "Parameters": {
+        "tenantId.$": "$.tenantId",
+        "jobId.$": "$.jobId",
+        "correlationId.$": "$.correlationId"
+      },
       "Next": "mark-complete",
       "Retry": [
         {
@@ -176,6 +216,11 @@
     "mark-complete": {
       "Type": "Task",
       "Resource": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:talkavocado-${Env}-mark-complete",
+      "Parameters": {
+        "tenantId.$": "$.tenantId",
+        "jobId.$": "$.jobId",
+        "correlationId.$": "$.correlationId"
+      },
       "End": true,
       "Retry": [
         {
@@ -196,6 +241,11 @@
     "mark-failed": {
       "Type": "Task",
       "Resource": "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:talkavocado-${Env}-mark-failed",
+      "Parameters": {
+        "tenantId.$": "$.tenantId",
+        "jobId.$": "$.jobId",
+        "correlationId.$": "$.correlationId"
+      },
       "End": true,
       "Retry": [
         {
