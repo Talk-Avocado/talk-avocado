@@ -5,6 +5,9 @@ import { saveManifest, manifestKey } from "../../manifest.js";
 import { startStateMachine } from "../../orchestration.js";
 import { Manifest } from "../../types.js";
 
+// In-memory idempotency store for local/dev testing (module-scoped)
+const idempotencyStore: Map<string, { jobId: string; manifestKey: string }> = new Map();
+
 // Mock DynamoDB client for Phase 1 (local mode)
 // In production, this would be AWS SDK DynamoDB client
 interface DynamoDBItem {
@@ -38,10 +41,7 @@ class MockDynamoDB {
 
 const dynamoDB = new MockDynamoDB();
 
-// Simple in-memory idempotency cache for Phase 1 local mode
-// Keyed by x-idempotency-key; stores the created jobId and manifestKey
-const idempotencyCache: Map<string, { jobId: string; manifestKey: string }> =
-  new Map();
+// (deprecated) Older cache removed; use idempotencyStore keyed by `${tenantId}#${key}`
 
 interface CreateJobRequest {
   tenantId: string;
@@ -67,7 +67,7 @@ export async function createJob(
 ): Promise<{ statusCode: number; body: string }> {
   const logger = new LoggingWrapper("createJob");
   const correlationId = event.headers?.["x-correlation-id"] || uuidv4();
-  const idempotencyKey = event.headers?.["x-idempotency-key"];
+  const idempotencyKey: string | undefined = event.headers?.["x-idempotency-key"];
 
   logger.addPersistentAttributes({
     correlationId,
@@ -75,22 +75,6 @@ export async function createJob(
   });
 
   try {
-    // Idempotency: return 409 if key is reused
-    if (idempotencyKey && idempotencyCache.has(idempotencyKey)) {
-      const existing = idempotencyCache.get(idempotencyKey)!;
-      logger.warn("Duplicate create detected via idempotency key", {
-        idempotencyKey,
-      });
-      return {
-        statusCode: 409,
-        body: JSON.stringify({
-          error: "Duplicate create",
-          jobId: existing.jobId,
-          manifestKey: existing.manifestKey,
-        }),
-      };
-    }
-
     // Parse and validate request body
     const body: CreateJobRequest = JSON.parse(event.body || "{}");
 
@@ -121,6 +105,25 @@ export async function createJob(
       jobId,
       env,
     });
+
+    // Idempotency short-circuit
+    if (idempotencyKey) {
+      const idemKey = `${body.tenantId}#${idempotencyKey}`;
+      const existing = idempotencyStore.get(idemKey);
+      if (existing) {
+        logger.info("Duplicate create detected via idempotency key", {
+          idempotencyKey,
+        });
+        return {
+          statusCode: 409,
+          body: JSON.stringify({
+            error: "Duplicate create",
+            jobId: existing.jobId,
+            manifestKey: existing.manifestKey,
+          }),
+        };
+      }
+    }
 
     // Create initial manifest
     const manifest: Manifest = {
@@ -172,6 +175,12 @@ export async function createJob(
     await dynamoDB.putItem(dbItem);
     logger.info("DynamoDB record created", { jobSort });
 
+    // Record idempotency only after successful creation
+    if (idempotencyKey) {
+      const idemKey = `${body.tenantId}#${idempotencyKey}`;
+      idempotencyStore.set(idemKey, { jobId, manifestKey: manifestKeyPath });
+    }
+
     // Check if we should start the state machine
     const startOnCreate = process.env.START_ON_CREATE === "true";
     if (startOnCreate) {
@@ -198,13 +207,7 @@ export async function createJob(
 
     logger.info("Job created successfully", { jobId, status: "pending" });
 
-    // Record idempotency mapping after successful creation
-    if (idempotencyKey) {
-      idempotencyCache.set(idempotencyKey, {
-        jobId,
-        manifestKey: manifestKeyPath,
-      });
-    }
+    // (mapping recorded earlier using idempotencyStore)
 
     return {
       statusCode: 201,
