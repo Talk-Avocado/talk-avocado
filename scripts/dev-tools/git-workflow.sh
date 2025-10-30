@@ -329,12 +329,8 @@ main() {
     10) validate_all ;;
     11) check_markdown_lint ;;
     12) fix_markdown_lint ;;
-<<<<<<< HEAD
     13) run_cicd_validation ;;
     14) api_up ;;
-=======
-    13) run_cicd_validation ;;
->>>>>>> origin/dev
     
     0) echo "Goodbye!"; exit 0 ;;
     *) echo "Invalid option. Please try again." ;;
