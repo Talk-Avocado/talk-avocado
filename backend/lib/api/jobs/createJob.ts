@@ -4,6 +4,10 @@ import { currentEnv, keyFor } from "../../storage.js";
 import { saveManifest, manifestKey } from "../../manifest.js";
 import { Manifest } from "../../types.js";
 
+// In-memory idempotency store for local/dev testing (module-scoped)
+const idempotencyStore: Map<string, { jobId: string; manifestKey: string }> =
+  new Map();
+
 // Mock DynamoDB client for Phase 1 (local mode)
 // In production, this would be AWS SDK DynamoDB client
 interface DynamoDBItem {
@@ -61,6 +65,10 @@ export async function createJob(
 ): Promise<{ statusCode: number; body: string }> {
   const logger = new LoggingWrapper("createJob");
   const correlationId = event.headers?.["x-correlation-id"] || uuidv4();
+  const idempotencyKey: string | undefined =
+    event.headers?.["x-idempotency-key"];
+
+  // Idempotency cache is module-scoped (see top)
 
   logger.addPersistentAttributes({
     correlationId,
@@ -98,6 +106,25 @@ export async function createJob(
       jobId,
       env,
     });
+
+    // Idempotency short-circuit
+    if (idempotencyKey) {
+      const idemKey = `${body.tenantId}#${idempotencyKey}`;
+      const existing = idempotencyStore.get(idemKey);
+      if (existing) {
+        logger.info("Duplicate create detected via idempotency key", {
+          idempotencyKey,
+        });
+        return {
+          statusCode: 409,
+          body: JSON.stringify({
+            error: "Duplicate create",
+            jobId: existing.jobId,
+            manifestKey: existing.manifestKey,
+          }),
+        };
+      }
+    }
 
     // Create initial manifest
     const manifest: Manifest = {
@@ -148,6 +175,12 @@ export async function createJob(
 
     await dynamoDB.putItem(dbItem);
     logger.info("DynamoDB record created", { jobSort });
+
+    // Record idempotency only after successful creation
+    if (idempotencyKey) {
+      const idemKey = `${body.tenantId}#${idempotencyKey}`;
+      idempotencyStore.set(idemKey, { jobId, manifestKey: manifestKeyPath });
+    }
 
     // Check if we should start the state machine
     const startOnCreate = process.env.START_ON_CREATE === "true";

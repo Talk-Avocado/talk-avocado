@@ -14,7 +14,7 @@ describe("Integration: End-to-end local flow", () => {
     // Set test environment
     process.env.TALKAVOCADO_ENV = "test";
     process.env.MEDIA_STORAGE_PATH = "./test-storage-integration";
-    
+
     // Ensure test storage directory is clean and ready
     try {
       if (fs.existsSync("./test-storage-integration")) {
@@ -22,10 +22,10 @@ describe("Integration: End-to-end local flow", () => {
         if (global.gc) {
           global.gc();
         }
-        
+
         // Wait a bit for file handles to be released
         await new Promise(resolve => setTimeout(resolve, 50));
-        
+
         fs.rmSync("./test-storage-integration", {
           recursive: true,
           force: true,
@@ -47,14 +47,14 @@ describe("Integration: End-to-end local flow", () => {
         if (global.gc) {
           global.gc();
         }
-        
+
         // Wait a bit for file handles to be released
         await new Promise(resolve => setTimeout(resolve, 50));
-        
+
         // Try multiple times with increasing delays for Windows
         let attempts = 0;
         const maxAttempts = 5;
-        
+
         while (attempts < maxAttempts) {
           try {
             fs.rmSync("./test-storage-integration", {
@@ -67,7 +67,12 @@ describe("Integration: End-to-end local flow", () => {
           } catch (error: any) {
             attempts++;
             if (attempts >= maxAttempts) {
-              console.warn("Cleanup warning after", maxAttempts, "attempts:", error.message);
+              console.warn(
+                "Cleanup warning after",
+                maxAttempts,
+                "attempts:",
+                error.message
+              );
               break;
             }
             // Wait longer between attempts
@@ -108,7 +113,7 @@ describe("Integration: End-to-end local flow", () => {
     const audioContent = "fake audio content";
     writeFileAtKey(audioKey, audioContent);
     console.log("✓ Wrote audio file");
-    
+
     // Small delay to ensure file operations complete on Windows
     await new Promise(resolve => setTimeout(resolve, 10));
 
@@ -151,7 +156,7 @@ describe("Integration: End-to-end local flow", () => {
     );
     writeFileAtKey(transcriptKey, transcriptContent);
     console.log("✓ Wrote transcript file");
-    
+
     // Small delay to ensure file operations complete on Windows
     await new Promise(resolve => setTimeout(resolve, 10));
 
