@@ -6,7 +6,8 @@ import { startStateMachine } from "../../orchestration.js";
 import { Manifest } from "../../types.js";
 
 // In-memory idempotency store for local/dev testing (module-scoped)
-const idempotencyStore: Map<string, { jobId: string; manifestKey: string }> = new Map();
+const idempotencyStore: Map<string, { jobId: string; manifestKey: string }> =
+  new Map();
 
 // Mock DynamoDB client for Phase 1 (local mode)
 // In production, this would be AWS SDK DynamoDB client
@@ -67,7 +68,8 @@ export async function createJob(
 ): Promise<{ statusCode: number; body: string }> {
   const logger = new LoggingWrapper("createJob");
   const correlationId = event.headers?.["x-correlation-id"] || uuidv4();
-  const idempotencyKey: string | undefined = event.headers?.["x-idempotency-key"];
+  const idempotencyKey: string | undefined =
+    event.headers?.["x-idempotency-key"];
 
   logger.addPersistentAttributes({
     correlationId,
