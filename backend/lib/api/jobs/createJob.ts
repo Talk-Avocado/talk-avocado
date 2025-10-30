@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from "uuid";
 import { LoggingWrapper } from "../../logging.js";
 import { currentEnv, keyFor } from "../../storage.js";
 import { saveManifest, manifestKey } from "../../manifest.js";
+import { startStateMachine } from "../../orchestration.js";
 import { Manifest } from "../../types.js";
 
 // Mock DynamoDB client for Phase 1 (local mode)
@@ -37,6 +38,11 @@ class MockDynamoDB {
 
 const dynamoDB = new MockDynamoDB();
 
+// Simple in-memory idempotency cache for Phase 1 local mode
+// Keyed by x-idempotency-key; stores the created jobId and manifestKey
+const idempotencyCache: Map<string, { jobId: string; manifestKey: string }> =
+  new Map();
+
 interface CreateJobRequest {
   tenantId: string;
   input?: {
@@ -61,6 +67,7 @@ export async function createJob(
 ): Promise<{ statusCode: number; body: string }> {
   const logger = new LoggingWrapper("createJob");
   const correlationId = event.headers?.["x-correlation-id"] || uuidv4();
+  const idempotencyKey = event.headers?.["x-idempotency-key"];
 
   logger.addPersistentAttributes({
     correlationId,
@@ -68,6 +75,22 @@ export async function createJob(
   });
 
   try {
+    // Idempotency: return 409 if key is reused
+    if (idempotencyKey && idempotencyCache.has(idempotencyKey)) {
+      const existing = idempotencyCache.get(idempotencyKey)!;
+      logger.warn("Duplicate create detected via idempotency key", {
+        idempotencyKey,
+      });
+      return {
+        statusCode: 409,
+        body: JSON.stringify({
+          error: "Duplicate create",
+          jobId: existing.jobId,
+          manifestKey: existing.manifestKey,
+        }),
+      };
+    }
+
     // Parse and validate request body
     const body: CreateJobRequest = JSON.parse(event.body || "{}");
 
@@ -153,8 +176,16 @@ export async function createJob(
     const startOnCreate = process.env.START_ON_CREATE === "true";
     if (startOnCreate) {
       logger.info("State machine start requested", { startOnCreate });
-      // TODO: In production, this would start the actual Step Functions state machine
-      // For now, we'll just log that it would be started
+      // Phase 1: local/dev lightweight starter
+      startStateMachine({
+        tenantId: body.tenantId,
+        jobId,
+        correlationId,
+      }).catch(error => {
+        logger.error("Failed to start state machine", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
     }
 
     const response: CreateJobResponse = {
@@ -166,6 +197,14 @@ export async function createJob(
     };
 
     logger.info("Job created successfully", { jobId, status: "pending" });
+
+    // Record idempotency mapping after successful creation
+    if (idempotencyKey) {
+      idempotencyCache.set(idempotencyKey, {
+        jobId,
+        manifestKey: manifestKeyPath,
+      });
+    }
 
     return {
       statusCode: 201,
