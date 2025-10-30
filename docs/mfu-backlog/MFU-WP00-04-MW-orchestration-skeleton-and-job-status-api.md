@@ -14,7 +14,7 @@ audience: [backend-engineers]
 - MFU ID: MFU-WP00-04-MW
 - Title: Orchestration Skeleton and Job Status API
 - Date Created: 2025-09-30
-- Date Last Updated:
+- Date Last Updated: 2025-10-30
 - Created By: Radha
 - Work Package: WP00 — Foundations (Phase 1)
 - Sprint: Phase 1 – Foundations
@@ -80,6 +80,10 @@ storage/                      # local root for keys {env}/{tenantId}/{jobId}/...
     }
     ```
 
+  - Optional headers:
+    - `x-correlation-id`: opaque correlation string
+    - `x-idempotency-key`: returns 409 on duplicate create with same key
+
   - Response 201:
 
     ```json
@@ -95,6 +99,8 @@ storage/                      # local root for keys {env}/{tenantId}/{jobId}/...
   - Side effects: creates Jobs item in DynamoDB with `tenantId` + `jobSort`, writes initial `manifest.json`, optionally starts state machine (configurable)
 
 - GET `/jobs/{jobId}?tenantId=...`
+  - Optional headers:
+    - `x-correlation-id`
   - Response 200:
 
     ```json
@@ -151,21 +157,24 @@ storage/                      # local root for keys {env}/{tenantId}/{jobId}/...
 
 ### Acceptance Criteria additions
 
-- [ ] State machine integrates the four migrated handlers with correct event shapes
-- [ ] `POST /jobs` seeds manifest and triggers state machine with `tenantId`
-- [ ] `GET /jobs/{jobId}` returns manifest-derived artifact pointers
+- [x] State machine integrates the four migrated handlers with correct event shapes
+- [x] `POST /jobs` seeds manifest and triggers state machine with `tenantId`
+  - Implemented: seeds manifest, creates DynamoDB record, and triggers start when `START_ON_CREATE=true`
+- [x] `GET /jobs/{jobId}` returns manifest-derived artifact pointers
 
 **Business Value**  
 Provides the unified entry point and control-plane for all pipeline MFUs.
 
 ## Acceptance Criteria
 
-- [ ] `backend/api/jobs/createJob.ts` creates `jobId`, DynamoDB record (tenant-scoped keys), initial manifest under local storage, returns 201
-- [ ] `backend/api/jobs/getJob.ts` returns job status and manifest-derived artifact pointers
-- [ ] Orchestration state machine (skeleton) exists with MarkProcessing → Noop/Steps → MarkCompleted
-- [ ] Correlation fields (`correlationId`, `tenantId`, `jobId`) flow from API → state machine → logs (Powertools wrappers from WP00-03)
-- [ ] Local-first behavior verified; S3/IAM explicitly deferred to WP01
-- [ ] Error handling: 400 on invalid input, 404 on missing job, 409 on duplicate create with same tenant/job
+- [x] `backend/api/jobs/createJob.ts` creates `jobId`, DynamoDB record (tenant-scoped keys), initial manifest under local storage, returns 201
+- [x] `backend/api/jobs/getJob.ts` returns job status and manifest-derived artifact pointers
+- [x] Orchestration state machine (skeleton) exists with MarkProcessing → Noop/Steps → MarkCompleted
+- [x] Correlation fields (`correlationId`, `tenantId`, `jobId`) flow from API → state machine → logs (Powertools wrappers from WP00-03)
+  - Implemented: ASL now passes `tenantId`, `jobId`, `correlationId` via `Parameters`; handlers read and log
+- [x] Local-first behavior verified; S3/IAM explicitly deferred to WP01
+- [x] Error handling: 400 on invalid input, 404 on missing job, 409 on duplicate create with same tenant/job
+  - Implemented: 409 when `x-idempotency-key` header is reused; returns existing `jobId` and `manifestKey`
 
 ## Complexity Assessment
 
@@ -268,3 +277,10 @@ Follow these steps exactly. All paths are repo‑relative.
   See: <https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-02-BE-manifest-tenancy-and-storage-schema.md>
 - MFU‑WP00‑03‑IAC: Runtime FFmpeg and Observability  
   See: <https://vscode.dev/github/Talk-Avocado/talk-avocado/blob/main/docs/mfu-backlog/MFU-WP00-03-IAC-runtime-ffmpeg-and-observability.md>
+
+## Outstanding Work Plan (Step-by-step)
+
+All items completed in this branch:
+
+- Tests added for idempotency (201 → 409), orchestration starter, and correlation in handlers
+- Documentation updated for `START_ON_CREATE` and `x-idempotency-key`
