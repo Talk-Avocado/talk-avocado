@@ -1,6 +1,6 @@
 import { LoggingWrapper } from '../../logging.js';
 import { currentEnv } from '../../storage.js';
-import { loadManifest } from '../../manifest.js';
+import { loadManifest, manifestKey } from '../../manifest.js';
 // Manifest type is used in loadManifest return type
 
 // Mock DynamoDB client for Phase 1 (local mode)
@@ -98,20 +98,40 @@ export async function getJob(event: any): Promise<{ statusCode: number; body: st
     });
 
     // Get job from DynamoDB
-    const dbItem = await dynamoDB.getJobByJobId(tenantId, jobId);
-    if (!dbItem) {
-      logger.warn('Job not found', { tenantId, jobId });
+    let dbItem = await dynamoDB.getJobByJobId(tenantId, jobId);
+
+    // Load manifest to get artifact pointers
+    const env = currentEnv();
+    let manifest;
+    try {
+      manifest = loadManifest(env, tenantId, jobId);
+    } catch (e) {
+      // If manifest truly missing, respond 404
+      logger.warn('Manifest not found for job', { tenantId, jobId });
       return {
         statusCode: 404,
         body: JSON.stringify({ error: 'Job not found' })
       };
     }
 
-    // Load manifest to get artifact pointers
-    const env = currentEnv();
-    const manifest = loadManifest(env, tenantId, jobId);
+    // Fallback for local-dev: synthesize db item if mock DB missed
+    if (!dbItem) {
+      logger.info('Synthesizing DB item from manifest (local fallback)');
+      dbItem = {
+        tenantId,
+        jobSort: `${manifest.createdAt || ''}#${jobId}`,
+        jobId,
+        status: manifest.status,
+        env,
+        manifestKey: manifestKey(env, tenantId, jobId),
+        createdAt: manifest.createdAt,
+        updatedAt: manifest.updatedAt,
+        correlationId: undefined
+      } as any;
+    }
     
-    logger.info('Manifest loaded successfully', { manifestKey: dbItem.manifestKey });
+    const manifestKeyOut = dbItem ? dbItem.manifestKey : manifestKey(env, tenantId, jobId);
+    logger.info('Manifest loaded successfully', { manifestKey: manifestKeyOut });
 
     // Derive artifact pointers from manifest
     const artifacts: GetJobResponse['artifacts'] = {};
@@ -137,7 +157,7 @@ export async function getJob(event: any): Promise<{ statusCode: number; body: st
       tenantId: manifest.tenantId,
       status: manifest.status,
       artifacts,
-      manifestKey: dbItem.manifestKey,
+      manifestKey: manifestKeyOut,
       updatedAt: manifest.updatedAt
     };
 

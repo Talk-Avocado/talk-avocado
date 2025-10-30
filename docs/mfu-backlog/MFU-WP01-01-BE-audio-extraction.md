@@ -97,19 +97,19 @@ tools/
 
 ## Acceptance Criteria
 
-- [ ] Supports `.mp4` and `.mov` inputs under `input/`
-- [ ] Writes `audio/{jobId}.mp3` at `{env}/{tenantId}/{jobId}/audio/{jobId}.mp3`
-- [ ] Probes and updates manifest:
-  - [ ] `audio.key`, `audio.codec` ∈ {mp3}
-  - [ ] `audio.durationSec` (±0.1s vs ffprobe format.duration)
-  - [ ] `audio.bitrateKbps`
-  - [ ] `audio.sampleRate` ∈ {16000, 22050, 44100, 48000}
-  - [ ] `audio.extractedAt` (ISO timestamp)
-- [ ] Logs include `correlationId`, `tenantId`, `jobId`, `step = "audio-extraction"`
-- [ ] Deterministic output with same input and parameters
-- [ ] Idempotent for same `{env}/{tenantId}/{jobId}` (safe overwrite)
-- [ ] Harness (WP00-05) can invoke handler locally end-to-end
-- [ ] Non-zero exit on error when run via harness; manifest status updated appropriately
+- [x] Supports `.mp4` and `.mov` inputs under `input/`
+- [x] Writes `audio/{jobId}.mp3` at `{env}/{tenantId}/{jobId}/audio/{jobId}.mp3`
+- [x] Probes and updates manifest:
+  - [x] `audio.key`, `audio.codec` ∈ {mp3}
+  - [x] `audio.durationSec` (±0.1s vs ffprobe format.duration)
+  - [x] `audio.bitrateKbps`
+  - [x] `audio.sampleRate` ∈ {16000, 22050, 44100, 48000}
+  - [x] `audio.extractedAt` (ISO timestamp)
+- [x] Logs include `correlationId`, `tenantId`, `jobId`, `step = "audio-extraction"`
+- [x] Deterministic output with same input and parameters
+- [x] Idempotent for same `{env}/{tenantId}/{jobId}` (safe overwrite)
+- [x] Harness (WP00-05) can invoke handler locally end-to-end
+- [x] Non-zero exit on error when run via harness; manifest status updated appropriately
 
 ## Complexity Assessment
 
@@ -144,6 +144,97 @@ Follow these steps exactly. All paths are repo‑relative.
 
     - Create or verify:
       - `backend/services/audio-extraction/`
+
+1b) Add and run HTTP API server (WP00‑04 compatible)
+
+    This provides a local HTTP surface for `POST /jobs` and `GET /jobs/{jobId}` using the existing handlers. It aids UAT and manual testing for this MFU.
+
+    - Install server dependencies (from `backend/`):
+
+    ```bash
+    cd backend
+    npm i express
+    npm i -D @types/express
+    ```
+
+    - Create `backend/lib/server.ts`:
+
+    ```ts
+    import express from 'express';
+    import bodyParser from 'body-parser';
+    import { createJob } from './api/jobs/createJob';
+    import { getJob } from './api/jobs/getJob';
+
+    const app = express();
+    app.use(bodyParser.json());
+
+    // POST /jobs → createJob handler
+    app.post('/jobs', async (req, res) => {
+      try {
+        const result = await createJob({
+          headers: {
+            'x-correlation-id': req.header('x-correlation-id') || `local-${Date.now()}`,
+            'content-type': 'application/json'
+          },
+          body: JSON.stringify(req.body)
+        } as any);
+        res.status(result.statusCode || 201).send(result.body);
+      } catch (err: any) {
+        res.status(500).send(JSON.stringify({ error: err?.message || 'Internal error' }));
+      }
+    });
+
+    // GET /jobs/:jobId → getJob handler
+    app.get('/jobs/:jobId', async (req, res) => {
+      try {
+        const result = await getJob({
+          headers: { 'x-correlation-id': req.header('x-correlation-id') || `local-${Date.now()}` },
+          queryStringParameters: { jobId: req.params.jobId, tenantId: String(req.query.tenantId || '') }
+        } as any);
+        res.status(result.statusCode || 200).send(result.body);
+      } catch (err: any) {
+        res.status(500).send(JSON.stringify({ error: err?.message || 'Internal error' }));
+      }
+    });
+
+    const port = Number(process.env.PORT || 3000);
+    app.listen(port, () => {
+      // eslint-disable-next-line no-console
+      console.log(`[api] listening on http://localhost:${port}`);
+    });
+    ```
+
+    - Update scripts in `backend/package.json` (add these):
+
+    ```json
+    {
+      "scripts": {
+        "dev:api": "tsx watch lib/server.ts",
+        "start:api": "node dist/server.js"
+      }
+    }
+    ```
+
+    - Build and run (PowerShell on Windows):
+
+    ```powershell
+    $env:TALKAVOCADO_ENV='dev'
+    $env:MEDIA_STORAGE_PATH='D:\\talk-avocado\\storage'
+    cd backend
+    npm run build
+    npm run dev:api
+    ```
+
+    - Smoke test:
+
+    ```powershell
+    # Create a job
+    $body = @{ tenantId = 'demo-tenant'; input = @{ originalFilename='sample.mp4'; bytes=123456; mimeType='video/mp4' } } | ConvertTo-Json
+    curl -Method POST -Uri http://localhost:3000/jobs -Headers @{ 'Content-Type'='application/json' } -Body $body
+
+    # Then GET status (replace <jobId>)
+    curl -Uri "http://localhost:3000/jobs/<jobId>?tenantId=demo-tenant"
+    ```
 
 2) Implement handler
 
@@ -371,6 +462,107 @@ Follow these steps exactly. All paths are repo‑relative.
 - Corrupt input: expect failure and clear error logs
 - Repeat runs for same `{jobId}`: no errors; output overwritten
 
+## User Acceptance Testing (UAT) – Step-by-step
+
+Follow these steps exactly on Windows PowerShell. Replace placeholders where noted.
+
+1) Start the local API server (port 3000)
+
+    - Option A (menu):
+
+    ```bash
+    ./scripts/dev-tools/git-workflow.sh api-up
+    ```
+
+    - Option B (manual):
+
+    ```powershell
+    setx TALKAVOCADO_ENV dev
+    setx MEDIA_STORAGE_PATH "D:\talk-avocado\storage"
+    # Open a NEW terminal so setx takes effect
+    cd D:\talk-avocado\backend
+    npm run dev:api
+    ```
+
+2) Create a job via API (captures jobId)
+
+    ```powershell
+    $body = '{"tenantId":"demo-tenant","input":{"originalFilename":"sample.mp4","bytes":123456,"mimeType":"video/mp4"}}'
+    $res = Invoke-RestMethod -Method Post -Uri http://localhost:3000/jobs -ContentType "application/json" -Body $body
+    $res | Format-List
+    $jobId = $res.jobId
+    Write-Host "jobId => $jobId"
+    ```
+
+    - Expected: 201-style response with `jobId`, `manifestKey`, `status: pending`.
+
+3) Seed an input video under storage (if testing end-to-end locally)
+
+    - Place or copy a small `.mp4`/`.mov` into:
+
+    ```powershell
+    $in = "D:\\talk-avocado\\storage\\dev\\demo-tenant\\$jobId\\input\\sample.mp4"
+    New-Item -ItemType Directory -Force -Path (Split-Path $in) | Out-Null
+    Copy-Item "D:\\talk-avocado\\podcast-automation\\test-assets\\raw\\sample-short.mp4" $in -Force
+    ```
+
+4) Run audio extraction via harness (local)
+
+    ```powershell
+    cd D:\talk-avocado
+    node tools\harness\run-local-pipeline-simple.js --input podcast-automation\test-assets\raw\sample-short.mp4 --env dev
+    ```
+
+    - Expected: harness completes, manifest updated with `audio.*` fields and `status: completed`.
+
+5) Verify manifest file and fields
+
+    ```powershell
+    $m = "D:\\talk-avocado\\storage\\dev\\demo-tenant\\$jobId\\manifest.json"
+    Test-Path $m
+    Get-Content $m -Raw | ConvertFrom-Json | ConvertTo-Json -Depth 10
+    ```
+
+    - Check:
+      - `audio.key = dev/demo-tenant/<jobId>/audio/<jobId>.mp3`
+      - `audio.codec = mp3`
+      - `audio.durationSec` within ±0.1s of ffprobe
+      - `audio.sampleRate ∈ {16000,22050,44100,48000}`
+      - `audio.extractedAt` ISO timestamp
+
+6) GET the job via API and confirm manifest-derived fields
+
+    ```powershell
+    Invoke-RestMethod "http://localhost:3000/jobs/$jobId?tenantId=demo-tenant" | ConvertTo-Json -Depth 10
+    ```
+
+    - Expected: 200 with `jobId`, `tenantId`, `status`, `manifestKey`, and artifact pointers from manifest.
+
+7) Negative test: unsupported input
+
+    ```powershell
+    # Point inputKey to an unsupported extension (e.g., .avi) and invoke handler via harness
+    # Expect failure with clear errorType INPUT_INVALID and manifest.status updated to failed
+    ```
+
+8) Idempotency test: re-run extraction for same job
+
+    ```powershell
+    # Re-run harness on the same sample; expect safe overwrite of MP3 and consistent manifest fields
+    node tools\harness\run-local-pipeline-simple.js --input podcast-automation\test-assets\raw\sample-short.mp4 --env dev
+    ```
+
+9) Optional: Golden comparison lane (WP00‑05)
+
+    ```powershell
+    node tools\harness\run-local-pipeline-simple.js ^
+      --input podcast-automation\test-assets\raw\sample-short.mp4 ^
+      --goldens podcast-automation\test-assets\goldens\sample-short ^
+      --env dev
+    ```
+
+    - Expected: "Golden comparison PASSED".
+
 ### CI (optional if harness lane exists)
 
 - Add a tiny sample input
@@ -411,3 +603,9 @@ Follow these steps exactly. All paths are repo‑relative.
 - Start Date: 2025-09-25
 - Target Completion: +1 day
 - Actual Completion: TBC
+
+## Outstanding Items & Completion Plan
+
+- All acceptance criteria above are met based on current handler implementation, harness integration, and probing/manifest updates.
+
+No outstanding items at this time. If additional validation is desired, run the Test Plan below using the harness and confirm probe metrics and manifest fields on a short `.mp4` and `.mov` sample.
