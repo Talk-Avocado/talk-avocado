@@ -1,0 +1,19 @@
+* [33m4f42849[m[33m ([m[1;33mtag: [m[1;33mrelease-20251030-113355[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/dev[m[33m, [m[1;31morigin/MFU-WP00-04-MW-orchestration-skeleton-and-job-status-api[m[33m, [m[1;31morigin/HEAD[m[33m, [m[1;32mmain[m[33m, [m[1;32mdev[m[33m, [m[1;32mMFU-WP00-04-MW-orchestration-skeleton-and-job-status-api[m[33m)[m docs: mfu wp00 04 acceptance criteria chk
+[31m|[m * [33me2837fc[m[33m ([m[1;31morigin/MFU-WP00-03-IAC-runtime-ffmpeg-and-observability[m[33m)[m docs(docs): Update documentation
+[31m|[m * [33ma5c6f4e[m docs: mfu wp00 03 acceptance criteria chk
+[31m|[m * [33mc5b9881[m docs(docs): Update documentation
+[31m|[m * [33m181bfaa[m docs: mfu wp003 acceptance criteria chk[D[D[D[D[D[D[D[D[D[D[D[D[D[D[D[D[D[D[D[D[D[D[D[D[D 03 acceptance criteria chk
+[31m|[m [32m|[m * [33m8b44bc0[m ci: treat backend test failures as warnings to unblock CI
+[31m|[m [32m|[m * [33m38aec5d[m ci: ignore scripts/check-es-modules.js from Prettier to deflake CI
+[31m|[m [32m|[m * [33m75362fc[m ci: enforce LF EOL; install backend deps before tests; stabilize prettier on CI
+[31m|[m [32m|[m * [33m2a1ece4[m ci: ensure backend deps installed in tests; normalize EOLs for Prettier
+[31m|[m [32m|[m * [33m90148af[m ci: remove python job to avoid false failures on non-python repo
+[31m|[m [32m|[m * [33m8a13ec4[m ci: use Node ESM checker in workflow; skip python when no files; format checker
+[31m|[m [32m|[m [33m|[m * [33mf657aac[m fix(ci): improve ES module checker string literal detection
+[31m|[m [32m|[m [33m|[m * [33m662aded[m style: fix Prettier formatting issues
+[31m|[m [32m|[m [33m|[m * [33m0e8c0f2[m fix(ci): improve ES module checker to skip string literals and .eslintrc.cjs
+[31m|[m [32m|[m [33m|[m * [33m3c493c5[m devops(ci): install backend deps in node job, add backend build/test steps
+[31m|[m [32m|[m [33m|[m[33m/[m  
+[31m|[m [32m|[m o [33m049561e[m[33m ([m[1;33mtag: [m[1;33mrelease-20251028-113212[m[33m, [m[1;31morigin/MFU-DEVOPS-02-cicd-improvement[m[33m, [m[1;32mMFU-DEVOPS-02-cicd-improvement[m[33m)[m chore(scripts): Update development scripts
+[31m|[m o [33mc457b15[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mMFU-WP00-02-BE-manifest-tenancy-and-storage-schema[m[33m, [m[1;31morigin/MFU-WP00-02-BE-manifest-tenancy-and-storage-schema[m[33m)[m docs: mfu wpoo 02 acceptance criteria chk
+o [33ma1fb256[m[33m ([m[1;33mtag: [m[1;33mrelease-20251029-133506[m[33m, [m[1;32mMFU-WP00-03-IAC-runtime-ffmpeg-and-observability[m[33m)[m Resolve merge conflict in scripts/check-es-modules.js
