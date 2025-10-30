@@ -74,6 +74,9 @@ show_menu() {
   echo "11) Check markdown lint issues"
   echo "12) Fix markdown lint issues"
   echo ""
+  echo "Local API:"
+  echo "13) Start backend API server (dev)"
+  echo ""
   echo "0) Exit"
   echo ""
   read -r -p "Select an option: " choice
@@ -94,6 +97,7 @@ main() {
     10) validate_all ;;
     11) check_markdown_lint ;;
     12) fix_markdown_lint ;;
+    13) api_up ;;
     
     0) echo "Goodbye!"; exit 0 ;;
     *) echo "Invalid option. Please try again." ;;
@@ -142,6 +146,9 @@ else
     "check-markdown") check_markdown_lint ;;
     "fix-markdown") fix_markdown_lint ;;
 
+    # Local API server
+    "api-up") api_up ;;
+
     # Help
     "help"|"-h"|"--help")
       echo "Usage: $SCRIPT_NAME [command]"
@@ -150,6 +157,7 @@ else
       echo "  MFU: mfu-create, mfu-commit, mfu-fast-commit, mfu-complete, mfu-release, mfu-status, mfu-cleanup"
       echo "  Docs: check-markdown, fix-markdown"
       echo "  General: push, sync, validate, commit-structured"
+      echo "  Local API: api-up"
       echo ""
       echo "Run without arguments for interactive menu."
       ;;

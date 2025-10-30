@@ -81,6 +81,27 @@ ensure_project_root() {
   echo -e "${GREEN}✓ Already in project root${NC}"
 }
 
+# Start backend API server (dev) for Talk Avocado local HTTP endpoints
+api_up() {
+  echo -e "${BLUE}Starting backend API server...${NC}"
+  # Ensure project root
+  if ! ensure_project_root; then
+    return 1
+  fi
+  # Defaults if not provided
+  export TALKAVOCADO_ENV="${TALKAVOCADO_ENV:-dev}"
+  # Resolve MEDIA_STORAGE_PATH to absolute project storage directory
+  local PROJECT_ROOT
+  PROJECT_ROOT="$(git rev-parse --show-toplevel)"
+  export MEDIA_STORAGE_PATH="${MEDIA_STORAGE_PATH:-${PROJECT_ROOT}/storage}"
+  echo "TALKAVOCADO_ENV=${TALKAVOCADO_ENV}"
+  echo "MEDIA_STORAGE_PATH=${MEDIA_STORAGE_PATH}"
+  (
+    cd backend || exit 1
+    npm run build && npm run dev:api
+  )
+}
+
 # Get current commit hash
 get_current_commit_hash() {
   git rev-parse HEAD 2>/dev/null || echo "unknown"
