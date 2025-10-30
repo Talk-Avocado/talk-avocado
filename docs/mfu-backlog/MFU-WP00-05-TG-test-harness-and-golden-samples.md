@@ -2,7 +2,7 @@
 title: "MFU-WP00-05-TG: Test Harness and Golden Samples"
 sidebar_label: "WP00-05: TG Harness & Goldens"
 date: 2025-10-01
-status: planned
+status: completed
 version: 1.0
 audience: [developers, qa]
 ---
@@ -14,7 +14,7 @@ audience: [developers, qa]
 - MFU ID: MFU-WP00-05-TG
 - Title: Test Harness and Golden Samples
 - Date Created: 2025-10-01
-- Date Last Updated:
+- Date Last Updated: 2025-10-30
 - Created By: Radha
 - Work Package: WP00 — Foundations (Phase 1)
 - Sprint: Phase 1 – Foundations
@@ -183,18 +183,18 @@ Manifest subset example (only specified fields are compared):
 
 ## Acceptance Criteria
 
-- [ ] `tools/harness/run-local-pipeline.js` runs end-to-end non-interactively
-- [ ] Canonical outputs written under `./storage/{env}/{tenantId}/{jobId}/...`
-- [ ] `tools/harness/compare-goldens.js` compares against goldens with:
-  - [ ] Numeric tolerances (durations ±0.1s)
-  - [ ] Subset JSON equality for manifest fields
-  - [ ] Normalized text comparison for transcript preview
-- [ ] Pass/fail summary printed; mismatches show concise diffs
-- [ ] Exit code is non-zero on any mismatch (CI-suitable)
-- [ ] Sample goldens provided for 1–2 short inputs
-- [ ] `--strict` flag implemented and documented
-- [ ] Error handling: handler failures update manifest and exit non-zero
-- [ ] CI job added that runs harness on sample and compares goldens
+- [x] `tools/harness/run-local-pipeline.js` runs end-to-end non-interactively
+- [x] Canonical outputs written under `./storage/{env}/{tenantId}/{jobId}/...`
+- [x] `tools/harness/compare-goldens.js` compares against goldens with:
+  - [x] Numeric tolerances (durations ±0.1s)
+  - [x] Subset JSON equality for manifest fields
+  - [x] Normalized text comparison for transcript preview
+- [x] Pass/fail summary printed; mismatches show concise diffs
+- [x] Exit code is non-zero on any mismatch (CI-suitable)
+- [x] Sample goldens provided for 1–2 short inputs
+- [x] `--strict` flag implemented and documented
+- [x] Error handling: handler failures update manifest and exit non-zero
+- [x] CI job added that runs harness on sample and compares goldens
 
 ## Complexity Assessment
 
@@ -504,7 +504,7 @@ Follow these steps exactly. All paths are repo‑relative.
                 --env dev
           - name: Upload artifacts on failure
             if: failure()
-            uses: actions/upload-artifact@v3
+            uses: actions/upload-artifact@v4
             with:
               name: harness-outputs
               path: storage/
@@ -576,8 +576,12 @@ See "Dependencies and Prerequisites" section above for full details.
 
 ## Implementation Tracking
 
-- Status: planned
+- Status: completed
 - Assigned To: Team
 - Start Date: 2025-09-25
 - Target Completion: +1 day
-- Actual Completion: TBC
+- Actual Completion: 2025-10-30
+
+## Outstanding Items and Completion Plan
+
+- None. All acceptance criteria are met on branch `MFU-WP00-05-TG-test-harness-and-golden-samples`.

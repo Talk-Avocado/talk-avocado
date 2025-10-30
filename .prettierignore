@@ -1,0 +1,36 @@
+# Ignore large, non-source or vendor-like areas for CI formatting checks
+# Docs and samples
+/docs/
+/prompts/
+/test-assets/
+/storage/
+
+# Infra/IaC and orchestration definitions
+/infra/
+/infrastructure/
+/orchestration/
+
+# Full podcast automation prototypes and assets
+/podcast-automation/
+
+# Backend service handlers (built from another process or external style)
+/backend/services/
+
+# Tooling and harness scripts
+/tools/
+/scripts/dev-tools/
+/scripts/check-es-modules.js
+
+# GitHub metadata
+/.github/
+
+# Common config and lockfiles (managed separately)
+package-lock.json
+package.json
+/backend/package-lock.json
+/backend/package.json
+/backend/tsconfig.json
+/backend/dist/
+.prettierrc
+.prettierrc.json
+.eslintrc.cjs

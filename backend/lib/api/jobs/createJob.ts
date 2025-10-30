@@ -1,8 +1,13 @@
-import { v4 as uuidv4 } from 'uuid';
-import { LoggingWrapper } from '../../logging.js';
-import { currentEnv, keyFor } from '../../storage.js';
-import { saveManifest, manifestKey } from '../../manifest.js';
-import { Manifest } from '../../types.js';
+import { v4 as uuidv4 } from "uuid";
+import { LoggingWrapper } from "../../logging.js";
+import { currentEnv, keyFor } from "../../storage.js";
+import { saveManifest, manifestKey } from "../../manifest.js";
+import { startStateMachine } from "../../orchestration.js";
+import { Manifest } from "../../types.js";
+
+// In-memory idempotency store for local/dev testing (module-scoped)
+const idempotencyStore: Map<string, { jobId: string; manifestKey: string }> =
+  new Map();
 
 // Mock DynamoDB client for Phase 1 (local mode)
 // In production, this would be AWS SDK DynamoDB client
@@ -26,13 +31,18 @@ class MockDynamoDB {
     this.items.set(key, item);
   }
 
-  async getItem(tenantId: string, jobSort: string): Promise<DynamoDBItem | null> {
+  async getItem(
+    tenantId: string,
+    jobSort: string
+  ): Promise<DynamoDBItem | null> {
     const key = `${tenantId}#${jobSort}`;
     return this.items.get(key) || null;
   }
 }
 
 const dynamoDB = new MockDynamoDB();
+
+// (deprecated) Older cache removed; use idempotencyStore keyed by `${tenantId}#${key}`
 
 interface CreateJobRequest {
   tenantId: string;
@@ -53,71 +63,102 @@ interface CreateJobResponse {
   manifestKey: string;
 }
 
-export async function createJob(event: any): Promise<{ statusCode: number; body: string }> {
-  const logger = new LoggingWrapper('createJob');
-  const correlationId = event.headers?.['x-correlation-id'] || uuidv4();
-  
+export async function createJob(
+  event: any
+): Promise<{ statusCode: number; body: string }> {
+  const logger = new LoggingWrapper("createJob");
+  const correlationId = event.headers?.["x-correlation-id"] || uuidv4();
+  const idempotencyKey: string | undefined =
+    event.headers?.["x-idempotency-key"];
+
   logger.addPersistentAttributes({
     correlationId,
-    operation: 'createJob'
+    operation: "createJob",
   });
 
   try {
     // Parse and validate request body
-    const body: CreateJobRequest = JSON.parse(event.body || '{}');
-    
+    const body: CreateJobRequest = JSON.parse(event.body || "{}");
+
     if (!body.tenantId) {
-      logger.error('Missing required field: tenantId');
+      logger.error("Missing required field: tenantId");
       return {
         statusCode: 400,
-        body: JSON.stringify({ error: 'Missing required field: tenantId' })
+        body: JSON.stringify({ error: "Missing required field: tenantId" }),
       };
     }
 
     // Validate tenantId format (alphanumeric with -/_ between, 1-64 chars)
     const tenantIdPattern = /^[a-z0-9](?:[a-z0-9-_]{0,62}[a-z0-9])?$/;
     if (!tenantIdPattern.test(body.tenantId)) {
-      logger.error('Invalid tenantId format', { tenantId: body.tenantId });
+      logger.error("Invalid tenantId format", { tenantId: body.tenantId });
       return {
         statusCode: 400,
-        body: JSON.stringify({ error: 'Invalid tenantId format' })
+        body: JSON.stringify({ error: "Invalid tenantId format" }),
       };
     }
 
     const env = currentEnv();
     const jobId = uuidv4();
     const now = new Date().toISOString();
-    
+
     logger.addPersistentAttributes({
       tenantId: body.tenantId,
       jobId,
-      env
+      env,
     });
+
+    // Idempotency short-circuit
+    if (idempotencyKey) {
+      const idemKey = `${body.tenantId}#${idempotencyKey}`;
+      const existing = idempotencyStore.get(idemKey);
+      if (existing) {
+        logger.info("Duplicate create detected via idempotency key", {
+          idempotencyKey,
+        });
+        return {
+          statusCode: 409,
+          body: JSON.stringify({
+            error: "Duplicate create",
+            jobId: existing.jobId,
+            manifestKey: existing.manifestKey,
+          }),
+        };
+      }
+    }
 
     // Create initial manifest
     const manifest: Manifest = {
-      schemaVersion: '1.0.0',
+      schemaVersion: "1.0.0",
       env,
       tenantId: body.tenantId,
       jobId,
-      status: 'pending',
+      status: "pending",
       createdAt: now,
       updatedAt: now,
-      input: body.input ? {
-        sourceKey: keyFor(env, body.tenantId, jobId, 'input', body.input.originalFilename),
-        originalFilename: body.input.originalFilename,
-        bytes: body.input.bytes,
-        mimeType: body.input.mimeType,
-        checksum: body.input.checksum,
-        uploadedAt: body.input.uploadedAt || now
-      } : undefined
+      input: body.input
+        ? {
+            sourceKey: keyFor(
+              env,
+              body.tenantId,
+              jobId,
+              "input",
+              body.input.originalFilename
+            ),
+            originalFilename: body.input.originalFilename,
+            bytes: body.input.bytes,
+            mimeType: body.input.mimeType,
+            checksum: body.input.checksum,
+            uploadedAt: body.input.uploadedAt || now,
+          }
+        : undefined,
     };
 
     // Save manifest to local storage
     const manifestKeyPath = manifestKey(env, body.tenantId, jobId);
     saveManifest(env, body.tenantId, jobId, manifest);
-    
-    logger.info('Manifest created and saved', { manifestKey: manifestKeyPath });
+
+    logger.info("Manifest created and saved", { manifestKey: manifestKeyPath });
 
     // Create DynamoDB record
     const jobSort = `${now}#${jobId}`;
@@ -125,46 +166,63 @@ export async function createJob(event: any): Promise<{ statusCode: number; body:
       tenantId: body.tenantId,
       jobSort,
       jobId,
-      status: 'pending',
+      status: "pending",
       env,
       manifestKey: manifestKeyPath,
       createdAt: now,
       updatedAt: now,
-      correlationId
+      correlationId,
     };
 
     await dynamoDB.putItem(dbItem);
-    logger.info('DynamoDB record created', { jobSort });
+    logger.info("DynamoDB record created", { jobSort });
+
+    // Record idempotency only after successful creation
+    if (idempotencyKey) {
+      const idemKey = `${body.tenantId}#${idempotencyKey}`;
+      idempotencyStore.set(idemKey, { jobId, manifestKey: manifestKeyPath });
+    }
 
     // Check if we should start the state machine
-    const startOnCreate = process.env.START_ON_CREATE === 'true';
+    const startOnCreate = process.env.START_ON_CREATE === "true";
     if (startOnCreate) {
-      logger.info('State machine start requested', { startOnCreate });
-      // TODO: In production, this would start the actual Step Functions state machine
-      // For now, we'll just log that it would be started
+      logger.info("State machine start requested", { startOnCreate });
+      // Phase 1: local/dev lightweight starter
+      startStateMachine({
+        tenantId: body.tenantId,
+        jobId,
+        correlationId,
+      }).catch(error => {
+        logger.error("Failed to start state machine", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
     }
 
     const response: CreateJobResponse = {
       jobId,
-      status: 'pending',
+      status: "pending",
       env,
       tenantId: body.tenantId,
-      manifestKey: manifestKeyPath
+      manifestKey: manifestKeyPath,
     };
 
-    logger.info('Job created successfully', { jobId, status: 'pending' });
+    logger.info("Job created successfully", { jobId, status: "pending" });
+
+    // (mapping recorded earlier using idempotencyStore)
 
     return {
       statusCode: 201,
-      body: JSON.stringify(response)
+      body: JSON.stringify(response),
     };
-
   } catch (error) {
-    logger.error('Failed to create job', { error: error instanceof Error ? error.message : String(error) });
-    
+    logger.error("Failed to create job", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: 'Internal server error' })
+      body: JSON.stringify({ error: "Internal server error" }),
     };
   }
 }

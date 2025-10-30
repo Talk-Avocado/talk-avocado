@@ -1,0 +1,154 @@
+{
+  "service": "audio-extraction",
+  "timestamp": "2025-10-29T07:29:16.333Z",
+  "analysis": {
+    "costEffective": {
+      "memory": 128,
+      "duration": 65513,
+      "cost": 0.00013668568963750002,
+      "success": true,
+      "error": null,
+      "timestamp": "2025-10-29T07:23:37.658Z"
+    },
+    "fastest": {
+      "memory": 8192,
+      "duration": 13574,
+      "cost": 0.0018100702864,
+      "success": true,
+      "error": null,
+      "timestamp": "2025-10-29T07:28:42.644Z"
+    },
+    "balanced": {
+      "memory": 10240,
+      "duration": 16115,
+      "cost": 0.0026860387049999998,
+      "success": true,
+      "error": null,
+      "timestamp": "2025-10-29T07:29:15.279Z"
+    },
+    "totalTests": 15,
+    "successfulTests": 15
+  },
+  "results": [
+    {
+      "memory": 128,
+      "duration": 65513,
+      "cost": 0.00013668568963750002,
+      "success": true,
+      "error": null,
+      "timestamp": "2025-10-29T07:23:37.658Z"
+    },
+    {
+      "memory": 256,
+      "duration": 60507,
+      "cost": 0.000252313004225,
+      "success": true,
+      "error": null,
+      "timestamp": "2025-10-29T07:24:39.188Z"
+    },
+    {
+      "memory": 512,
+      "duration": 62038,
+      "cost": 0.0005171843673,
+      "success": true,
+      "error": null,
+      "timestamp": "2025-10-29T07:25:42.238Z"
+    },
+    {
+      "memory": 1024,
+      "duration": 30578,
+      "cost": 0.0005098343526,
+      "success": true,
+      "error": null,
+      "timestamp": "2025-10-29T07:26:13.822Z"
+    },
+    {
+      "memory": 1536,
+      "duration": 21559,
+      "cost": 0.0005391760779500001,
+      "success": true,
+      "error": null,
+      "timestamp": "2025-10-29T07:26:36.392Z"
+    },
+    {
+      "memory": 1769,
+      "duration": 16530,
+      "cost": 0.0004761379635927735,
+      "success": true,
+      "error": null,
+      "timestamp": "2025-10-29T07:26:53.931Z"
+    },
+    {
+      "memory": 2048,
+      "duration": 15557,
+      "cost": 0.0005187677038,
+      "success": true,
+      "error": null,
+      "timestamp": "2025-10-29T07:27:10.493Z"
+    },
+    {
+      "memory": 3008,
+      "duration": 13845,
+      "cost": 0.0006780294806562501,
+      "success": true,
+      "error": null,
+      "timestamp": "2025-10-29T07:27:25.347Z"
+    },
+    {
+      "memory": 4096,
+      "duration": 14509,
+      "cost": 0.0009674686012000001,
+      "success": true,
+      "error": null,
+      "timestamp": "2025-10-29T07:27:40.871Z"
+    },
+    {
+      "memory": 5120,
+      "duration": 16199,
+      "cost": 0.0013501193665,
+      "success": true,
+      "error": null,
+      "timestamp": "2025-10-29T07:27:58.074Z"
+    },
+    {
+      "memory": 6144,
+      "duration": 14143,
+      "cost": 0.0014145028286,
+      "success": true,
+      "error": null,
+      "timestamp": "2025-10-29T07:28:13.232Z"
+    },
+    {
+      "memory": 7168,
+      "duration": 13804,
+      "cost": 0.0016106698876,
+      "success": true,
+      "error": null,
+      "timestamp": "2025-10-29T07:28:28.049Z"
+    },
+    {
+      "memory": 8192,
+      "duration": 13574,
+      "cost": 0.0018100702864,
+      "success": true,
+      "error": null,
+      "timestamp": "2025-10-29T07:28:42.644Z"
+    },
+    {
+      "memory": 9216,
+      "duration": 14500,
+      "cost": 0.0021752043500000004,
+      "success": true,
+      "error": null,
+      "timestamp": "2025-10-29T07:28:58.152Z"
+    },
+    {
+      "memory": 10240,
+      "duration": 16115,
+      "cost": 0.0026860387049999998,
+      "success": true,
+      "error": null,
+      "timestamp": "2025-10-29T07:29:15.279Z"
+    }
+  ]
+}

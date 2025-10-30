@@ -1,0 +1,32 @@
+#!/usr/bin/env node
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+require("source-map-support/register");
+const cdk = require("aws-cdk-lib");
+const lambda_stack_1 = require("./lambda-stack");
+const app = new cdk.App();
+// Get environment from context or default to 'dev'
+const environment = app.node.tryGetContext("environment") || "dev";
+const tenantId = app.node.tryGetContext("tenantId") || "default";
+// Create the Lambda stack
+new lambda_stack_1.TalkAvocadoLambdaStack(
+  app,
+  `TalkAvocado-Lambda-${environment}`,
+  {
+    environment,
+    tenantId,
+    env: {
+      account: process.env.CDK_DEFAULT_ACCOUNT,
+      region: process.env.CDK_DEFAULT_REGION || "us-east-1",
+    },
+    description: `TalkAvocado Lambda functions for ${environment} environment`,
+    tags: {
+      Environment: environment,
+      Service: "TalkAvocado",
+      Component: "Lambda",
+      TenantId: tenantId,
+    },
+  }
+);
+// Context values are set via command line or cdk.json
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoiYXBwLmpzIiwic291cmNlUm9vdCI6IiIsInNvdXJjZXMiOlsiYXBwLnRzIl0sIm5hbWVzIjpbXSwibWFwcGluZ3MiOiI7OztBQUNBLHVDQUFxQztBQUNyQyxtQ0FBbUM7QUFDbkMsaURBQXdEO0FBRXhELE1BQU0sR0FBRyxHQUFHLElBQUksR0FBRyxDQUFDLEdBQUcsRUFBRSxDQUFDO0FBRTFCLG1EQUFtRDtBQUNuRCxNQUFNLFdBQVcsR0FBRyxHQUFHLENBQUMsSUFBSSxDQUFDLGFBQWEsQ0FBQyxhQUFhLENBQUMsSUFBSSxLQUFLLENBQUM7QUFDbkUsTUFBTSxRQUFRLEdBQUcsR0FBRyxDQUFDLElBQUksQ0FBQyxhQUFhLENBQUMsVUFBVSxDQUFDLElBQUksU0FBUyxDQUFDO0FBRWpFLDBCQUEwQjtBQUMxQixJQUFJLHFDQUFzQixDQUFDLEdBQUcsRUFBRSxzQkFBc0IsV0FBVyxFQUFFLEVBQUU7SUFDbkUsV0FBVztJQUNYLFFBQVE7SUFDUixHQUFHLEVBQUU7UUFDSCxPQUFPLEVBQUUsT0FBTyxDQUFDLEdBQUcsQ0FBQyxtQkFBbUI7UUFDeEMsTUFBTSxFQUFFLE9BQU8sQ0FBQyxHQUFHLENBQUMsa0JBQWtCLElBQUksV0FBVztLQUN0RDtJQUNELFdBQVcsRUFBRSxvQ0FBb0MsV0FBVyxjQUFjO0lBQzFFLElBQUksRUFBRTtRQUNKLFdBQVcsRUFBRSxXQUFXO1FBQ3hCLE9BQU8sRUFBRSxhQUFhO1FBQ3RCLFNBQVMsRUFBRSxRQUFRO1FBQ25CLFFBQVEsRUFBRSxRQUFRO0tBQ25CO0NBQ0YsQ0FBQyxDQUFDO0FBRUgsc0RBQXNEIiwic291cmNlc0NvbnRlbnQiOlsiIyEvdXNyL2Jpbi9lbnYgbm9kZVxyXG5pbXBvcnQgJ3NvdXJjZS1tYXAtc3VwcG9ydC9yZWdpc3Rlcic7XHJcbmltcG9ydCAqIGFzIGNkayBmcm9tICdhd3MtY2RrLWxpYic7XHJcbmltcG9ydCB7IFRhbGtBdm9jYWRvTGFtYmRhU3RhY2sgfSBmcm9tICcuL2xhbWJkYS1zdGFjayc7XHJcblxyXG5jb25zdCBhcHAgPSBuZXcgY2RrLkFwcCgpO1xyXG5cclxuLy8gR2V0IGVudmlyb25tZW50IGZyb20gY29udGV4dCBvciBkZWZhdWx0IHRvICdkZXYnXHJcbmNvbnN0IGVudmlyb25tZW50ID0gYXBwLm5vZGUudHJ5R2V0Q29udGV4dCgnZW52aXJvbm1lbnQnKSB8fCAnZGV2JztcclxuY29uc3QgdGVuYW50SWQgPSBhcHAubm9kZS50cnlHZXRDb250ZXh0KCd0ZW5hbnRJZCcpIHx8ICdkZWZhdWx0JztcclxuXHJcbi8vIENyZWF0ZSB0aGUgTGFtYmRhIHN0YWNrXHJcbm5ldyBUYWxrQXZvY2Fkb0xhbWJkYVN0YWNrKGFwcCwgYFRhbGtBdm9jYWRvLUxhbWJkYS0ke2Vudmlyb25tZW50fWAsIHtcclxuICBlbnZpcm9ubWVudCxcclxuICB0ZW5hbnRJZCxcclxuICBlbnY6IHtcclxuICAgIGFjY291bnQ6IHByb2Nlc3MuZW52LkNES19ERUZBVUxUX0FDQ09VTlQsXHJcbiAgICByZWdpb246IHByb2Nlc3MuZW52LkNES19ERUZBVUxUX1JFR0lPTiB8fCAndXMtZWFzdC0xJyxcclxuICB9LFxyXG4gIGRlc2NyaXB0aW9uOiBgVGFsa0F2b2NhZG8gTGFtYmRhIGZ1bmN0aW9ucyBmb3IgJHtlbnZpcm9ubWVudH0gZW52aXJvbm1lbnRgLFxyXG4gIHRhZ3M6IHtcclxuICAgIEVudmlyb25tZW50OiBlbnZpcm9ubWVudCxcclxuICAgIFNlcnZpY2U6ICdUYWxrQXZvY2FkbycsXHJcbiAgICBDb21wb25lbnQ6ICdMYW1iZGEnLFxyXG4gICAgVGVuYW50SWQ6IHRlbmFudElkLFxyXG4gIH0sXHJcbn0pO1xyXG5cclxuLy8gQ29udGV4dCB2YWx1ZXMgYXJlIHNldCB2aWEgY29tbWFuZCBsaW5lIG9yIGNkay5qc29uXHJcbiJdfQ==

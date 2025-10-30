@@ -8,6 +8,7 @@ import path from 'node:path';
 // Import storage and manifest helpers
 import { keyFor, pathFor, ensureDirForFile } from '../../backend/dist/storage.js';
 import { saveManifest, loadManifest } from '../../backend/dist/manifest.js';
+import { logger } from "../../scripts/logger.js";
 
 async function main() {
   // Parse CLI arguments
@@ -23,7 +24,7 @@ async function main() {
   });
 
   if (!values.input) {
-    console.error('Error: --input is required');
+    logger.error('Error: --input is required');
     process.exit(1);
   }
 
@@ -31,14 +32,14 @@ async function main() {
   const env = values.env;
   const tenantId = values.tenant;
 
-  console.log(`[harness] Starting pipeline: env=${env}, tenant=${tenantId}, job=${jobId}`);
+  logger.info(`[harness] Starting pipeline: env=${env}, tenant=${tenantId}, job=${jobId}`);
 
   // 1. Seed input
   const inputKey = keyFor(env, tenantId, jobId, 'input', path.basename(values.input));
   const inputPath = pathFor(inputKey);
   ensureDirForFile(inputPath);
   copyFileSync(values.input, inputPath);
-  console.log(`[harness] Input seeded: ${inputKey}`);
+  logger.info(`[harness] Input seeded: ${inputKey}`);
 
   // 2. Create initial manifest
   const manifest = {
@@ -57,7 +58,7 @@ async function main() {
     }
   };
   saveManifest(env, tenantId, jobId, manifest);
-  console.log(`[harness] Manifest created`);
+  logger.info(`[harness] Manifest created`);
 
   // 3. Invoke handlers in sequence
   const handlers = [
@@ -69,7 +70,7 @@ async function main() {
 
   for (const handler of handlers) {
     try {
-      console.log(`[harness] Running ${handler.name}...`);
+      logger.info(`[harness] Running ${handler.name}...`);
       const { handler: fn } = await import(handler.path);
       
       // Build event based on handler requirements
@@ -90,9 +91,9 @@ async function main() {
       
       const context = { awsRequestId: `local-${Date.now()}` };
       await fn(event, context);
-      console.log(`[harness] ✓ ${handler.name} completed`);
+      logger.info(`[harness] ✓ ${handler.name} completed`);
     } catch (error) {
-      console.error(`[harness] ✗ ${handler.name} failed:`, error.message);
+      logger.error(`[harness] ✗ ${handler.name} failed:`, error.message);
       // Update manifest status to failed
       const m = loadManifest(env, tenantId, jobId);
       m.status = 'failed';
@@ -108,11 +109,11 @@ async function main() {
   finalManifest.updatedAt = new Date().toISOString();
   saveManifest(env, tenantId, jobId, finalManifest);
 
-  console.log(`[harness] Pipeline completed successfully`);
+  logger.info(`[harness] Pipeline completed successfully`);
 
   // 5. Compare goldens if provided
   if (values.goldens) {
-    console.log(`[harness] Comparing against goldens: ${values.goldens}`);
+    logger.info(`[harness] Comparing against goldens: ${values.goldens}`);
     const { compareGoldens } = await import('./compare-goldens.js');
     const passed = await compareGoldens({
       actualPath: pathFor(keyFor(env, tenantId, jobId)),
@@ -120,16 +121,16 @@ async function main() {
       strict: values.strict
     });
     if (!passed) {
-      console.error('[harness] Golden comparison FAILED');
+      logger.error('[harness] Golden comparison FAILED');
       process.exit(1);
     }
-    console.log('[harness] Golden comparison PASSED');
+    logger.info('[harness] Golden comparison PASSED');
   }
 
-  console.log(`[harness] Job complete: ${jobId}`);
+  logger.info(`[harness] Job complete: ${jobId}`);
 }
 
 main().catch(err => {
-  console.error('[harness] Fatal error:', err);
+  logger.error('[harness] Fatal error:', err);
   process.exit(1);
 });
