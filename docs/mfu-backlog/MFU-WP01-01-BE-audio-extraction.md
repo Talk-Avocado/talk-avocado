@@ -590,6 +590,7 @@ Follow these steps exactly on Windows PowerShell. Replace placeholders where not
     
     # Create a temporary Node.js script (ES module) to call the handler
     $tempScript = @"
+
 // Import CommonJS handler using dynamic import
 // Script runs from project root, so relative path works
 (async () => {
@@ -624,45 +625,34 @@ Follow these steps exactly on Windows PowerShell. Replace placeholders where not
   }
 })();
 "@
-
     # Use .js extension - ES module compatible with dynamic import for CommonJS handler
     $tempScript | Out-File -FilePath ".\temp-test-handler.js" -Encoding utf8
-
     # Run the test script from project root
     node .\temp-test-handler.js 2>&1
-
     # Clean up temp script
     Remove-Item .\temp-test-handler.js -ErrorAction SilentlyContinue
-
     # Return to original directory
     Pop-Location
-
     # Verify manifest status is 'failed' and contains error log with INPUT_INVALID
     $manifestPath = "D:\\talk-avocado\\storage\\dev\\demo-tenant\\$jobIdAvi\\manifest.json"
     if (Test-Path $manifestPath) {
         $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
         Write-Host "`nVerifying manifest..." -ForegroundColor Cyan
         Write-Host "Manifest status: $($manifest.status)" -ForegroundColor Cyan
-
-        if ($manifest.status -eq 'failed') {
-            Write-Host "✓ Manifest status is 'failed' as expected" -ForegroundColor Green
-        } else {
-            Write-Host "ERROR: Expected manifest.status='failed', got '$($manifest.status)'" -ForegroundColor Red
+    if ($manifest.status -eq 'failed') {
+     -ForegroundColor Red
         }
-
         # Check error logs
         if ($manifest.logs -and $manifest.logs.Count -gt 0) {
             $errorLog = $manifest.logs | Where-Object { $_.type -eq 'error' } | Select-Object -Last 1
             if ($errorLog) {
                 Write-Host "`nError log found:" -ForegroundColor Cyan
                 $errorLog | ConvertTo-Json -Depth 5
-                
                 if ($errorLog.errorType -eq 'INPUT_INVALID') {
                     Write-Host "✓ Error type is INPUT_INVALID as expected" -ForegroundColor Green
                 } else {
                     Write-Host "ERROR: Expected errorType='INPUT_INVALID', got '$($errorLog.errorType)'" -ForegroundColor Red
                 }
-                
                 if ($errorLog.message -like '*Unsupported input format*' -or $errorLog.message -like '*avi*') {
                     Write-Host "✓ Error message mentions unsupported format" -ForegroundColor Green
                 }
@@ -674,9 +664,7 @@ Follow these steps exactly on Windows PowerShell. Replace placeholders where not
         }
     } else {
         Write-Host "ERROR: Manifest file not found at $manifestPath" -ForegroundColor Red
-    
     ```
-    
     - Expected:
       - Handler throws error with `errorType = "INPUT_INVALID"`
       - Error message mentions "Unsupported input format" and ".avi"
@@ -684,7 +672,7 @@ Follow these steps exactly on Windows PowerShell. Replace placeholders where not
       - Manifest `logs` array contains error entry with `errorType = "INPUT_INVALID"`
       - Handler exits with non-zero exit code (or script handles error appropriately)
 
-9) Idempotency test: re-run extraction for same job
+9)Idempotency test: re-run extraction for same job
 
   ```powershell
     # Create a new job for idempotency test
