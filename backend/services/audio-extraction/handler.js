@@ -112,7 +112,24 @@ export const handler = async (event, context) => {
     const aStream = (probe.streams || []).find(s => s.codec_type === 'audio') || {};
     const durationSec = Number(probe.format?.duration || aStream.duration || 0);
     const bitrateKbps = Math.round(Number(probe.format?.bit_rate || 0) / 1000);
-    const sampleRateHz = Number(aStream.sample_rate || sampleRate);
+    let sampleRateHz = Number(aStream.sample_rate || sampleRate);
+    
+    // Validate and normalize sampleRate to match WP00-02 schema enum values
+    const allowedSampleRates = [16000, 22050, 44100, 48000];
+    if (!allowedSampleRates.includes(sampleRateHz)) {
+      // Coerce to nearest allowed value, or default to 44100
+      logger.warn('sampleRate from ffprobe not in allowed enum, normalizing', {
+        detected: sampleRateHz,
+        allowed: allowedSampleRates
+      });
+      // Find closest allowed sample rate
+      const closest = allowedSampleRates.reduce((prev, curr) => 
+        Math.abs(curr - sampleRateHz) < Math.abs(prev - sampleRateHz) ? curr : prev
+      );
+      sampleRateHz = closest;
+      logger.info('Normalized sampleRate', { original: aStream.sample_rate, normalized: sampleRateHz });
+    }
+    
     // const codec = (aStream.codec_name || 'mp3').toLowerCase(); // Not used currently
 
     // Update manifest with error handling
@@ -123,7 +140,7 @@ export const handler = async (event, context) => {
       manifest.audio.codec = 'mp3'; // Fixed: removed redundant ternary
       manifest.audio.durationSec = durationSec;
       manifest.audio.bitrateKbps = Number.isFinite(bitrateKbps) ? bitrateKbps : undefined;
-      manifest.audio.sampleRate = Number(sampleRateHz);
+      manifest.audio.sampleRate = sampleRateHz;
       manifest.audio.extractedAt = new Date().toISOString();
       manifest.updatedAt = new Date().toISOString();
       saveManifest(env, tenantId, jobId, manifest);

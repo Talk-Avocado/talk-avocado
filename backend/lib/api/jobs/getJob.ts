@@ -1,5 +1,9 @@
 import { LoggingWrapper } from "../../logging.js";
-import { currentEnv } from "../../storage.js";
+import {
+  currentEnv,
+  storageRoot,
+  pathFor as storagePathFor,
+} from "../../storage.js";
 import { loadManifest, manifestKey } from "../../manifest.js";
 // Manifest type is used in loadManifest return type
 
@@ -110,12 +114,62 @@ export async function getJob(
 
     // Load manifest to get artifact pointers
     const env = currentEnv();
+
+    // Debug logging for path resolution issue
+    const manifestKeyPath = manifestKey(env, tenantId, jobId);
+    const resolvedPath = storagePathFor(manifestKeyPath);
+
+    logger.info("Attempting to load manifest", {
+      env,
+      tenantId,
+      jobId,
+      manifestKey: manifestKeyPath,
+      resolvedPath,
+      MEDIA_STORAGE_PATH: process.env.MEDIA_STORAGE_PATH || "(not set)",
+      cwd: process.cwd(),
+      storageRoot: storageRoot(),
+    });
+
     let manifest;
     try {
       manifest = loadManifest(env, tenantId, jobId);
     } catch (e) {
+      const errorMsg = e instanceof Error ? e.message : String(e);
+
+      // Enhanced error logging
+      logger.error("Failed to load manifest", {
+        tenantId,
+        jobId,
+        error: errorMsg,
+        attemptedPath: resolvedPath,
+        MEDIA_STORAGE_PATH: process.env.MEDIA_STORAGE_PATH || "(not set)",
+        cwd: process.cwd(),
+      });
+
+      // Distinguish between file not found vs validation error
+      if (
+        errorMsg.includes("Invalid manifest") ||
+        errorMsg.includes("schema")
+      ) {
+        logger.error("Manifest validation failed for job", {
+          tenantId,
+          jobId,
+          error: errorMsg,
+        });
+        return {
+          statusCode: 500,
+          body: JSON.stringify({
+            error: "Job manifest is invalid",
+            details: errorMsg,
+          }),
+        };
+      }
       // If manifest truly missing, respond 404
-      logger.warn("Manifest not found for job", { tenantId, jobId });
+      logger.warn("Manifest not found for job", {
+        tenantId,
+        jobId,
+        error: errorMsg,
+      });
       return {
         statusCode: 404,
         body: JSON.stringify({ error: "Job not found" }),
@@ -138,8 +192,12 @@ export async function getJob(
       } as any;
     }
 
-    const manifestKeyOut = dbItem ? dbItem.manifestKey : manifestKey(env, tenantId, jobId);
-    logger.info("Manifest loaded successfully", { manifestKey: manifestKeyOut });
+    const manifestKeyOut = dbItem
+      ? dbItem.manifestKey
+      : manifestKey(env, tenantId, jobId);
+    logger.info("Manifest loaded successfully", {
+      manifestKey: manifestKeyOut,
+    });
 
     // Derive artifact pointers from manifest
     const artifacts: GetJobResponse["artifacts"] = {};
@@ -164,7 +222,7 @@ export async function getJob(
       jobId: manifest.jobId,
       tenantId: manifest.tenantId,
       status: manifest.status,
-  artifacts,
+      artifacts,
       manifestKey: manifestKeyOut,
       updatedAt: manifest.updatedAt,
     };

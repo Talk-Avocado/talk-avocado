@@ -8,7 +8,7 @@
     "test": "node --test dist/**/*.test.js",
     "build": "tsc",
     "dev": "tsx watch lib/index.ts",
-    "dev:api": "tsx watch lib/server.ts",
+    "dev:api": "cross-env TALKAVOCADO_ENV=dev MEDIA_STORAGE_PATH=D:\\talk-avocado\\storage tsx watch lib/server.ts",
     "start:api": "node dist/server.js",
     "lint": "eslint lib --ext .ts"
   },

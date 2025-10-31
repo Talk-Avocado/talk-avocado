@@ -4,7 +4,7 @@ import addFormats from "ajv-formats";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Manifest } from "./types.js";
-import { keyFor, pathFor, ensureDirForFile } from "./storage.js";
+import { keyFor, pathFor, ensureDirForFile, storageRoot } from "./storage.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -44,12 +44,60 @@ export function loadManifest(
   jobId: string
 ): Manifest {
   const p = pathFor(manifestKey(env, tenantId, jobId));
-  const obj = JSON.parse(fs.readFileSync(p, "utf-8"));
-  if (!validate(obj)) {
-    const msg = ajv.errorsText(validate.errors || []);
-    throw new Error("Invalid manifest: " + msg);
+
+  // Enhanced error handling with detailed path information
+  if (!fs.existsSync(p)) {
+    const errorMsg =
+      `Manifest file not found at: ${p}\n` +
+      `Storage root: ${storageRoot()}\n` +
+      `Manifest key: ${manifestKey(env, tenantId, jobId)}\n` +
+      `MEDIA_STORAGE_PATH: ${process.env.MEDIA_STORAGE_PATH || "(not set)"}\n` +
+      `Current working directory: ${process.cwd()}`;
+    throw new Error(errorMsg);
   }
-  return obj;
+
+  try {
+    // Read file and strip BOM if present, normalize line endings
+    let content = fs.readFileSync(p, "utf-8");
+
+    // Remove BOM (Byte Order Mark) if present
+    if (content.charCodeAt(0) === 0xfeff) {
+      content = content.slice(1);
+    }
+
+    // Trim whitespace (shouldn't be necessary but helps)
+    content = content.trim();
+
+    // Parse JSON
+    const obj = JSON.parse(content);
+
+    if (!validate(obj)) {
+      const msg = ajv.errorsText(validate.errors || []);
+      throw new Error("Invalid manifest: " + msg);
+    }
+    return obj;
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("not found")) {
+      throw error; // Re-throw our custom error
+    }
+    // Other errors (JSON parse, validation) - add context
+    const errorMsg = error instanceof Error ? error.message : String(error);
+
+    // Enhanced error reporting for JSON parse errors
+    if (error instanceof SyntaxError) {
+      // Try to read first few bytes to help debug encoding issues
+      const rawBytes = fs.readFileSync(p);
+      const preview = rawBytes
+        .slice(0, 50)
+        .toString("utf-8")
+        .replace(/\r?\n/g, "\\n");
+      throw new Error(
+        `Failed to parse JSON from ${p}: ${errorMsg}\nFile preview (first 50 bytes): ${preview}`
+      );
+    }
+
+    throw new Error(`Failed to load manifest from ${p}: ${errorMsg}`);
+  }
 }
 
 export function saveManifest(
