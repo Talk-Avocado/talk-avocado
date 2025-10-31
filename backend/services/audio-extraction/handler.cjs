@@ -77,15 +77,20 @@ class FFmpegRuntime {
     this.tracer = tracer;
   }
   
-  async executeCommand(command, operation) {
-    this.logger.info(`Executing FFmpeg command: ${command}`);
+  async executeCommand(args, operation) {
+    // Accept either array of args or string command (for backward compatibility)
+    const commandArgs = Array.isArray(args) ? args : args.split(' ').filter(arg => arg.length > 0);
+    // Remove 'ffmpeg' from args if present (we'll call it directly)
+    const ffmpegArgs = commandArgs[0] === 'ffmpeg' ? commandArgs.slice(1) : commandArgs;
+    
+    this.logger.info(`Executing FFmpeg command: ffmpeg ${ffmpegArgs.join(' ')}`);
     
     try {
       // Check if FFmpeg is available
       execFileSync('ffmpeg', ['-version'], { stdio: 'ignore' });
       
-      // Execute the command
-      execFileSync('sh', ['-c', command], { stdio: 'pipe' });
+      // Execute the command directly (cross-platform)
+      execFileSync('ffmpeg', ffmpegArgs, { stdio: 'pipe' });
       
       this.logger.info(`FFmpeg command completed: ${operation}`);
       return { stdout: '', stderr: '', duration: 0 };
@@ -142,6 +147,9 @@ exports.handler = async (event, context) => {
     const bitrate = process.env.AUDIO_BITRATE || '192k';
     const sampleRate = String(process.env.AUDIO_SAMPLE_RATE || '44100');
 
+    // Ensure output directory exists before FFmpeg execution
+    ensureDirForFile(outputPath);
+
     // Extract audio (mp3) - following guide exactly
     try {
       // Check if FFmpeg is available first
@@ -154,7 +162,7 @@ exports.handler = async (event, context) => {
         '-b:a', bitrate,
         '-ar', sampleRate,
         outputPath,
-      ].join(' '), 'AudioExtraction');
+      ], 'AudioExtraction');
     } catch (ffmpegErr) {
       // For testing, if FFmpeg is not available, create dummy audio file
       if (ffmpegErr.message.includes('ENOENT') || ffmpegErr.message.includes('not found')) {

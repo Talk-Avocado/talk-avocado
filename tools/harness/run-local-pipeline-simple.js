@@ -81,7 +81,7 @@ async function main() {
         m.audio = {
           key: keyFor(env, tenantId, jobId, 'audio', `${jobId}.mp3`),
           codec: 'mp3',
-          durationSec: 30.5,
+          durationSec: 43.9,
           extractedAt: new Date().toISOString()
         };
       } else if (handler.name === 'transcription') {

@@ -105,12 +105,37 @@ api_up() {
   if ! ensure_project_root; then
     return 1
   fi
+  
+  # On Windows, use PowerShell script for proper environment variable handling
+  if [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "cygwin" ]] || [[ -n "$WINDIR" ]] || [[ "$OS" == "Windows_NT" ]]; then
+    echo -e "${CYAN}Detected Windows - using PowerShell script for proper environment setup...${NC}"
+    # Get project root (where this script is executed from)
+    local PROJECT_ROOT
+    PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+    local PS_SCRIPT="${PROJECT_ROOT}/scripts/start-api-server.ps1"
+    
+    if [[ -f "$PS_SCRIPT" ]]; then
+      # Convert path to Windows format if needed (for Git Bash / MSYS)
+      if command -v cygpath &> /dev/null; then
+        PS_SCRIPT=$(cygpath -w "$PS_SCRIPT" 2>/dev/null || echo "$PS_SCRIPT")
+      fi
+      echo -e "${GREEN}Running: powershell.exe -File \"${PS_SCRIPT}\"${NC}"
+      powershell.exe -File "$PS_SCRIPT"
+      return $?
+    else
+      echo -e "${YELLOW}Warning: PowerShell script not found at ${PS_SCRIPT}${NC}"
+      echo -e "${YELLOW}Falling back to manual environment setup...${NC}"
+    fi
+  fi
+  
+  # Unix/Linux or fallback for Windows
   # Defaults if not provided
   export TALKAVOCADO_ENV="${TALKAVOCADO_ENV:-dev}"
   # Resolve MEDIA_STORAGE_PATH to absolute project storage directory
   local PROJECT_ROOT
   PROJECT_ROOT="$(git rev-parse --show-toplevel)"
-  export MEDIA_STORAGE_PATH="${MEDIA_STORAGE_PATH:-${PROJECT_ROOT}/storage}"
+  MEDIA_STORAGE_PATH="${MEDIA_STORAGE_PATH:-${PROJECT_ROOT}/storage}"
+  export MEDIA_STORAGE_PATH
   echo "TALKAVOCADO_ENV=${TALKAVOCADO_ENV}"
   echo "MEDIA_STORAGE_PATH=${MEDIA_STORAGE_PATH}"
   (
