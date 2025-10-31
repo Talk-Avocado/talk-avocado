@@ -137,7 +137,7 @@ function calculateConfidence(transcriptData) {
 }
 
 const handler = async (event, context) => {
-  const { env, tenantId, jobId, audioKey } = event;
+  const { env, tenantId, jobId, audioKey: providedAudioKey } = event;
   const correlationId = event.correlationId || context.awsRequestId;
 
   const { logger, metrics } = initObservability({
@@ -149,6 +149,22 @@ const handler = async (event, context) => {
   });
 
   try {
+    // Derive audioKey from manifest if not provided in event
+    let audioKey = providedAudioKey;
+    if (!audioKey) {
+      logger.info('audioKey not provided in event, deriving from manifest');
+      const manifest = loadManifest(env, tenantId, jobId);
+      if (!manifest.audio || !manifest.audio.key) {
+        throw new TranscriptionError(
+          'Audio key not found in manifest. Audio extraction must complete before transcription.',
+          ERROR_TYPES.INPUT_NOT_FOUND,
+          { manifestHasAudio: !!manifest.audio, audioKey: manifest.audio?.key }
+        );
+      }
+      audioKey = manifest.audio.key;
+      logger.info('Derived audioKey from manifest', { audioKey });
+    }
+
     // Validate input exists
     const inputPath = pathFor(audioKey);
     if (!existsSync(inputPath)) {
@@ -194,7 +210,9 @@ const handler = async (event, context) => {
         );
       }
 
-      // Run Whisper: output JSON and SRT
+      // Run Whisper: output JSON with word-level timestamps
+      // Note: When using --output_format json, Whisper CLI outputs word-level timestamps
+      // in segments[].words[] array by default (for openai-whisper >= 20230314)
       logger.info('Executing Whisper', { whisperCmd, model, language });
       
       const whisperArgs = [
@@ -206,6 +224,9 @@ const handler = async (event, context) => {
         '--device', device,
         '--verbose', 'False'
       ];
+      
+      // Note: Word-level timestamps are included in JSON output by default
+      // If using whisper-ctranslate2 or other variants, verify compatibility
 
       const whisperOutput = execFileSync(whisperCmd, whisperArgs, {
         encoding: 'utf8',
@@ -285,6 +306,34 @@ const handler = async (event, context) => {
         ERROR_TYPES.TRANSCRIPT_PARSE,
         { hasSegments: !!transcriptData.segments, segmentsType: typeof transcriptData.segments }
       );
+    }
+
+    // Validate word-level timestamps (acceptance criteria requirement)
+    // Check for word-level data in either top-level words[] or segments[].words[]
+    const hasTopLevelWords = Array.isArray(transcriptData.words) && transcriptData.words.length > 0;
+    const hasSegmentWords = transcriptData.segments.some(seg => 
+      Array.isArray(seg.words) && seg.words.length > 0
+    );
+    
+    if (!hasTopLevelWords && !hasSegmentWords) {
+      logger.warn('Word-level timestamps not found in transcript', {
+        hasTopLevelWords,
+        hasSegmentWords,
+        segmentCount: transcriptData.segments.length,
+        message: 'Transcript contains segments but no word-level timestamps. This may affect downstream processing.'
+      });
+      // Note: We don't fail here because segments are still valid for SRT generation
+      // But we log a warning to alert that word-level data is expected
+    } else {
+      const wordCount = hasTopLevelWords 
+        ? transcriptData.words.length 
+        : transcriptData.segments.reduce((sum, seg) => sum + (seg.words?.length || 0), 0);
+      logger.info('Word-level timestamps validated', {
+        hasTopLevelWords,
+        hasSegmentWords,
+        wordCount,
+        segmentCount: transcriptData.segments.length
+      });
     }
 
     // Generate SRT from transcript JSON

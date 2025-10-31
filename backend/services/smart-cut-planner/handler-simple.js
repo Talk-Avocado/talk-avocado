@@ -3,7 +3,7 @@
 import { planCuts } from './planner-logic.js';
 import fs from 'node:fs';
 import path from 'node:path';
-import { logger } from "scripts/logger.js";
+import { initObservability } from '../../dist/init-observability.js';
 
 class PlannerError extends Error {
   constructor(message, type, details = {}) {
@@ -77,6 +77,14 @@ export const handler = async (event, context) => {
   const { env, tenantId, jobId, transcriptKey } = event;
   const correlationId = event.correlationId || context.awsRequestId;
   
+  const { logger } = initObservability({
+    serviceName: 'SmartCutPlanner',
+    correlationId,
+    tenantId,
+    jobId,
+    step: 'smart-cut-planner',
+  });
+
   logger.info(`[SmartCutPlanner] Processing: env=${env}, tenant=${tenantId}, job=${jobId}`);
   logger.info(`[SmartCutPlanner] Transcript key: ${transcriptKey}`);
 

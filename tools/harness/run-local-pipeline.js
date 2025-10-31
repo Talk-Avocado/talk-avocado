@@ -63,7 +63,7 @@ async function main() {
   // 3. Invoke handlers in sequence
   const handlers = [
     { name: 'audio-extraction', path: '../../backend/services/audio-extraction/handler.cjs' },
-    { name: 'transcription', path: '../../backend/services/transcription/handler' },
+    { name: 'transcription', path: '../../backend/services/transcription/handler.js' },
     { name: 'smart-cut-planner', path: '../../backend/services/smart-cut-planner/handler-simple.js' },
     { name: 'video-render-engine', path: '../../backend/services/video-render-engine/handler-simple.cjs' }
   ];
@@ -75,6 +75,16 @@ async function main() {
       
       // Build event based on handler requirements
       let event = { env, tenantId, jobId, inputKey };
+      
+      // Transcription needs audioKey from manifest (after audio extraction)
+      if (handler.name === 'transcription') {
+        const manifest = loadManifest(env, tenantId, jobId);
+        const audioKey = manifest.audio?.key;
+        if (!audioKey) {
+          throw new Error(`Audio key not found in manifest for transcription. Audio extraction must complete first.`);
+        }
+        event = { env, tenantId, jobId, audioKey };
+      }
       
       // Smart cut planner needs transcriptKey
       if (handler.name === 'smart-cut-planner') {

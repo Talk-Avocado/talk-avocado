@@ -4,7 +4,7 @@
   "description": "TalkAvocado video processing pipeline",
   "type": "module",
   "scripts": {
-    "test": "bash scripts/test.sh",
+    "test": "node scripts/test-runner.js",
     "setup": "bash scripts/setup.sh",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
