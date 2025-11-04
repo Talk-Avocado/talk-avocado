@@ -115,3 +115,4 @@ If environment variables still don't work, you can:
 - ✅ **Debugging added**: Warning message detects wrong path resolution
 - ⏳ **Testing needed**: Restart server and verify Step 6 works
 
+

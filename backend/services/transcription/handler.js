@@ -3,8 +3,9 @@ import { initObservability } from '../../dist/init-observability.js';
 import { keyFor, pathFor, writeFileAtKey } from '../../dist/storage.js';
 import { loadManifest, saveManifest } from '../../dist/manifest.js';
 import { execFileSync } from 'node:child_process';
-import { existsSync, unlinkSync, readFileSync } from 'node:fs';
+import { existsSync, unlinkSync, readFileSync, mkdirSync, readdirSync } from 'node:fs';
 import { basename, dirname, join, extname, resolve } from 'node:path';
+import { tmpdir } from 'node:os';
 
 // Error types for better error handling
 class TranscriptionError extends Error {
@@ -23,7 +24,11 @@ const ERROR_TYPES = {
   TRANSCRIPT_PARSE: 'TRANSCRIPT_PARSE',
   SRT_GENERATION: 'SRT_GENERATION',
   MANIFEST_UPDATE: 'MANIFEST_UPDATE',
-  STORAGE_ERROR: 'STORAGE_ERROR'
+  STORAGE_ERROR: 'STORAGE_ERROR',
+  FFMPEG_NOT_AVAILABLE: 'FFMPEG_NOT_AVAILABLE',
+  CHUNK_SEGMENTATION: 'CHUNK_SEGMENTATION',
+  CHUNK_TRANSCRIPTION_FAILED: 'CHUNK_TRANSCRIPTION_FAILED',
+  TIMESTAMP_MERGE: 'TIMESTAMP_MERGE'
 };
 
 /**
@@ -138,38 +143,390 @@ function calculateConfidence(transcriptData) {
 
 /**
  * Detect available Whisper command variant
- * Checks for whisper-ctranslate2 first (faster), then falls back to standard whisper
- * @param {string} preferredCmd - Preferred command from WHISPER_CMD env var
- * @returns {string} Available whisper command
+ * Only supports whisper-ctranslate2 for optimal performance (2-4x faster than standard whisper)
+ * @param {string} preferredCmd - Preferred command from WHISPER_CMD env var (defaults to whisper-ctranslate2)
+ * @returns {string} Available whisper command (always whisper-ctranslate2)
+ * @throws {Error} If whisper-ctranslate2 is not available
  */
 function detectWhisperCommand(preferredCmd) {
-  // If WHISPER_CMD is explicitly set, use it
-  if (preferredCmd && preferredCmd !== 'whisper' && preferredCmd !== 'whisper-ctranslate2') {
-    return preferredCmd;
+  // Only support whisper-ctranslate2 (no fallback to standard whisper)
+  // If WHISPER_CMD is explicitly set to something other than whisper-ctranslate2, reject it
+  if (preferredCmd && preferredCmd !== 'whisper-ctranslate2') {
+    throw new Error(
+      `Only whisper-ctranslate2 is supported. ` +
+      `Set WHISPER_CMD=whisper-ctranslate2 or leave unset (defaults to whisper-ctranslate2). ` +
+      `Standard whisper is not supported due to performance limitations (too slow for large files).`
+    );
   }
 
-  // Check for whisper-ctranslate2 first (preferred for performance)
-  if (!preferredCmd || preferredCmd === 'whisper-ctranslate2') {
-    try {
-      execFileSync('whisper-ctranslate2', ['--version'], { encoding: 'utf8', stdio: 'pipe' });
-      return 'whisper-ctranslate2';
-    } catch (err) {
-      // whisper-ctranslate2 not available, continue to check standard whisper
+  // Check for whisper-ctranslate2
+  try {
+    execFileSync('whisper-ctranslate2', ['--version'], { encoding: 'utf8', stdio: 'pipe' });
+    return 'whisper-ctranslate2';
+  } catch (err) {
+    // Fail fast with clear error message
+    throw new Error(
+      `whisper-ctranslate2 not available. Install with: pip install whisper-ctranslate2. ` +
+      `Error: ${err.message}. ` +
+      `Note: Standard whisper is not supported due to performance limitations.`
+    );
+  }
+}
+
+/**
+ * Check if FFmpeg is available (required for chunking)
+ * @returns {boolean} True if FFmpeg is available
+ */
+function checkFFmpegAvailable() {
+  try {
+    execFileSync('ffmpeg', ['-version'], { encoding: 'utf8', stdio: 'pipe' });
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
+/**
+ * Check if FFprobe is available (required for duration detection)
+ * @returns {boolean} True if FFprobe is available
+ */
+function checkFFprobeAvailable() {
+  try {
+    execFileSync('ffprobe', ['-version'], { encoding: 'utf8', stdio: 'pipe' });
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
+/**
+ * Determine if chunking is needed based on audio duration
+ * @param {number} durationSeconds - Audio duration in seconds
+ * @returns {boolean} True if chunking is needed
+ */
+function shouldChunkAudio(durationSeconds) {
+  const chunkThreshold = Number(process.env.TRANSCRIPT_CHUNK_THRESHOLD || 1800); // Default: 30 minutes
+  return durationSeconds > chunkThreshold;
+}
+
+/**
+ * Split audio file into chunks using FFmpeg
+ * @param {string} inputPath - Path to input audio file
+ * @param {number} chunkDurationSec - Duration of each chunk in seconds
+ * @param {string} outputDir - Directory to store chunk files
+ * @returns {Array<{path: string, startTime: number, endTime: number}>} Array of chunk info
+ */
+function splitAudioIntoChunks(inputPath, chunkDurationSec, outputDir) {
+  if (!checkFFmpegAvailable()) {
+    throw new TranscriptionError(
+      'FFmpeg not available. Required for audio segmentation.',
+      ERROR_TYPES.FFMPEG_NOT_AVAILABLE,
+      { inputPath }
+    );
+  }
+
+  // Ensure output directory exists
+  mkdirSync(outputDir, { recursive: true });
+
+  const chunkTemplate = join(outputDir, 'chunk-%03d.mp3');
+  const chunkList = [];
+
+  try {
+    // Use FFmpeg segment muxer to split audio into chunks
+    // Re-encode with libmp3lame to ensure consistent format
+    const ffmpegArgs = [
+      '-i', inputPath,
+      '-f', 'segment',
+      '-segment_time', String(chunkDurationSec),
+      '-segment_format', 'mp3',
+      '-c:a', 'libmp3lame',
+      '-b:a', '192k',
+      '-ar', '44100',
+      '-reset_timestamps', '1',
+      '-y',
+      chunkTemplate
+    ];
+
+    execFileSync('ffmpeg', ffmpegArgs, { encoding: 'utf8', stdio: 'pipe' });
+
+    // Find all generated chunk files
+    const files = readdirSync(outputDir)
+      .filter(f => f.startsWith('chunk-') && f.endsWith('.mp3'))
+      .map(f => join(outputDir, f))
+      .sort();
+
+    // Get duration for each chunk and calculate timestamps
+    let currentTime = 0;
+    for (const chunkPath of files) {
+      try {
+        const chunkDuration = getAudioDuration(chunkPath);
+        chunkList.push({
+          path: chunkPath,
+          startTime: currentTime,
+          endTime: currentTime + chunkDuration,
+          duration: chunkDuration
+        });
+        currentTime += chunkDuration;
+      } catch (err) {
+        // Skip chunks that can't be probed (likely very short or corrupted)
+        // Note: logger not available here, will log at handler level
+        console.warn(`Skipping chunk (could not probe): ${chunkPath}`, err.message);
+      }
+    }
+
+    if (chunkList.length === 0) {
+      throw new TranscriptionError(
+        'No valid chunks created from audio segmentation',
+        ERROR_TYPES.CHUNK_SEGMENTATION,
+        { inputPath, chunkDurationSec, outputDir }
+      );
+    }
+
+    return chunkList;
+  } catch (err) {
+    if (err instanceof TranscriptionError) {
+      throw err;
+    }
+    throw new TranscriptionError(
+      `Failed to split audio into chunks: ${err.message}`,
+      ERROR_TYPES.CHUNK_SEGMENTATION,
+      { inputPath, chunkDurationSec, outputDir, error: err.message }
+    );
+  }
+}
+
+/**
+ * Transcribe a single audio chunk using Whisper
+ * @param {string} chunkPath - Path to chunk audio file
+ * @param {string} whisperCmd - Whisper command to use
+ * @param {string} model - Whisper model to use
+ * @param {string} language - Language code
+ * @param {string} device - Device (cpu/cuda)
+ * @param {string} outputDir - Directory for Whisper output
+ * @returns {Object} Transcript data from Whisper
+ */
+function transcribeChunk(chunkPath, whisperCmd, model, language, device, outputDir) {
+  try {
+    // Only whisper-ctranslate2 is supported (2-4x faster than standard whisper)
+    const whisperArgs = [
+      chunkPath,
+      '--model', model,
+      '--language', language,
+      '--output_format', 'json',
+      '--output_dir', outputDir,
+      '--device', device,
+      '--verbose', 'False'
+    ];
+
+    const whisperOutput = execFileSync('whisper-ctranslate2', whisperArgs, {
+      encoding: 'utf8',
+      maxBuffer: 50 * 1024 * 1024, // 50MB buffer for large outputs
+      timeout: 3600000 // 60 min timeout (medium/large models on CPU can take 7-10 min per 5-min chunk)
+    });
+
+    // Read generated JSON (Whisper writes to <basename>.json)
+    const jsonBasename = basename(chunkPath, extname(chunkPath)) + '.json';
+    const whisperJsonPath = join(outputDir, jsonBasename);
+
+    if (!existsSync(whisperJsonPath)) {
+      throw new TranscriptionError(
+        `Whisper output not found at expected path: ${whisperJsonPath}`,
+        ERROR_TYPES.CHUNK_TRANSCRIPTION_FAILED,
+        { expectedPath: whisperJsonPath, outputDir, chunkPath }
+      );
+    }
+
+    const transcriptData = JSON.parse(readFileSync(whisperJsonPath, 'utf8'));
+
+    // Validate transcript structure
+    if (!transcriptData.segments || !Array.isArray(transcriptData.segments)) {
+      throw new TranscriptionError(
+        'Invalid transcript structure: missing or invalid segments array',
+        ERROR_TYPES.CHUNK_TRANSCRIPTION_FAILED,
+        { chunkPath, hasSegments: !!transcriptData.segments }
+      );
+    }
+
+    return transcriptData;
+  } catch (err) {
+    if (err instanceof TranscriptionError) {
+      throw err;
+    }
+    throw new TranscriptionError(
+      `Chunk transcription failed: ${err.message}`,
+      ERROR_TYPES.CHUNK_TRANSCRIPTION_FAILED,
+      { chunkPath, error: err.message }
+    );
+  }
+}
+
+/**
+ * Merge chunk transcripts with proper timestamp offsets
+ * @param {Array<{chunkIndex: number, startTime: number, endTime: number, transcript: Object}>} chunkTranscripts - Array of chunk transcript data
+ * @returns {Object} Merged transcript data with adjusted timestamps
+ */
+function mergeChunkTranscripts(chunkTranscripts) {
+  if (!chunkTranscripts || chunkTranscripts.length === 0) {
+    throw new TranscriptionError(
+      'No chunk transcripts to merge',
+      ERROR_TYPES.TIMESTAMP_MERGE,
+      { chunkCount: 0 }
+    );
+  }
+
+  // Sort chunks by start time to ensure chronological order
+  const sortedChunks = chunkTranscripts.sort((a, b) => a.startTime - b.startTime);
+
+  const mergedSegments = [];
+  let totalWordCount = 0;
+  let totalConfidence = 0;
+  let confidenceCount = 0;
+  let detectedLanguage = null;
+
+  for (const chunkData of sortedChunks) {
+    const { chunkIndex, startTime: chunkStartTime, transcript } = chunkData;
+    const chunkOffset = chunkStartTime; // Offset to add to chunk timestamps
+
+    if (!transcript.segments || !Array.isArray(transcript.segments)) {
+      throw new TranscriptionError(
+        `Chunk ${chunkIndex} has invalid transcript structure`,
+        ERROR_TYPES.TIMESTAMP_MERGE,
+        { chunkIndex, hasSegments: !!transcript.segments }
+      );
+    }
+
+    // Adjust segment timestamps by adding chunk offset
+    for (const segment of transcript.segments) {
+      const adjustedSegment = {
+        ...segment,
+        start: segment.start + chunkOffset,
+        end: segment.end + chunkOffset
+      };
+
+      // Adjust word-level timestamps if present
+      if (segment.words && Array.isArray(segment.words)) {
+        adjustedSegment.words = segment.words.map(word => ({
+          ...word,
+          start: word.start + chunkOffset,
+          end: word.end + chunkOffset
+        }));
+        totalWordCount += segment.words.length;
+      }
+
+      mergedSegments.push(adjustedSegment);
+    }
+
+    // Collect confidence and language info
+    if (transcript.segments.length > 0) {
+      for (const segment of transcript.segments) {
+        if (typeof segment.confidence === 'number') {
+          totalConfidence += segment.confidence;
+          confidenceCount++;
+        } else if (typeof segment.no_speech_prob === 'number') {
+          totalConfidence += (1 - segment.no_speech_prob);
+          confidenceCount++;
+        }
+      }
+    }
+
+    // Use language from first chunk (should be consistent)
+    if (!detectedLanguage && transcript.language) {
+      detectedLanguage = transcript.language;
     }
   }
 
-  // Fall back to standard whisper
-  if (!preferredCmd || preferredCmd === 'whisper') {
-    try {
-      execFileSync('whisper', ['--version'], { encoding: 'utf8', stdio: 'pipe' });
-      return 'whisper';
-    } catch (err) {
-      // Standard whisper not available either
+  // Sort merged segments by start time to ensure chronological order
+  mergedSegments.sort((a, b) => a.start - b.start);
+
+  // Verify no gaps or overlaps in timestamps (allow small tolerance)
+  for (let i = 1; i < mergedSegments.length; i++) {
+    const prevEnd = mergedSegments[i - 1].end;
+    const currStart = mergedSegments[i].start;
+    const gap = currStart - prevEnd;
+
+    // Allow small gaps/overlaps (±100ms) due to Whisper's segment boundaries
+    if (Math.abs(gap) > 0.1) {
+      // Log warning but don't fail (Whisper segments may have natural gaps)
+      console.warn(`Segment gap/overlap detected: ${gap.toFixed(3)}s between segments ${i - 1} and ${i}`);
     }
   }
 
-  // If explicitly requested command not found, return it anyway (will fail with clear error)
-  return preferredCmd || 'whisper';
+  // Calculate average confidence
+  const averageConfidence = confidenceCount > 0 ? totalConfidence / confidenceCount : 0;
+
+  // Build merged transcript object
+  const mergedTranscript = {
+    language: detectedLanguage || 'en',
+    segments: mergedSegments,
+    text: mergedSegments.map(s => s.text).join(' ').trim()
+  };
+
+  // Add word count if available
+  if (totalWordCount > 0) {
+    mergedTranscript.wordCount = totalWordCount;
+  }
+
+  return mergedTranscript;
+}
+
+/**
+ * Get audio duration in seconds using FFprobe
+ * @param {string} audioPath - Path to audio file
+ * @returns {number} Duration in seconds
+ */
+function getAudioDuration(audioPath) {
+  if (!checkFFprobeAvailable()) {
+    throw new TranscriptionError(
+      'FFprobe not available. Required for duration detection.',
+      ERROR_TYPES.FFMPEG_NOT_AVAILABLE,
+      { audioPath }
+    );
+  }
+
+  try {
+    const probeJson = execFileSync(
+      'ffprobe',
+      [
+        '-v', 'quiet',
+        '-print_format', 'json',
+        '-show_format',
+        '-show_streams',
+        audioPath
+      ],
+      { encoding: 'utf8', stdio: 'pipe' }
+    );
+
+    const probe = JSON.parse(probeJson);
+    
+    // Try to get duration from format first
+    if (probe.format && probe.format.duration) {
+      return parseFloat(probe.format.duration);
+    }
+
+    // Fall back to stream duration
+    if (probe.streams && probe.streams.length > 0) {
+      for (const stream of probe.streams) {
+        if (stream.codec_type === 'audio' && stream.duration) {
+          return parseFloat(stream.duration);
+        }
+      }
+    }
+
+    throw new TranscriptionError(
+      'Could not determine audio duration from FFprobe output',
+      ERROR_TYPES.CHUNK_SEGMENTATION,
+      { audioPath, probe }
+    );
+  } catch (err) {
+    if (err instanceof TranscriptionError) {
+      throw err;
+    }
+    throw new TranscriptionError(
+      `Failed to get audio duration: ${err.message}`,
+      ERROR_TYPES.CHUNK_SEGMENTATION,
+      { audioPath, error: err.message }
+    );
+  }
 }
 
 const handler = async (event, context) => {
@@ -211,7 +568,9 @@ const handler = async (event, context) => {
       );
     }
 
-    const model = process.env.WHISPER_MODEL || 'medium';
+    // Default to 'base' for CPU (faster, still good accuracy)
+    // Use 'medium' or 'large' only with GPU for better accuracy
+    const model = process.env.WHISPER_MODEL || 'base';
     const language = process.env.WHISPER_LANGUAGE || 'en';
     const device = process.env.WHISPER_DEVICE || 'cpu';
 
@@ -226,7 +585,28 @@ const handler = async (event, context) => {
     const transcriptJsonKey = keyFor(env, tenantId, jobId, 'transcripts', 'transcript.json');
     const transcriptSrtKey = keyFor(env, tenantId, jobId, 'transcripts', 'captions.source.srt');
     const transcriptJsonPath = pathFor(transcriptJsonKey);
-    // const transcriptSrtPath = pathFor(transcriptSrtKey); // Not used currently
+    const outputDir = dirname(transcriptJsonPath);
+
+    // Check audio duration and decide if chunking is needed
+    let audioDuration;
+    let useChunking = false;
+    try {
+      audioDuration = getAudioDuration(inputPath);
+      useChunking = shouldChunkAudio(audioDuration);
+      logger.info('Audio duration check', {
+        durationSeconds: audioDuration,
+        durationMinutes: (audioDuration / 60).toFixed(2),
+        useChunking,
+        chunkThreshold: process.env.TRANSCRIPT_CHUNK_THRESHOLD || 1800
+      });
+    } catch (durationErr) {
+      // If duration detection fails, log warning but continue with standard flow
+      logger.warn('Could not determine audio duration, using standard flow', {
+        error: durationErr.message
+      });
+      audioDuration = null;
+      useChunking = false;
+    }
 
     // Execute Whisper transcription
     // Note: Assumes whisper CLI is available (whisper or whisper-ctranslate2)
@@ -236,88 +616,251 @@ const handler = async (event, context) => {
     try {
       // Detect available whisper command (prefers whisper-ctranslate2 for performance)
       const preferredCmd = process.env.WHISPER_CMD;
-      whisperCmd = detectWhisperCommand(preferredCmd);
-      const outputDir = dirname(transcriptJsonPath);
       
-      logger.info('Detected Whisper command', { whisperCmd, preferredCmd });
-      
-      // Check if detected Whisper command is available
       try {
-        const versionArgs = whisperCmd === 'whisper-ctranslate2' ? ['--version'] : ['--version'];
-        execFileSync(whisperCmd, versionArgs, { encoding: 'utf8', stdio: 'pipe' });
-      } catch (checkErr) {
-        // Provide helpful error message based on which command was requested
-        const installCmd = whisperCmd === 'whisper-ctranslate2' 
-          ? 'pip install whisper-ctranslate2' 
-          : 'pip install openai-whisper';
-        const altInstallCmd = whisperCmd === 'whisper-ctranslate2'
-          ? 'pip install openai-whisper'
-          : 'pip install whisper-ctranslate2';
-        
+        whisperCmd = detectWhisperCommand(preferredCmd);
+      } catch (detectErr) {
+        // If detection fails (e.g., whisper-ctranslate2 explicitly requested but not available)
         throw new TranscriptionError(
-          `Whisper command not found: ${whisperCmd}. Install with: ${installCmd} (or use alternative: ${altInstallCmd})`,
+          `Whisper command detection failed: ${detectErr.message}`,
           ERROR_TYPES.WHISPER_NOT_AVAILABLE,
-          { whisperCmd, installCmd, altInstallCmd }
+          { preferredCmd, error: detectErr.message }
+        );
+      }
+      
+      logger.info('Detected Whisper command', { whisperCmd, preferredCmd, variant: 'ctranslate2 (fast)' });
+      
+      // Verify whisper-ctranslate2 is available (should already be verified in detectWhisperCommand)
+      // Double-check for additional safety
+      try {
+        execFileSync('whisper-ctranslate2', ['--version'], { encoding: 'utf8', stdio: 'pipe' });
+      } catch (checkErr) {
+        throw new TranscriptionError(
+          `whisper-ctranslate2 not available. Install with: pip install whisper-ctranslate2. ` +
+          `Error: ${checkErr.message}. ` +
+          `Note: Only whisper-ctranslate2 is supported (standard whisper is too slow for production).`,
+          ERROR_TYPES.WHISPER_NOT_AVAILABLE,
+          { whisperCmd, installCmd: 'pip install whisper-ctranslate2' }
         );
       }
 
-      // Run Whisper: output JSON with word-level timestamps
-      // Note: When using --output_format json, Whisper CLI outputs word-level timestamps
-      // in segments[].words[] array by default (for openai-whisper >= 20230314)
-      // whisper-ctranslate2 also supports same format and is 2-4x faster
-      logger.info('Executing Whisper', { whisperCmd, model, language, variant: whisperCmd === 'whisper-ctranslate2' ? 'ctranslate2' : 'standard' });
-      
-      const whisperArgs = [
-        inputPath,
-        '--model', model,
-        '--language', language,
-        '--output_format', 'json',
-        '--output_dir', outputDir,
-        '--device', device,
-        '--verbose', 'False'
-      ];
-      
-      // Note: whisper-ctranslate2 may not output word-level timestamps by default
-      // Standard whisper includes word-level timestamps in JSON output
-      // If word-level timestamps are critical, consider using standard whisper
-      // or upgrading whisper-ctranslate2 to a version that supports them
-      
-      // Attempt to request word-level timestamps (may not be supported by all variants)
-      if (whisperCmd === 'whisper-ctranslate2') {
-        // whisper-ctranslate2 may not support --word_timestamps flag
+      // Branch: Use chunking flow or standard flow
+      if (useChunking) {
+        // CHUNKING FLOW: For large files (>30 minutes)
+        logger.info('Using chunking flow for large audio file', {
+          durationSeconds: audioDuration,
+          durationMinutes: (audioDuration / 60).toFixed(2),
+          chunkDuration: process.env.TRANSCRIPT_CHUNK_DURATION || 300
+        });
+
+        // Step 1: Split audio into chunks
+        const chunkDurationSec = Number(process.env.TRANSCRIPT_CHUNK_DURATION || 300); // Default: 5 minutes
+        const chunkDir = join(tmpdir(), `transcription-chunks-${jobId}`);
+        
+        let chunks;
+        try {
+          chunks = splitAudioIntoChunks(inputPath, chunkDurationSec, chunkDir);
+          logger.info('Audio split into chunks', {
+            chunkCount: chunks.length,
+            chunkDir
+          });
+        } catch (chunkErr) {
+          throw new TranscriptionError(
+            `Failed to split audio into chunks: ${chunkErr.message}`,
+            ERROR_TYPES.CHUNK_SEGMENTATION,
+            { inputPath, chunkDurationSec, error: chunkErr.message }
+          );
+        }
+
+        // Step 2: Transcribe each chunk
+        const chunkTranscripts = [];
+        const chunkErrors = [];
+        
+        for (let i = 0; i < chunks.length; i++) {
+          const chunk = chunks[i];
+          const chunkIndex = i + 1;
+          
+          try {
+            logger.info(`Transcribing chunk ${chunkIndex}/${chunks.length}`, {
+              chunkPath: chunk.path,
+              chunkStartTime: chunk.startTime,
+              chunkDuration: chunk.duration
+            });
+
+            const chunkTranscript = transcribeChunk(
+              chunk.path,
+              whisperCmd,
+              model,
+              language,
+              device,
+              outputDir
+            );
+
+            chunkTranscripts.push({
+              chunkIndex,
+              startTime: chunk.startTime,
+              endTime: chunk.endTime,
+              transcript: chunkTranscript
+            });
+
+            logger.info(`Chunk ${chunkIndex}/${chunks.length} transcribed successfully`, {
+              segmentCount: chunkTranscript.segments?.length || 0
+            });
+
+            // Track progress in manifest (optional)
+            metrics.addMetric('ChunkTranscriptionSuccess', 'Count', 1);
+          } catch (chunkErr) {
+            logger.error(`Chunk ${chunkIndex}/${chunks.length} transcription failed`, {
+              chunkPath: chunk.path,
+              error: chunkErr.message,
+              errorType: chunkErr.type || 'UNKNOWN'
+            });
+            
+            chunkErrors.push({
+              chunkIndex,
+              chunkPath: chunk.path,
+              error: chunkErr.message,
+              errorType: chunkErr.type || 'UNKNOWN'
+            });
+
+            metrics.addMetric('ChunkTranscriptionError', 'Count', 1);
+            
+            // Continue with other chunks if possible
+            // If too many chunks fail, we'll fail the entire operation
+            if (chunkErrors.length > chunks.length / 2) {
+              throw new TranscriptionError(
+                `Too many chunks failed (${chunkErrors.length}/${chunks.length}). Aborting.`,
+                ERROR_TYPES.CHUNK_TRANSCRIPTION_FAILED,
+                { chunkErrors, totalChunks: chunks.length }
+              );
+            }
+          }
+        }
+
+        // Step 3: Merge chunk transcripts
+        if (chunkTranscripts.length === 0) {
+          throw new TranscriptionError(
+            'No chunks transcribed successfully',
+            ERROR_TYPES.CHUNK_TRANSCRIPTION_FAILED,
+            { totalChunks: chunks.length, chunkErrors }
+          );
+        }
+
+        logger.info('Merging chunk transcripts', {
+          successfulChunks: chunkTranscripts.length,
+          totalChunks: chunks.length,
+          failedChunks: chunkErrors.length
+        });
+
+        try {
+          transcriptData = mergeChunkTranscripts(chunkTranscripts);
+          logger.info('Chunk transcripts merged successfully', {
+            totalSegments: transcriptData.segments?.length || 0,
+            wordCount: transcriptData.wordCount || 0,
+            language: transcriptData.language
+          });
+        } catch (mergeErr) {
+          throw new TranscriptionError(
+            `Failed to merge chunk transcripts: ${mergeErr.message}`,
+            ERROR_TYPES.TIMESTAMP_MERGE,
+            {
+              successfulChunks: chunkTranscripts.length,
+              totalChunks: chunks.length,
+              error: mergeErr.message
+            }
+          );
+        }
+
+        // Step 4: Clean up temporary chunk files and Whisper JSON outputs
+        try {
+          // Clean up chunk audio files
+          for (const chunk of chunks) {
+            if (existsSync(chunk.path)) {
+              unlinkSync(chunk.path);
+            }
+            
+            // Clean up Whisper JSON output for this chunk
+            const chunkBasename = basename(chunk.path, extname(chunk.path));
+            const chunkJsonPath = join(outputDir, `${chunkBasename}.json`);
+            if (existsSync(chunkJsonPath)) {
+              unlinkSync(chunkJsonPath);
+            }
+          }
+          
+          // Clean up chunk directory if empty
+          try {
+            const chunkFiles = readdirSync(chunkDir);
+            if (chunkFiles.length === 0) {
+              // Directory is empty, can be removed
+              // Note: fs.rmdirSync requires empty directory, but we'll leave it for now
+            }
+          } catch (dirErr) {
+            // Ignore directory cleanup errors
+          }
+          logger.info('Temporary chunk files cleaned up', { chunkCount: chunks.length });
+        } catch (cleanupErr) {
+          // Log warning but don't fail - cleanup is best effort
+          logger.warn('Failed to clean up some chunk files', {
+            error: cleanupErr.message,
+            chunkCount: chunks.length
+          });
+        }
+
+        // Write merged transcript to canonical location
+        writeFileAtKey(transcriptJsonKey, JSON.stringify(transcriptData, null, 2));
+        metrics.addMetric('ChunkedTranscriptionSuccess', 'Count', 1);
+        metrics.addMetric('TotalChunksProcessed', 'Count', chunks.length);
+      } else {
+        // STANDARD FLOW: For files <=30 minutes
+        logger.info('Using standard transcription flow', {
+          durationSeconds: audioDuration,
+          durationMinutes: audioDuration ? (audioDuration / 60).toFixed(2) : 'unknown'
+        });
+
+        // Only whisper-ctranslate2 is supported (2-4x faster than standard whisper)
+        // Note: whisper-ctranslate2 may not output word-level timestamps by default
         // This is a known limitation of the ctranslate2 implementation
         // The handler will gracefully handle missing word-level timestamps
-      } else {
-        // Standard whisper includes word-level timestamps in JSON output by default
-        // No additional flags needed
-      }
+        // Segment-level timestamps are always available and sufficient for SRT generation
+        logger.info('Executing Whisper', { whisperCmd, model, language, variant: 'ctranslate2 (fast)' });
+        
+        const whisperArgs = [
+          inputPath,
+          '--model', model,
+          '--language', language,
+          '--output_format', 'json',
+          '--output_dir', outputDir,
+          '--device', device,
+          '--verbose', 'False'
+        ];
 
-      const whisperOutput = execFileSync(whisperCmd, whisperArgs, {
-        encoding: 'utf8',
-        maxBuffer: 50 * 1024 * 1024, // 50MB buffer for large outputs
-        timeout: 600000 // 10 min timeout
-      });
+        const whisperOutput = execFileSync('whisper-ctranslate2', whisperArgs, {
+          encoding: 'utf8',
+          maxBuffer: 50 * 1024 * 1024, // 50MB buffer for large outputs
+          timeout: 3600000 // 60 min timeout (medium/large models on CPU can be slow)
+        });
 
-      logger.info('Whisper execution completed', { outputLength: whisperOutput.length });
+        logger.info('Whisper execution completed', { outputLength: whisperOutput.length });
 
-      // Read generated JSON (Whisper writes to <basename>.json)
-      const jsonBasename = basename(inputPath, extname(inputPath)) + '.json';
-      const whisperJsonPath = join(outputDir, jsonBasename);
+        // Read generated JSON (Whisper writes to <basename>.json)
+        const jsonBasename = basename(inputPath, extname(inputPath)) + '.json';
+        const whisperJsonPath = join(outputDir, jsonBasename);
 
-      if (!existsSync(whisperJsonPath)) {
-        throw new TranscriptionError(
-          `Whisper output not found at expected path: ${whisperJsonPath}`,
-          ERROR_TYPES.WHISPER_EXECUTION,
-          { expectedPath: whisperJsonPath, outputDir }
-        );
-      }
+        if (!existsSync(whisperJsonPath)) {
+          throw new TranscriptionError(
+            `Whisper output not found at expected path: ${whisperJsonPath}`,
+            ERROR_TYPES.WHISPER_EXECUTION,
+            { expectedPath: whisperJsonPath, outputDir }
+          );
+        }
 
-      transcriptData = JSON.parse(readFileSync(whisperJsonPath, 'utf8'));
+        transcriptData = JSON.parse(readFileSync(whisperJsonPath, 'utf8'));
 
-      // Move to canonical location if needed
-      if (whisperJsonPath !== transcriptJsonPath) {
-        writeFileAtKey(transcriptJsonKey, JSON.stringify(transcriptData, null, 2));
-        unlinkSync(whisperJsonPath); // Clean up temp file
+        // Move to canonical location if needed
+        if (whisperJsonPath !== transcriptJsonPath) {
+          writeFileAtKey(transcriptJsonKey, JSON.stringify(transcriptData, null, 2));
+          unlinkSync(whisperJsonPath); // Clean up temp file
+        }
       }
 
     } catch (whisperErr) {
@@ -381,28 +924,16 @@ const handler = async (event, context) => {
     );
     
     if (!hasTopLevelWords && !hasSegmentWords) {
-      // Check if this is whisper-ctranslate2 (known limitation)
-      const isCtranslate2 = whisperCmd === 'whisper-ctranslate2';
-      
-      if (isCtranslate2) {
-        logger.warn('Word-level timestamps not found in transcript (whisper-ctranslate2 limitation)', {
-          hasTopLevelWords,
-          hasSegmentWords,
-          segmentCount: transcriptData.segments.length,
-          whisperCmd,
-          variant: 'ctranslate2',
-          message: 'whisper-ctranslate2 may not output word-level timestamps. Segment-level timestamps are available. For word-level timestamps, consider using standard whisper (pip install openai-whisper) or check for whisper-ctranslate2 updates that support word-level timestamps.',
-          workaround: 'Segment-level timestamps are sufficient for SRT generation. Word-level timestamps are only required for advanced downstream processing.'
-        });
-      } else {
-        logger.warn('Word-level timestamps not found in transcript', {
-          hasTopLevelWords,
-          hasSegmentWords,
-          segmentCount: transcriptData.segments.length,
-          whisperCmd: whisperCmd || 'unknown',
-          message: 'Transcript contains segments but no word-level timestamps. This may affect downstream processing.'
-        });
-      }
+      // whisper-ctranslate2 may not output word-level timestamps (known limitation)
+      logger.warn('Word-level timestamps not found in transcript (whisper-ctranslate2 limitation)', {
+        hasTopLevelWords,
+        hasSegmentWords,
+        segmentCount: transcriptData.segments.length,
+        whisperCmd,
+        variant: 'ctranslate2',
+        message: 'whisper-ctranslate2 may not output word-level timestamps. Segment-level timestamps are available and sufficient for SRT generation.',
+        note: 'Segment-level timestamps are sufficient for SRT generation. Word-level timestamps are only required for advanced downstream processing. If needed, use forced alignment tools for post-processing.'
+      });
       
       // Note: We don't fail here because segments are still valid for SRT generation
       // whisper-ctranslate2 limitation is documented and handled gracefully
@@ -415,8 +946,8 @@ const handler = async (event, context) => {
         hasSegmentWords,
         wordCount,
         segmentCount: transcriptData.segments.length,
-        whisperCmd: whisperCmd || 'unknown',
-        variant: whisperCmd === 'whisper-ctranslate2' ? 'ctranslate2' : (whisperCmd || 'standard')
+        whisperCmd: whisperCmd || 'whisper-ctranslate2',
+        variant: 'ctranslate2'
       });
     }
 
