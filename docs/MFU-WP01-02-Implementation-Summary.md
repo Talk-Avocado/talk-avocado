@@ -293,7 +293,7 @@ node test-chunking-validation.js
 
 Test results are stored in tenant-scoped storage paths following the canonical layout:
 
-```
+```location
 storage/
 └── dev/
     └── t-test/                    # Test tenant
@@ -378,6 +378,7 @@ cat storage/dev/t-test/{jobId}/manifest.json
 All implementation steps completed (14/15). Step 2.12 (test audio files) requires manual creation.
 
 **Steps Completed**:
+
 1. ✅ **Step 2.1**: Added FFmpeg dependency check and helper functions
 2. ✅ **Step 2.2**: Created audio duration detection function using FFprobe
 3. ✅ **Step 2.3**: Created chunking decision logic with configurable thresholds
@@ -474,6 +475,7 @@ TRANSCRIPT_CHUNK_THRESHOLD=1800   # Duration threshold in seconds to trigger chu
 4. Result: Standard whisper used (slow), causing timeouts
 
 **Evidence**:
+
 - Test ran for 2+ hours (standard Whisper behavior)
 - Only 1 chunk transcribed (standard Whisper: ~8-10 min per 5-min chunk)
 - whisper-ctranslate2 would have taken ~24-36 minutes total
@@ -493,6 +495,7 @@ TRANSCRIPT_CHUNK_THRESHOLD=1800   # Duration threshold in seconds to trigger chu
 #### Recommendation: Use Only whisper-ctranslate2
 
 **Rationale**:
+
 1. **Performance Critical**: 2-4x faster is essential for production
 2. **Chunking Required**: Standard Whisper times out on large files
 3. **Use Cases**: Most use cases don't need word-level timestamps (segment-level is sufficient)
@@ -500,12 +503,14 @@ TRANSCRIPT_CHUNK_THRESHOLD=1800   # Duration threshold in seconds to trigger chu
 5. **User Experience**: Faster results = better UX
 
 **Implementation**:
+
 - Simplified detection logic to only support whisper-ctranslate2
 - Removed all standard whisper fallback code
 - Fail fast if whisper-ctranslate2 not available
 - Clear error messages explaining why standard whisper not supported
 
 **Code Changes**:
+
 - Removed ~50 lines of fallback logic
 - Simplified `detectWhisperCommand()` function
 - Removed `python -m whisper` handling
@@ -514,11 +519,13 @@ TRANSCRIPT_CHUNK_THRESHOLD=1800   # Duration threshold in seconds to trigger chu
 #### Word-Level Timestamps
 
 **If Needed**:
+
 - Use forced alignment tools (post-processing)
 - Use standard whisper for specific jobs (if really critical)
 - Wait for whisper-ctranslate2 updates
 
 **Most Use Cases Don't Need Them**:
+
 - SRT generation works with segment-level timestamps
 - Video subtitles work with segment-level timestamps
 - Most downstream processing works with segments
@@ -572,6 +579,7 @@ TRANSCRIPT_CHUNK_THRESHOLD=1800   # Duration threshold in seconds to trigger chu
 **Test Audio**: 60-minute file (`test-60min.mp3`)
 
 **What's Being Tested**:
+
 - ✅ Chunking triggered correctly
 - ✅ Audio segmentation (12 chunks)
 - ✅ Chunk transcription with whisper-ctranslate2 only
@@ -585,9 +593,10 @@ TRANSCRIPT_CHUNK_THRESHOLD=1800   # Duration threshold in seconds to trigger chu
 **Date**: 2025-11-04  
 **Status**: Implementation Complete, Full Validation Pending
 
-#### Implementation Status
+ Implementation Status
 
 ✅ **All chunking code implemented and working:**
+
 - Duration detection: ✅ Working
 - Chunking decision logic: ✅ Working  
 - Audio segmentation: ✅ Working (12 chunks created from 60-minute file)
@@ -598,6 +607,7 @@ TRANSCRIPT_CHUNK_THRESHOLD=1800   # Duration threshold in seconds to trigger chu
 #### Test Results
 
 **Test Files Created**:
+
 - ✅ `test-30min.mp3` (1800 seconds) - Extracted from source video
 - ✅ `test-60min.mp3` (3600 seconds) - Extracted from source video
 
@@ -631,12 +641,14 @@ TRANSCRIPT_CHUNK_THRESHOLD=1800   # Duration threshold in seconds to trigger chu
 #### Performance Analysis
 
 **Standard Whisper (Too Slow)**:
+
 - Processing time: ~0.5-0.7x real-time (slower than real-time)
 - 5-minute chunks: ~8-10 minutes each
 - 60-minute file (12 chunks): ~96-120 minutes total
 - **Result**: Timeouts occur even with 30-minute timeout
 
 **whisper-ctranslate2 (Recommended)**:
+
 - Processing time: ~0.75x real-time (faster than real-time)
 - 5-minute chunks: ~2-3 minutes each
 - 60-minute file (12 chunks): ~24-36 minutes total
@@ -645,6 +657,7 @@ TRANSCRIPT_CHUNK_THRESHOLD=1800   # Duration threshold in seconds to trigger chu
 #### Test Results Summary
 
 **30-Minute File Test**:
+
 - **Status**: ❌ **FAILED** - Timeout
 - **Duration Check**: ✅ Correctly identified as 30 minutes (1800s)
 - **Chunking Decision**: ✅ Correctly decided NOT to chunk (exactly at threshold)
@@ -652,6 +665,7 @@ TRANSCRIPT_CHUNK_THRESHOLD=1800   # Duration threshold in seconds to trigger chu
   - Standard Whisper on CPU with medium model is too slow for 30-minute files
 
 **60-Minute File Test**:
+
 - **Status**: ❌ **FAILED** - Too many chunks failed
 - **Duration Check**: ✅ Correctly identified as 60 minutes (3600s)
 - **Chunking Decision**: ✅ Correctly decided to chunk (above threshold)
@@ -663,7 +677,7 @@ TRANSCRIPT_CHUNK_THRESHOLD=1800   # Duration threshold in seconds to trigger chu
 
 #### Issues Identified & Fixes
 
-1. **Timeout Too Short**: 
+1. **Timeout Too Short**:
    - ✅ Fixed: Increased timeout from 10 min → 30 min → 60 min (standard flow and chunk transcription)
    - **Reason**: Medium model on CPU with whisper-ctranslate2 can take 7-10 minutes per 5-minute chunk
    - **Actual Speed**: ~0.56x real-time (slower than expected ~0.75x)
@@ -683,11 +697,13 @@ TRANSCRIPT_CHUNK_THRESHOLD=1800   # Duration threshold in seconds to trigger chu
 #### Chunk 8 Timeout Analysis
 
 **Observation**: Chunk 8 timed out after 30 minutes
+
 - Progress: 84% complete (252.6/299.97825 seconds processed)
 - Time elapsed: 7:26 minutes
 - Processing speed: ~0.56x real-time (slower than expected ~0.75x)
 
 **Root Cause**: Medium model on CPU is slower than expected
+
 - whisper-ctranslate2 is being used correctly
 - Medium model requires more processing time on CPU
 - 5-minute chunk takes ~7.5 minutes to process at current speed
