@@ -138,7 +138,7 @@ Updated `package.json` with required dependencies:
 
 The smart cut planner writes its output to the following location:
 
-```
+```path
 storage/{env}/{tenantId}/{jobId}/plan/cut_plan.json
 ```
 
@@ -153,12 +153,14 @@ storage/{env}/{tenantId}/{jobId}/plan/cut_plan.json
 1. **From Test Results**: The handler returns `{ ok: true, planKey: "...", correlationId: "..." }` where `planKey` contains the full path relative to storage root.
 
 2. **From Manifest**: Check the manifest file for the job:
+
    ```bash
    # Location: storage/{env}/{tenantId}/{jobId}/manifest.json
    # Look for: manifest.plan.key
    ```
 
 3. **List Recent Outputs** (PowerShell):
+
    ```powershell
    Get-ChildItem -Path "storage\*\*\plan\cut_plan.json" -Recurse | 
      Sort-Object LastWriteTime -Descending | 
@@ -166,6 +168,7 @@ storage/{env}/{tenantId}/{jobId}/plan/cut_plan.json
    ```
 
 4. **From Test Logs**: Test execution logs include the `planKey` in the output:
+
    ```json
    {"planKey":"dev/t-test/{jobId}/plan/cut_plan.json"}
    ```
@@ -173,6 +176,7 @@ storage/{env}/{tenantId}/{jobId}/plan/cut_plan.json
 **Output File Format:**
 
 The `cut_plan.json` file contains:
+
 - `schemaVersion`: "1.0.0"
 - `source`: "transcripts/transcript.json"
 - `output`: "plan/cut_plan.json"
@@ -182,6 +186,7 @@ The `cut_plan.json` file contains:
 **Test Output Files:**
 
 When running tests, output files are located at:
+
 - **Test Environment**: `storage/dev/t-test/{jobId}/plan/cut_plan.json`
 - **Test Results Summary**: See `docs/test-execution-summary-smart-cut-planner.md` for detailed test results
 - **Full Test Output**: `test-results-output.txt` (in repository root)
@@ -201,17 +206,20 @@ When running tests, output files are located at:
   - **Schema Validation**: ✅ Passed
 
 **Output File Location:**
+
 - **Storage Key**: `dev/t-test/872d6765-2d60-4806-aa8f-b9df56f74c03/plan/cut_plan.json`
 - **Full Path**: `storage/dev/t-test/872d6765-2d60-4806-aa8f-b9df56f74c03/plan/cut_plan.json`
 - **Test Date**: 2025-11-05
 - **Job ID**: `872d6765-2d60-4806-aa8f-b9df56f74c03`
 
 **Generated Cut Plan Summary:**
+
 - The planner successfully identified 19 cut regions (silences and filler words) across the 60-minute transcript
 - 47 keep segments were preserved, maintaining content flow while removing unnecessary pauses
 - Cut plan segments range from 0.00 to 3600.01 seconds (full video duration)
 
 **Test Results:**
+
 - ✅ Successfully processed large transcript (907 segments, 60 minutes)
 - ✅ Performance: Processing completed in 3ms for 60-minute video
 - ✅ Schema validation passed
