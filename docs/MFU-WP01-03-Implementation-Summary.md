@@ -132,6 +132,93 @@ Updated `package.json` with required dependencies:
 }
 ```
 
+### Output File Location
+
+**Smart Cut Planner Output Files:**
+
+The smart cut planner writes its output to the following location:
+
+```
+storage/{env}/{tenantId}/{jobId}/plan/cut_plan.json
+```
+
+**Full Path Details:**
+
+- **Default Location**: `{project_root}/storage/{env}/{tenantId}/{jobId}/plan/cut_plan.json`
+- **Example Path**: `D:\talk-avocado\storage\dev\t-test\{jobId}\plan\cut_plan.json`
+- **If `MEDIA_STORAGE_PATH` is set**: `{MEDIA_STORAGE_PATH}/{env}/{tenantId}/{jobId}/plan/cut_plan.json`
+
+**Finding Output Files:**
+
+1. **From Test Results**: The handler returns `{ ok: true, planKey: "...", correlationId: "..." }` where `planKey` contains the full path relative to storage root.
+
+2. **From Manifest**: Check the manifest file for the job:
+   ```bash
+   # Location: storage/{env}/{tenantId}/{jobId}/manifest.json
+   # Look for: manifest.plan.key
+   ```
+
+3. **List Recent Outputs** (PowerShell):
+   ```powershell
+   Get-ChildItem -Path "storage\*\*\plan\cut_plan.json" -Recurse | 
+     Sort-Object LastWriteTime -Descending | 
+     Select-Object FullName, LastWriteTime
+   ```
+
+4. **From Test Logs**: Test execution logs include the `planKey` in the output:
+   ```json
+   {"planKey":"dev/t-test/{jobId}/plan/cut_plan.json"}
+   ```
+
+**Output File Format:**
+
+The `cut_plan.json` file contains:
+- `schemaVersion`: "1.0.0"
+- `source`: "transcripts/transcript.json"
+- `output`: "plan/cut_plan.json"
+- `cuts[]`: Array of cut/keep segments with `start`, `end`, `type`, `reason`, `confidence`
+- `metadata`: Processing time and parameters used
+
+**Test Output Files:**
+
+When running tests, output files are located at:
+- **Test Environment**: `storage/dev/t-test/{jobId}/plan/cut_plan.json`
+- **Test Results Summary**: See `docs/test-execution-summary-smart-cut-planner.md` for detailed test results
+- **Full Test Output**: `test-results-output.txt` (in repository root)
+
+### Weekly Q&A Session Test (60-minute Video)
+
+**Test Case**: Real-world transcript from Weekly Q&A session (60-minute video)
+
+- **Input Transcript**: `storage/dev/t-test/872d6765-2d60-4806-aa8f-b9df56f74c03/transcripts/transcript.json`
+  - Duration: 60.01 minutes
+  - Segments: 907 segments
+- **Output**: Cut plan generated successfully
+  - **Total Segments**: 66 segments
+  - **Total Cuts**: 19 segments
+  - **Total Keeps**: 47 segments
+  - **Processing Time**: 3ms
+  - **Schema Validation**: ✅ Passed
+
+**Output File Location:**
+- **Storage Key**: `dev/t-test/872d6765-2d60-4806-aa8f-b9df56f74c03/plan/cut_plan.json`
+- **Full Path**: `storage/dev/t-test/872d6765-2d60-4806-aa8f-b9df56f74c03/plan/cut_plan.json`
+- **Test Date**: 2025-11-05
+- **Job ID**: `872d6765-2d60-4806-aa8f-b9df56f74c03`
+
+**Generated Cut Plan Summary:**
+- The planner successfully identified 19 cut regions (silences and filler words) across the 60-minute transcript
+- 47 keep segments were preserved, maintaining content flow while removing unnecessary pauses
+- Cut plan segments range from 0.00 to 3600.01 seconds (full video duration)
+
+**Test Results:**
+- ✅ Successfully processed large transcript (907 segments, 60 minutes)
+- ✅ Performance: Processing completed in 3ms for 60-minute video
+- ✅ Schema validation passed
+- ✅ Manifest updated with plan metadata
+- ✅ Output file created at expected location
+- ✅ Generated 66 cut plan segments (47 keep, 19 cut) covering full video duration (3600.65 seconds)
+
 ### Determinism Testing
 
 **Test**: Multiple runs with identical input

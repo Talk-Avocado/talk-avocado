@@ -88,10 +88,14 @@ export const handler = async (event, context) => {
       throw new PlannerError(`Manifest update failed: ${e.message}`, ERROR_TYPES.MANIFEST_UPDATE);
     }
 
+    const totalKeeps = cutPlan.cuts?.filter(c => c.type === 'keep').length || 0;
+    const totalCuts = cutPlan.cuts?.filter(c => c.type === 'cut').length || 0;
+
     metrics.addMetric('PlanningSuccess', 'Count', 1);
     metrics.addMetric('TotalSegments', 'Count', transcriptData.segments.length);
-    metrics.addMetric('TotalCuts', 'Count', cutPlan.cuts?.length || 0);
-    logger.info('Planning completed', { planKey, totalCuts: cutPlan.cuts?.length || 0 });
+    metrics.addMetric('TotalCuts', 'Count', totalCuts);
+    metrics.addMetric('TotalKeeps', 'Count', totalKeeps);
+    logger.info('Planning completed', { planKey, totalCuts, totalKeeps });
 
     return { ok: true, planKey, correlationId };
   } catch (err) {

@@ -137,9 +137,12 @@ export const handler = async (event, context) => {
       throw new PlannerError(`Manifest update failed: ${e.message}`, ERROR_TYPES.MANIFEST_UPDATE);
     }
 
+    const totalKeeps = cutPlan.cuts?.filter(c => c.type === 'keep').length || 0;
+    const totalCuts = cutPlan.cuts?.filter(c => c.type === 'cut').length || 0;
+
     logger.info(`[SmartCutPlanner] Planning completed successfully`);
     logger.info(`[SmartCutPlanner] Plan key: ${planKey}`);
-    logger.info(`[SmartCutPlanner] Total cuts: ${cutPlan.cuts?.length || 0}`);
+    logger.info(`[SmartCutPlanner] Total cuts: ${totalCuts}, Total keeps: ${totalKeeps}`);
 
     return { ok: true, planKey, correlationId };
   } catch (err) {

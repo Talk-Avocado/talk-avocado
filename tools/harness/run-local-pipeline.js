@@ -64,7 +64,7 @@ async function main() {
   const handlers = [
     { name: 'audio-extraction', path: '../../backend/services/audio-extraction/handler.cjs' },
     { name: 'transcription', path: '../../backend/services/transcription/handler.js' },
-    { name: 'smart-cut-planner', path: '../../backend/services/smart-cut-planner/handler-simple.js' },
+    { name: 'smart-cut-planner', path: '../../backend/services/smart-cut-planner/handler.js' },
     { name: 'video-render-engine', path: '../../backend/services/video-render-engine/handler-simple.cjs' }
   ];
 
