@@ -242,6 +242,114 @@ This is the second segment with shorter
 text.
 ```
 
+### Test Files Location
+
+**Test Scripts** (root directory):
+
+- `test-transcription.js` - Basic transcription handler test
+- `test-timestamp-alignment.js` - Timestamp alignment verification test
+- `test-idempotency-repeat-runs.js` - Idempotency validation test
+- `test-chunking-validation.js` - Large file chunking validation test
+- `test-chunking-success-criteria.js` - Chunking success criteria test
+
+**Test Execution**:
+
+```bash
+# Basic transcription test
+node test-transcription.js
+
+# Timestamp alignment test
+node test-timestamp-alignment.js [jobId]
+
+# Idempotency test
+node test-idempotency-repeat-runs.js
+
+# Chunking validation test
+node test-chunking-validation.js
+```
+
+### Sample Files Location
+
+**Sample Transcripts**:
+
+- `podcast-automation/test-assets/transcripts/sample-short.json` - Sample transcript for testing
+
+**Test Audio Files**:
+
+- `podcast-automation/test-assets/audio/test-30min.mp3` - 30-minute test audio (1800 seconds)
+- `podcast-automation/test-assets/audio/test-60min.mp3` - 60-minute test audio (3600 seconds)
+
+**Golden Files** (for test harness validation):
+
+- `podcast-automation/test-assets/goldens/sample-short/` - Golden files directory
+  - `manifest.json` - Selected manifest fields for comparison
+  - `metrics.json` - Numeric metrics with tolerances
+  - `transcript.preview.txt` - First 200 characters of transcript
+  - `_metadata.json` - Schema version and generation info
+
+### Test Results Storage
+
+**Test Job Outputs**:
+
+Test results are stored in tenant-scoped storage paths following the canonical layout:
+
+```
+storage/
+└── dev/
+    └── t-test/                    # Test tenant
+        └── {jobId}/              # Test job UUID
+            ├── manifest.json     # Job manifest with transcript metadata
+            ├── audio/
+            │   └── {jobId}.mp3   # Input audio file
+            └── transcripts/
+                ├── transcript.json         # JSON transcript with segments
+                └── captions.source.srt     # SRT caption file
+```
+
+**Example Test Results**:
+
+- `storage/dev/t-test/872d6765-2d60-4806-aa8f-b9df56f74c03/` - Example test job with complete transcription output
+- `storage/dev/t-test/test-idempotency-*/` - Multiple test runs for idempotency validation
+- `storage/dev/t-test/chunking-validation-*/` - Chunking validation test results
+
+**Test Outputs Include**:
+
+1. **Transcript JSON** (`transcripts/transcript.json`):
+   - Whisper JSON output with segments array
+   - Word-level timestamps (when available)
+   - Segment-level timestamps
+   - Language detection
+   - Confidence scores
+
+2. **SRT Captions** (`transcripts/captions.source.srt`):
+   - Deterministic SRT format
+   - Configurable line wrapping (42 chars per line, 2 lines per cue)
+   - Proper timestamp formatting (HH:MM:SS,mmm)
+
+3. **Manifest Updates** (`manifest.json`):
+   - `transcript.jsonKey` - Path to JSON transcript
+   - `transcript.srtKey` - Path to SRT captions
+   - `transcript.language` - Detected/configured language
+   - `transcript.model` - Whisper model used
+   - `transcript.confidence` - Average confidence score
+   - `transcript.transcribedAt` - Timestamp of transcription
+
+**Accessing Test Results**:
+
+```bash
+# List test jobs
+ls storage/dev/t-test/
+
+# View transcript for a specific job
+cat storage/dev/t-test/{jobId}/transcripts/transcript.json
+
+# View SRT captions
+cat storage/dev/t-test/{jobId}/transcripts/captions.source.srt
+
+# View manifest
+cat storage/dev/t-test/{jobId}/manifest.json
+```
+
 ## Dependencies
 
 **Hard Dependencies**:

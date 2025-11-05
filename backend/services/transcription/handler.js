@@ -270,6 +270,7 @@ function splitAudioIntoChunks(inputPath, chunkDurationSec, outputDir) {
       } catch (err) {
         // Skip chunks that can't be probed (likely very short or corrupted)
         // Note: logger not available here, will log at handler level
+        // eslint-disable-next-line no-console
         console.warn(`Skipping chunk (could not probe): ${chunkPath}`, err.message);
       }
     }
@@ -318,7 +319,8 @@ function transcribeChunk(chunkPath, whisperCmd, model, language, device, outputD
       '--verbose', 'False'
     ];
 
-    const whisperOutput = execFileSync('whisper-ctranslate2', whisperArgs, {
+    // Execute whisper (output is written to file, stdout is not used)
+    execFileSync('whisper-ctranslate2', whisperArgs, {
       encoding: 'utf8',
       maxBuffer: 50 * 1024 * 1024, // 50MB buffer for large outputs
       timeout: 3600000 // 60 min timeout (medium/large models on CPU can take 7-10 min per 5-min chunk)
@@ -447,6 +449,8 @@ function mergeChunkTranscripts(chunkTranscripts) {
     // Allow small gaps/overlaps (±100ms) due to Whisper's segment boundaries
     if (Math.abs(gap) > 0.1) {
       // Log warning but don't fail (Whisper segments may have natural gaps)
+      // Note: logger not available in this helper function
+      // eslint-disable-next-line no-console
       console.warn(`Segment gap/overlap detected: ${gap.toFixed(3)}s between segments ${i - 1} and ${i}`);
     }
   }
@@ -464,6 +468,11 @@ function mergeChunkTranscripts(chunkTranscripts) {
   // Add word count if available
   if (totalWordCount > 0) {
     mergedTranscript.wordCount = totalWordCount;
+  }
+
+  // Add average confidence if calculated
+  if (averageConfidence > 0) {
+    mergedTranscript.averageConfidence = averageConfidence;
   }
 
   return mergedTranscript;
