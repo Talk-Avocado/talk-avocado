@@ -72,3 +72,7 @@ temp/
 # Test outputs
 test-results/
 coverage/
+
+# Large test audio files (generated locally)
+podcast-automation/test-assets/audio/test-30min.mp3
+podcast-automation/test-assets/audio/test-60min.mp3
