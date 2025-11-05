@@ -1,5 +1,6 @@
 // backend/services/video-render-engine/handler.js
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, mkdirSync } from 'node:fs';
+import { resolve, dirname } from 'node:path';
 import { initObservability } from '../../dist/init-observability.js';
 import { keyFor, pathFor } from '../../dist/storage.js';
 import { loadManifest, saveManifest } from '../../dist/manifest.js';
@@ -17,7 +18,8 @@ const ajv = new Ajv({ allErrors: true });
 addFormats(ajv);
 
 // Load cut plan schema for validation
-const cutPlanSchema = JSON.parse(readFileSync('docs/schemas/cut_plan.schema.json', 'utf-8'));
+const cutPlanSchemaPath = resolve('docs/schemas/cut_plan.schema.json');
+const cutPlanSchema = JSON.parse(readFileSync(cutPlanSchemaPath, 'utf-8'));
 const validateCutPlan = ajv.compile(cutPlanSchema);
 
 /**
@@ -152,6 +154,12 @@ export const handler = async (event, context) => {
     const outputKey = keyFor(env, tenantId, jobId, 'renders', 'base_cuts.mp4');
     const outputPath = pathFor(outputKey);
 
+    // Ensure output directory exists
+    const outputDir = dirname(outputPath);
+    if (!existsSync(outputDir)) {
+      mkdirSync(outputDir, { recursive: true });
+    }
+
     logger.info('Starting FFmpeg processing', { 
       outputKey,
       filterGraphLength: filterGraph.length 
@@ -178,14 +186,46 @@ export const handler = async (event, context) => {
     
     const durationSec = Number(probeResult.format?.duration || videoStream?.duration || 0);
     const resolution = videoStream ? `${videoStream.width}x${videoStream.height}` : undefined;
-    const fps = videoStream?.r_frame_rate || renderFps;
+    // Parse fps from format like "30/1" or use renderFps
+    const rawFps = videoStream?.r_frame_rate || renderFps;
+    const fpsString = rawFps.includes('/') ? rawFps : `${rawFps}/1`;
 
     logger.info('Video metadata extracted', { 
       durationSec, 
       resolution, 
-      fps,
+      fps: fpsString,
       hasVideo: !!videoStream,
       hasAudio: !!audioStream
+    });
+
+    // Validate duration within ±1 frame tolerance
+    const expectedDurationSec = keeps.reduce((sum, seg) => sum + (seg.end - seg.start), 0);
+    const fpsNumber = parseFloat(fpsString.split('/')[0]) / (fpsString.includes('/') ? parseFloat(fpsString.split('/')[1]) : 1);
+    const frameDurationSec = 1 / fpsNumber;
+    const toleranceSec = frameDurationSec; // ±1 frame
+    const durationDiffSec = Math.abs(durationSec - expectedDurationSec);
+    
+    if (durationDiffSec > toleranceSec) {
+      throw new VideoRenderError(
+        `Output duration mismatch: expected ${expectedDurationSec.toFixed(3)}s, got ${durationSec.toFixed(3)}s (diff: ${durationDiffSec.toFixed(3)}s, tolerance: ±${toleranceSec.toFixed(3)}s)`,
+        'DURATION_MISMATCH',
+        { 
+          expectedDurationSec, 
+          actualDurationSec: durationSec, 
+          durationDiffSec, 
+          toleranceSec,
+          fps: fpsNumber,
+          frameDurationSec
+        }
+      );
+    }
+
+    logger.info('Duration validation passed', { 
+      expectedDurationSec, 
+      actualDurationSec: durationSec, 
+      durationDiffSec,
+      toleranceSec,
+      fps: fpsNumber
     });
 
     // Measure A/V sync drift
@@ -212,7 +252,7 @@ export const handler = async (event, context) => {
       codec: 'h264',
       durationSec,
       resolution,
-      fps,
+      fps: fpsString,
       notes: `preset=${renderPreset},crf=${renderCrf}`,
       renderedAt: new Date().toISOString(),
     };
@@ -223,15 +263,8 @@ export const handler = async (event, context) => {
     // Add render log entry
     updatedManifest.logs = updatedManifest.logs || [];
     updatedManifest.logs.push({
-      type: 'info',
-      message: `Video render completed: ${outputKey}`,
-      details: {
-        durationSec,
-        resolution,
-        fps,
-        keepSegments: keeps.length,
-        maxDriftMs: driftResult.maxDriftMs
-      },
+      key: outputKey,
+      type: 'pipeline',
       createdAt: new Date().toISOString()
     });
 
@@ -247,7 +280,7 @@ export const handler = async (event, context) => {
       outputKey, 
       durationSec, 
       resolution, 
-      fps,
+      fps: fpsString,
       keepSegments: keeps.length,
       maxDriftMs: driftResult.maxDriftMs
     });
@@ -258,7 +291,7 @@ export const handler = async (event, context) => {
       correlationId,
       durationSec,
       resolution,
-      fps,
+      fps: fpsString,
       keepSegments: keeps.length
     };
 
@@ -280,12 +313,8 @@ export const handler = async (event, context) => {
       manifest.updatedAt = new Date().toISOString();
       manifest.logs = manifest.logs || [];
       manifest.logs.push({
+        key: `error-${Date.now()}`,
         type: 'error',
-        message: `Video render failed: ${errorMessage}`,
-        details: {
-          errorType,
-          ...error.details
-        },
         createdAt: new Date().toISOString()
       });
       saveManifest(env, tenantId, jobId, manifest);

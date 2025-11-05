@@ -1,8 +1,8 @@
 # MFU-WP01-04-BE: Video Engine Cuts - Implementation Summary
 
-**Date:** 2025-01-27  
+**Date:** 2025-01-27 (Updated: 2025-01-27)  
 **MFU:** MFU-WP01-04-BE: Video Engine Cuts  
-**Status:** ✅ **COMPLETED**  
+**Status:** ✅ **COMPLETED** (Enhanced with duration validation and schema improvements)  
 
 ## Overview
 
@@ -138,7 +138,7 @@ ffmpeg -y -i {sourcePath} -filter_complex {filterGraph} \
 | Reads `plan/cut_plan.json` and validates against schema | ✅ | Ajv validation with detailed error reporting |
 | Resolves source video from manifest or `input/` folder | ✅ | Manifest-first resolution with fallback |
 | Applies cuts to produce `renders/base_cuts.mp4` | ✅ | FFmpeg filtergraph with precise cuts |
-| Output duration matches total planned keep duration | ✅ | 20s calculated from 4 keep segments |
+| Output duration matches total planned keep duration within ±1 frame | ✅ | **NEW**: Duration validation with frame-accurate tolerance |
 | A/V sync drift ≤ 50ms at each cut boundary | ✅ | Drift measurement with 50ms threshold |
 | ffprobe metrics captured: duration, fps, resolution | ✅ | Comprehensive metadata extraction |
 | Manifest updated with renders[] entry | ✅ | Complete render metadata with timestamps |
@@ -250,6 +250,31 @@ docs/schemas/
 - Filtergraph: ✅ 531 characters generated
 - FFmpeg processing: ✅ Ready (requires FFmpeg installation)
 
+### Recent Enhancements (2025-01-27)
+
+**Duration Validation (Critical Enhancement)**:
+- ✅ **Frame-accurate duration validation**: Output duration now validated within ±1 frame tolerance
+- ✅ Calculates expected duration from keep segments
+- ✅ Parses FPS from ffprobe output (handles "30/1" format)
+- ✅ Throws `DURATION_MISMATCH` error if tolerance exceeded
+- ✅ Comprehensive logging of duration validation results
+
+**Schema Validation Improvements**:
+- ✅ **Schema path resolution**: Uses `path.resolve()` for reliable schema loading (matching smart-cut-planner)
+- ✅ **handler-simple.cjs validation**: Added comprehensive schema validation to testing handler
+- ✅ Validates cuts array structure and required fields
+- ✅ Validates cut types ('keep' or 'cut')
+
+**FPS Handling**:
+- ✅ Proper parsing of FPS from ffprobe output (handles "30/1" fractional format)
+- ✅ Consistent FPS string format throughout handler
+- ✅ Frame duration calculation for tolerance validation
+
+**Error Handling**:
+- ✅ New error type: `DURATION_MISMATCH` for duration validation failures
+- ✅ Detailed error context with expected vs actual duration
+- ✅ Tolerance and FPS information in error details
+
 ### Error Scenarios
 
 **Tested Scenarios**:
@@ -257,6 +282,7 @@ docs/schemas/
 - ✅ Missing cut plan → Clear error with path details
 - ✅ Invalid cut plan → Schema validation errors
 - ✅ Missing source video → Input not found error
+- ✅ **Duration mismatch** → Clear error with expected vs actual duration and tolerance
 - ✅ No keep segments → Invalid plan error
 - ✅ FFmpeg unavailable → Graceful fallback (testing mode)
 

@@ -213,7 +213,33 @@ exports.handler = async (event, context) => {
     const planData = fs.readFileSync(planPath, 'utf-8');
     const plan = JSON.parse(planData);
 
-    logger.info('Cut plan loaded successfully', { 
+    // Basic schema validation
+    if (!plan.cuts || !Array.isArray(plan.cuts)) {
+      throw new VideoRenderError(
+        'Cut plan validation failed: missing or invalid cuts array',
+        'SCHEMA_VALIDATION',
+        { plan: plan }
+      );
+    }
+
+    for (const cut of plan.cuts) {
+      if (!cut.start || !cut.end || !cut.type) {
+        throw new VideoRenderError(
+          `Cut plan validation failed: missing required fields (start, end, type)`,
+          'SCHEMA_VALIDATION',
+          { cut }
+        );
+      }
+      if (!['keep', 'cut'].includes(cut.type)) {
+        throw new VideoRenderError(
+          `Cut plan validation failed: invalid type "${cut.type}" (must be "keep" or "cut")`,
+          'SCHEMA_VALIDATION',
+          { cut }
+        );
+      }
+    }
+
+    logger.info('Cut plan validated successfully', { 
       cutsCount: plan.cuts?.length || 0,
       schemaVersion: plan.schemaVersion 
     });
@@ -295,14 +321,47 @@ exports.handler = async (event, context) => {
     
     const durationSec = Number(probeResult.format?.duration || videoStream?.duration || 0);
     const resolution = videoStream ? `${videoStream.width}x${videoStream.height}` : undefined;
-    const fps = videoStream?.r_frame_rate || renderFps;
+
+    // Parse fps from format like "30/1" or use renderFps
+    const rawFps = videoStream?.r_frame_rate || renderFps;
+    const fpsString = rawFps.includes('/') ? rawFps : `${rawFps}/1`;
 
     logger.info('Video metadata extracted', { 
       durationSec, 
       resolution, 
-      fps,
+      fps: fpsString,
       hasVideo: !!videoStream,
       hasAudio: !!audioStream
+    });
+
+    // Validate duration within ±1 frame tolerance
+    const expectedDurationSec = keeps.reduce((sum, seg) => sum + (seg.end - seg.start), 0);
+    const fpsNumber = parseFloat(fpsString.split('/')[0]) / (fpsString.includes('/') ? parseFloat(fpsString.split('/')[1]) : 1);
+    const frameDurationSec = 1 / fpsNumber;
+    const toleranceSec = frameDurationSec; // ±1 frame
+    const durationDiffSec = Math.abs(durationSec - expectedDurationSec);
+    
+    if (durationDiffSec > toleranceSec) {
+      throw new VideoRenderError(
+        `Output duration mismatch: expected ${expectedDurationSec.toFixed(3)}s, got ${durationSec.toFixed(3)}s (diff: ${durationDiffSec.toFixed(3)}s, tolerance: ±${toleranceSec.toFixed(3)}s)`,
+        'DURATION_MISMATCH',
+        { 
+          expectedDurationSec, 
+          actualDurationSec: durationSec, 
+          durationDiffSec, 
+          toleranceSec,
+          fps: fpsNumber,
+          frameDurationSec
+        }
+      );
+    }
+
+    logger.info('Duration validation passed', { 
+      expectedDurationSec, 
+      actualDurationSec: durationSec, 
+      durationDiffSec,
+      toleranceSec,
+      fps: fpsNumber
     });
 
     // Measure A/V sync drift
@@ -329,7 +388,7 @@ exports.handler = async (event, context) => {
       codec: 'h264',
       durationSec,
       resolution,
-      fps,
+      fps: fpsString,
       notes: `preset=${renderPreset},crf=${renderCrf}`,
       renderedAt: new Date().toISOString(),
     };
@@ -345,7 +404,7 @@ exports.handler = async (event, context) => {
       details: {
         durationSec,
         resolution,
-        fps,
+        fps: fpsString,
         keepSegments: keeps.length,
         maxDriftMs: driftResult.maxDriftMs
       },
@@ -364,7 +423,7 @@ exports.handler = async (event, context) => {
       outputKey, 
       durationSec, 
       resolution, 
-      fps,
+      fps: fpsString,
       keepSegments: keeps.length,
       maxDriftMs: driftResult.maxDriftMs
     });

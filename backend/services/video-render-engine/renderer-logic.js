@@ -4,7 +4,13 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { logger } from "scripts/logger.js";
+// Logger is optional - using console for now to avoid import path issues
+// import { logger } from "../../scripts/logger.js";
+const logger = {
+  info: (...args) => console.log("[INFO]", ...args),
+  warn: (...args) => console.warn("[WARN]", ...args),
+  error: (...args) => console.error("[ERROR]", ...args),
+};
 
 const execFileAsync = promisify(execFile);
 
