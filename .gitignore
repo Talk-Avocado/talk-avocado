@@ -76,3 +76,7 @@ coverage/
 # Large test audio files (generated locally)
 podcast-automation/test-assets/audio/test-30min.mp3
 podcast-automation/test-assets/audio/test-60min.mp3
+
+# Large test video files (too large for GitHub)
+podcast-automation/test-assets/raw/*.mp4
+podcast-automation/test-assets/raw/*Weekly*.mp4
