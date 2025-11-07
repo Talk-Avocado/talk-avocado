@@ -60,7 +60,7 @@ export const handler = async (event, context) => {
     }
 
     const start = Date.now();
-    const cutPlan = planCuts(transcriptData);
+    const cutPlan = await planCuts(transcriptData);
     cutPlan.metadata.processingTimeMs = Date.now() - start;
 
     const valid = validator(cutPlan);

@@ -6,9 +6,13 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 // Logger is optional - using console for now to avoid import path issues
 // import { logger } from "../../scripts/logger.js";
+// eslint-disable-next-line no-console
 const logger = {
+  // eslint-disable-next-line no-console
   info: (...args) => console.log("[INFO]", ...args),
+  // eslint-disable-next-line no-console
   warn: (...args) => console.warn("[WARN]", ...args),
+  // eslint-disable-next-line no-console
   error: (...args) => console.error("[ERROR]", ...args),
 };
 
@@ -157,11 +161,26 @@ export function buildFilterGraph(keepSegments) {
   keepSegments.forEach((segment, idx) => {
     const start = toSSFF(segment.start);
     const end = toSSFF(segment.end);
+    const duration = Number(end) - Number(start);
     
-    filterParts.push(
-      `[0:v]trim=start=${start}:end=${end},setpts=PTS-STARTPTS[v${idx}]`,
-      `[0:a]atrim=start=${start}:end=${end},asetpts=PTS-STARTPTS[a${idx}]`
-    );
+    // For the last segment, always use duration instead of end to ensure we capture the full segment
+    // FFmpeg trim end is exclusive, so using duration is more reliable for the last segment
+    const isLastSegment = idx === keepSegments.length - 1;
+    
+    if (isLastSegment) {
+      // Last segment: use duration to ensure we capture all content up to the end
+      const dur = toSSFF(duration);
+      filterParts.push(
+        `[0:v]trim=start=${start}:duration=${dur},setpts=PTS-STARTPTS[v${idx}]`,
+        `[0:a]atrim=start=${start}:duration=${dur},asetpts=PTS-STARTPTS[a${idx}]`
+      );
+    } else {
+      // Use end parameter for other segments
+      filterParts.push(
+        `[0:v]trim=start=${start}:end=${end},setpts=PTS-STARTPTS[v${idx}]`,
+        `[0:a]atrim=start=${start}:end=${end},asetpts=PTS-STARTPTS[a${idx}]`
+      );
+    }
   });
   
   // Build concat filters

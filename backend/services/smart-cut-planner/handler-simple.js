@@ -4,6 +4,8 @@ import { planCuts } from './planner-logic.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { initObservability } from '../../dist/init-observability.js';
+import { keyFor, pathFor } from '../../dist/storage.js';
+import { loadManifest } from '../../dist/manifest.js';
 
 class PlannerError extends Error {
   constructor(message, type, details = {}) {
@@ -23,15 +25,6 @@ const ERROR_TYPES = {
   MANIFEST_UPDATE: 'MANIFEST_UPDATE',
 };
 
-// Simple storage functions for testing
-function keyFor(env, tenantId, jobId, ...pathParts) {
-  return `${env}/${tenantId}/${jobId}/${pathParts.join('/')}`;
-}
-
-function pathFor(key) {
-  return `storage/${key}`;
-}
-
 function writeFileAtKey(key, content) {
   const filePath = pathFor(key);
   const dir = path.dirname(filePath);
@@ -39,15 +32,6 @@ function writeFileAtKey(key, content) {
     fs.mkdirSync(dir, { recursive: true });
   }
   fs.writeFileSync(filePath, content);
-}
-
-function loadManifest(env, tenantId, jobId) {
-  const manifestKey = keyFor(env, tenantId, jobId, 'manifest.json');
-  const manifestPath = pathFor(manifestKey);
-  if (fs.existsSync(manifestPath)) {
-    return JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
-  }
-  return {};
 }
 
 function saveManifest(env, tenantId, jobId, manifest) {
@@ -108,8 +92,31 @@ export const handler = async (event, context) => {
 
     logger.info(`[SmartCutPlanner] Found ${transcriptData.segments.length} segments`);
 
+    // Try to get audio path for direct silence detection
+    let audioPath = null;
+    try {
+      const manifest = loadManifest(env, tenantId, jobId);
+      if (manifest.audio && manifest.audio.key) {
+        audioPath = pathFor(manifest.audio.key);
+        if (fs.existsSync(audioPath)) {
+          logger.info(`[SmartCutPlanner] Using audio file for silence detection: ${audioPath}`);
+        } else {
+          audioPath = null;
+        }
+      }
+    } catch (err) {
+      // If manifest load fails, try to find audio file directly
+      logger.warn(`[SmartCutPlanner] Could not load audio path from manifest: ${err.message}`);
+      const audioKey = keyFor(env, tenantId, jobId, 'audio', 'sample-short.mp3');
+      const directAudioPath = pathFor(audioKey);
+      if (fs.existsSync(directAudioPath)) {
+        audioPath = directAudioPath;
+        logger.info(`[SmartCutPlanner] Found audio file directly: ${audioPath}`);
+      }
+    }
+
     const start = Date.now();
-    const cutPlan = planCuts(transcriptData);
+    const cutPlan = await planCuts(transcriptData, null, audioPath);
     cutPlan.metadata.processingTimeMs = Date.now() - start;
 
     logger.info(`[SmartCutPlanner] Generated cut plan with ${cutPlan.cuts.length} segments`);

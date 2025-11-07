@@ -142,6 +142,18 @@ export const handler = async (event, context) => {
       );
     }
 
+    // Get source video duration for filtergraph building
+    let sourceDuration = null;
+    try {
+      const probeResult = await probe(sourcePath);
+      sourceDuration = Number(probeResult.format?.duration || 0);
+      if (sourceDuration > 0) {
+        logger.info('Source video duration', { sourceDurationSec: sourceDuration });
+      }
+    } catch (err) {
+      logger.warn('Could not probe source video duration', { error: err.message });
+    }
+
     logger.info('Processing keep segments', { 
       keepSegments: keeps.length,
       totalDuration: keeps.reduce((sum, seg) => sum + (seg.end - seg.start), 0)

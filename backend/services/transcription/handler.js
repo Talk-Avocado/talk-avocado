@@ -309,6 +309,7 @@ function splitAudioIntoChunks(inputPath, chunkDurationSec, outputDir) {
 function transcribeChunk(chunkPath, whisperCmd, model, language, device, outputDir) {
   try {
     // Only whisper-ctranslate2 is supported (2-4x faster than standard whisper)
+    // Enable word-level timestamps for better filler word detection
     const whisperArgs = [
       chunkPath,
       '--model', model,
@@ -316,6 +317,7 @@ function transcribeChunk(chunkPath, whisperCmd, model, language, device, outputD
       '--output_format', 'json',
       '--output_dir', outputDir,
       '--device', device,
+      '--word_timestamps', 'True', // Enable word-level timestamps for accurate filler word detection
       '--verbose', 'False'
     ];
 
@@ -840,6 +842,7 @@ const handler = async (event, context) => {
           '--output_format', 'json',
           '--output_dir', outputDir,
           '--device', device,
+          '--word_timestamps', 'True', // Enable word-level timestamps for accurate filler word detection
           '--verbose', 'False'
         ];
 

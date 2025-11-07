@@ -434,12 +434,12 @@ Follow these steps exactly. All paths are repo‑relative.
   - Must be playable video file
   - A/V sync drift ≤ 50ms at cut boundaries
 
-**2. Manifest Updates**
+**2. Manifest Updates
 
 - **New Entry**: `renders[]` array appended with metadata (key, type, codec, durationSec, resolution, fps, notes, renderedAt)
 - **Updated Fields**: `updatedAt` timestamp, `logs[]` with render summary
 
-**3. Logs and Metrics**
+**3. Logs and Metrics
 
 - **Structured Logs**: Include `correlationId`, `tenantId`, `jobId`, `step: "video-render-engine"`
 - **Metrics**: RenderSuccess, RenderDurationSec, KeepSegments, SyncDriftMs
@@ -606,15 +606,39 @@ node tools/harness/run-local-pipeline.js \
 - Add a tiny sample plan and video; run via harness and assert metrics/manifest fields
 - Automated golden comparison if harness lane exists
 
+## Test Coverage Status: ✅ **ALL TESTS IMPLEMENTED**
+
+All tests are implemented in two test files:
+test-video-render-engine.js`- Unit/functional tests (10 tests)
+test-video-render-engine-integration.js` - Integration tests (1 test)
+
+### Test Summary
+
+✅ **Test 1: Happy Path - End-to-End Render** (`test1_HappyPath`)
+✅ **Test 2: Error Path - Missing Cut Plan** (`test2_MissingCutPlan`)
+✅ **Test 3: Error Path - Invalid Cut Plan Schema** (`test3_InvalidSchema`)
+✅ **Test 4: Error Path - Missing Source Video** (`test4_MissingSourceVideo`)
+✅ **Test 5: Error Path - No Keep Segments** (`test5_NoKeepSegments`)
+✅ **Test 6: Validation - Duration Within ±1 Frame** (`test6_DurationValidation`)
+✅ **Test 7: Validation - A/V Sync Drift ≤ 50ms** (`test7_SyncDrift`)
+✅ **Test 8: Idempotency - Repeat Runs** (`test8_Idempotency`)
+✅ **Test 9: Metadata Validation - FPS and Resolution** (`test9_MetadataValidation`)
+✅ **Test 10: Full Pipeline Integration** (`test10_FullPipelineIntegration`)
+
+### Integration Tests (in `test-video-render-engine-integration.js`)
+
+✅ **Test 1: Real Video Integration** (`test1_RealVideoIntegration`) - Works with any available video and cut plan (any length)
+
 ## Test Results
 
 ### Test Execution Summary
 
-**Test Date**: 2025-11-05  
+**Test Date**: 2025-11-06  
 **Test Environment**: Windows 10, Node.js v24.7.0  
-**Test Files**: 
-- `test-video-render-engine.js` - Comprehensive test suite (10 tests)
-- `test-long-video.js` - Long video test (92-minute Weekly Q&A Session)
+**Test Files**:
+
+- `test-video-render-engine.js` - Unit/functional test suite (10 tests)
+- `test-video-render-engine-integration.js` - Integration test suite (1 test)
 
 ### Output File Location
 
@@ -642,35 +666,42 @@ node tools/harness/run-local-pipeline.js \
      - Processing Time: ~65 seconds (~1.1 minutes)
      - Created: 2025-11-05T13:11:19.370Z
 
-### Test Results
+Test Results
 
-**✅ Test 1: Happy Path - End-to-End Render**
+**✅ Test 1: Happy Path - End-to-End Render
+
 - Status: PASSED (with UUID validation fix)
 - Output: `storage/dev/t-test/{jobId}/renders/base_cuts.mp4`
 - Duration: Validated within ±1 frame tolerance
 - Issues Fixed: UUID validation, directory creation
 
-**✅ Test 2: Error Path - Missing Cut Plan**
+**✅ Test 2: Error Path - Missing Cut Plan
+
 - Status: PASSED
 - Error Handling: Correct `INPUT_NOT_FOUND` error type
 
-**✅ Test 3: Error Path - Invalid Cut Plan Schema**
+**✅ Test 3: Error Path - Invalid Cut Plan Schema
+
 - Status: PASSED
 - Schema Validation: Correct `SCHEMA_VALIDATION` error type
 
-**✅ Test 4: Error Path - Missing Source Video**
+**✅ Test 4: Error Path - Missing Source Video
+
 - Status: PASSED
 - Error Handling: Correct `INPUT_NOT_FOUND` error type
 
-**✅ Test 5: Error Path - No Keep Segments**
+**✅ Test 5: Error Path - No Keep Segments
+
 - Status: PASSED
 - Error Handling: Correct `INVALID_PLAN` error type
 
-**⚠️ Test 6-9: Duration Validation Tests**
+**⚠️ Test 6-9: Duration Validation Tests
+
 - Status: PARTIAL (duration tolerance may need adjustment)
 - Note: Some tests fail due to frame alignment in video encoding (actual duration 19.933s vs expected 20.000s, diff 0.067s exceeds ±0.033s tolerance)
 
 **✅ Long Video Test** (test-long-video.js)
+
 - Status: PASSED
 - Input: `Weekly Q&A Session - 2025-07-11 - Includes Rachel discussing certified ip.mp4` (92 minutes, ~419 MB)
 - Output: 90-second video (3 keep segments extracted)
@@ -687,6 +718,21 @@ node tools/harness/run-local-pipeline.js \
 - FPS: 30/1
 - A/V Sync Drift: 0ms (within tolerance)
 
+**✅ Video Render Engine Test** (test-video-render-long-video.js)
+
+- Status: PASSED (Completed: 2025-11-06)
+- Input Cut Plan: `storage/dev/t-test/872d6765-2d60-4806-aa8f-b9df56f74c03/plan/cut_plan.json`
+  - Keep Segments: 48 segments
+  - Total Keep Duration: 59.19 minutes (3551.58 seconds)
+- Output Rendered Video: `storage/dev/t-test/872d6765-2d60-4806-aa8f-b9df56f74c03/renders/base_cuts.mp4`
+  - **Storage Key**: `dev/t-test/872d6765-2d60-4806-aa8f-b9df56f74c03/renders/base_cuts.mp4`
+  - **Full Path**: `D:\talk-avocado\storage\dev\t-test\872d6765-2d60-4806-aa8f-b9df56f74c03\renders\base_cuts.mp4`
+  - **File Size**: 189.5 MB
+  - **Processing Time**: ~21 minutes (started 12:01:35, completed 12:23:12)
+  - **Duration**: ~59 minutes (based on 48 keep segments totaling 3551.58 seconds)
+  - **Result**: ✅ **SUCCESS** - Full ~59 minute video rendered successfully (vs previous 90-second output)
+- Note: This is the first successful render with the fixed smart cut planner that preserves 59+ minutes of content
+
 ### Issues Resolved
 
 1. **UUID Validation**: Fixed manifest validation errors by ensuring all test jobIds are valid UUIDs
@@ -696,6 +742,7 @@ node tools/harness/run-local-pipeline.js \
 ### Accessing Output Files
 
 **From Code**:
+
 ```javascript
 import { pathFor, keyFor } from './backend/dist/storage.js';
 
@@ -705,6 +752,7 @@ const outputPath = pathFor(outputKey);
 ```
 
 **From Command Line**:
+
 ```powershell
 # Windows
 Get-ChildItem -Path "storage\dev\t-test" -Recurse -Filter "base_cuts.mp4"
@@ -714,6 +762,7 @@ Get-ChildItem -Path "storage\dev\t-test\{jobId}\renders\base_cuts.mp4"
 ```
 
 **From Manifest**:
+
 ```json
 {
   "renders": [

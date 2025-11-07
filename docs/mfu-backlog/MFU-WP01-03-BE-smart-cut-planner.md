@@ -484,34 +484,98 @@ Follow these steps exactly. All paths are repo‑relative.
 
 ## Test Plan
 
-### Local
+### Test Coverage Status: ✅ **ALL TESTS IMPLEMENTED**
+
+All tests are implemented in two test files:
+
+- `test-smart-cut-planner-comprehensive.js` - Unit/functional tests (11 tests)
+- `test-smart-cut-planner-integration.js` - Integration tests (2 tests)
+
+### Local Tests (Implemented)
+
+✅ **Test 1: Basic Functionality** (`testBasicFunctionality`)
 
 - Run harness on a short transcript:
   - Expect `plan/cut_plan.json` with `cuts[]` array
   - Verify cuts include `start`, `end`, `type`, `reason`
   - Verify manifest fields: `algorithm`, `totalCuts`, `plannedAt`
-- Validate determinism:
-  - Run 10 times with same input; expect identical output
-  - Compare JSON byte-for-byte or via checksum
-- Validate configuration:
-  - Override `minPauseMs` via env var; expect different cut decisions
-  - Override `fillerWords` via env; expect different cut decisions
-- Error path testing:
-  - Missing transcript: expect `INPUT_NOT_FOUND` error
-  - Corrupt transcript JSON: expect `TRANSCRIPT_PARSE` error
-  - Empty segments: expect `TRANSCRIPT_INVALID` error
-  - Invalid cut plan (manual test): expect `SCHEMA_VALIDATION` error with field details
+
+✅ **Test 2: Determinism** (`testDeterminism`)
+
+- Run 10 times with same input; expect identical output
+- Compare JSON byte-for-byte or via checksum
+- All 10 runs produce identical checksums
+
+✅ **Test 3: Configuration Override - minPauseMs** (`testConfigMinPauseMs`)
+
+- Override `minPauseMs` via env var; expect different cut decisions
+- Tests with default (1500ms) vs custom values
+
+✅ **Test 4: Configuration Override - fillerWords** (`testConfigFillerWords`)
+
+- Override `fillerWords` via env; expect different cut decisions
+- Tests with default vs custom filler word lists
+
+✅ **Test 5: Error Path - Missing Transcript** (`testErrorMissingTranscript`)
+
+- Missing transcript: expect `INPUT_NOT_FOUND` error
+- Verifies proper error handling and error types
+
+✅ **Test 6: Error Path - Corrupt JSON** (`testErrorCorruptJSON`)
+
+- Corrupt transcript JSON: expect `TRANSCRIPT_PARSE` error
+- Verifies proper error handling for invalid JSON
+
+✅ **Test 7: Error Path - Empty Segments** (`testErrorEmptySegments`)
+
+- Empty segments: expect `TRANSCRIPT_INVALID` error
+- Verifies proper validation of transcript structure
+
+✅ **Test 8: Idempotency** (`testIdempotency`)
+
 - Repeat runs for same `{jobId}`: no errors; outputs overwritten; manifest updated
+- Verifies idempotent behavior (safe overwrite)
 
-### CI (optional if harness lane exists)
+✅ **Test 9: Segment Duration Constraints** (`testSegmentDurationConstraints`)
 
-- Add a tiny sample transcript (10-20 segments)
-- Run planning via harness; assert:
-  - `plan/cut_plan.json` exists and is valid JSON
-  - Schema validation passes
-  - Manifest fields present and non-empty
-  - Deterministic flag produces identical output
-  - Logs contain required correlation fields
+- Tests `minSegmentDurationSec` and `maxSegmentDurationSec` constraints
+- Verifies short segments are kept (not cut) and long segments are split
+
+✅ **Test 10: Manifest Updates** (`testManifestUpdates`)
+
+- Verifies manifest is updated correctly with plan metadata
+- Checks plan key, algorithm, totalCuts, plannedAt fields
+
+✅ **Test 11: Schema Validation - Invalid Cut Plan** (`testSchemaValidation`)
+
+- Tests schema validation with invalid cut plans
+- Verifies `SCHEMA_VALIDATION` error with field details for:
+  - Missing required "cuts" field
+  - Invalid cut type (not "keep" or "cut")
+  - Missing required fields in cut segments (start, end, type)
+  - Invalid confidence value (outside 0-1 range)
+  - Invalid schemaVersion (not "1.0.0")
+- Verifies valid cut plans pass validation
+
+### Integration Tests (in `test-smart-cut-planner-integration.js`)
+
+✅ **Test 1: Real Video Integration** (`test1_RealVideoIntegration`)
+
+- Integration test with real video transcripts (any length - short or long)
+- Tests performance and accuracy on real-world inputs
+- Verifies content preservation works correctly for all video lengths
+- Uses any available transcript in storage (flexible test)
+
+✅ **Test 2: CI Harness Test** (`test2_CIHarness`)
+
+- Creates a tiny sample transcript (15 segments, within 10-20 range)
+- Runs planning via handler (simulating harness execution)
+- Asserts:
+  - ✅ `plan/cut_plan.json` exists and is valid JSON
+  - ✅ Schema validation passes
+  - ✅ Manifest fields present and non-empty (key, algorithm, totalCuts, plannedAt)
+  - ✅ Deterministic flag produces identical output (runs twice, compares checksums)
+  - ✅ Logs contain required correlation fields (correlationId, tenantId, jobId)
 
 ## Success Metrics
 

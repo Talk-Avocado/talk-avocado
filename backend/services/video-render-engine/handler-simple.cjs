@@ -70,18 +70,33 @@ function toSSFF(seconds) {
   return Number(seconds).toFixed(2);
 }
 
-function buildFilterGraph(keepSegments) {
+function buildFilterGraph(keepSegments, sourceDuration = null) {
   const filterParts = [];
   
   // Build trim filters for each segment
   keepSegments.forEach((segment, idx) => {
     const start = toSSFF(segment.start);
     const end = toSSFF(segment.end);
+    const duration = Number(end) - Number(start);
     
-    filterParts.push(
-      `[0:v]trim=start=${start}:end=${end},setpts=PTS-STARTPTS[v${idx}]`,
-      `[0:a]atrim=start=${start}:end=${end},asetpts=PTS-STARTPTS[a${idx}]`
-    );
+    // For the last segment, always use duration instead of end to ensure we capture the full segment
+    // FFmpeg trim end is exclusive, so using duration is more reliable for the last segment
+    const isLastSegment = idx === keepSegments.length - 1;
+    
+    if (isLastSegment) {
+      // Last segment: use duration to ensure we capture all content up to the end
+      const dur = toSSFF(duration);
+      filterParts.push(
+        `[0:v]trim=start=${start}:duration=${dur},setpts=PTS-STARTPTS[v${idx}]`,
+        `[0:a]atrim=start=${start}:duration=${dur},asetpts=PTS-STARTPTS[a${idx}]`
+      );
+    } else {
+      // Use end parameter for other segments
+      filterParts.push(
+        `[0:v]trim=start=${start}:end=${end},setpts=PTS-STARTPTS[v${idx}]`,
+        `[0:a]atrim=start=${start}:end=${end},asetpts=PTS-STARTPTS[a${idx}]`
+      );
+    }
   });
   
   // Build concat filters
@@ -262,7 +277,7 @@ exports.handler = async (event, context) => {
     logger.info('Source video resolved', { sourceKey });
 
     // Extract keep segments from cut plan
-    const keeps = (plan.cuts || [])
+    let keeps = (plan.cuts || [])
       .filter(cut => cut.type === 'keep')
       .map(cut => ({
         start: Number(cut.start),
@@ -277,13 +292,25 @@ exports.handler = async (event, context) => {
       );
     }
 
+    // Get source video duration for filtergraph building
+    let sourceDuration = null;
+    try {
+      const probeResult = await probe(sourcePath);
+      sourceDuration = Number(probeResult.format?.duration || 0);
+      if (sourceDuration > 0) {
+        logger.info('Source video duration', { sourceDurationSec: sourceDuration });
+      }
+    } catch (err) {
+      logger.warn('Could not probe source video duration', { error: err.message });
+    }
+
     logger.info('Processing keep segments', { 
       keepSegments: keeps.length,
       totalDuration: keeps.reduce((sum, seg) => sum + (seg.end - seg.start), 0)
     });
 
-    // Build filtergraph for precise cuts
-    const filterGraph = buildFilterGraph(keeps);
+    // Build filtergraph for precise cuts (sourceDuration already probed above)
+    const filterGraph = buildFilterGraph(keeps, sourceDuration);
     
     // Set up output path
     const outputKey = mockStorage.keyFor(env, tenantId, jobId, 'renders', 'base_cuts.mp4');
@@ -434,7 +461,7 @@ exports.handler = async (event, context) => {
       correlationId,
       durationSec,
       resolution,
-      fps,
+      fps: fpsString,
       keepSegments: keeps.length
     };
 

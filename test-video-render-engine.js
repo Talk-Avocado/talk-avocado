@@ -1,13 +1,17 @@
 #!/usr/bin/env node
 // test-video-render-engine.js
-// Comprehensive test suite for Video Render Engine (MFU-WP01-04-BE)
+// Comprehensive unit/functional test suite for Video Render Engine (MFU-WP01-04-BE)
+//
+// This file contains unit and functional tests only.
+// Integration tests are in: test-video-render-engine-integration.js
+// Covers all unit/functional tests required by the MFU including:
+// - Happy path, error paths, validation, idempotency, metadata
 
 import { handler } from "./backend/services/video-render-engine/handler.js";
 import { keyFor, pathFor, ensureDirForFile } from "./backend/dist/storage.js";
 import { saveManifest, loadManifest } from "./backend/dist/manifest.js";
-import fs from "node:fs";
+import fs, { copyFileSync } from "node:fs";
 import path from "node:path";
-import { copyFileSync } from "node:fs";
 import { v4 as uuidv4 } from "uuid";
 import { logger } from "./scripts/logger.js";
 
@@ -15,7 +19,8 @@ import { logger } from "./scripts/logger.js";
 const TEST_ENV = "dev";
 const TEST_TENANT = "t-test";
 const TEST_VIDEO = "podcast-automation/test-assets/raw/sample-short.mp4";
-const SAMPLE_CUT_PLAN = "podcast-automation/test-assets/plans/sample-short-cut-plan.json";
+const SAMPLE_CUT_PLAN =
+  "podcast-automation/test-assets/plans/sample-short-cut-plan.json";
 
 // Test results tracking
 const testResults = [];
@@ -41,12 +46,20 @@ function assert(condition, message) {
 }
 
 async function setupTestJob(jobId, options = {}) {
-  const { includeVideo = true, includeCutPlan = true, cutPlanData = null } = options;
+  const {
+    includeVideo = true,
+    includeCutPlan = true,
+    cutPlanData = null,
+  } = options;
 
   // Ensure jobId is a valid UUID format
-  const validJobId = typeof jobId === 'string' && jobId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i) 
-    ? jobId 
-    : uuidv4();
+  const validJobId =
+    typeof jobId === "string" &&
+    jobId.match(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    )
+      ? jobId
+      : uuidv4();
 
   // Create manifest
   const manifest = {
@@ -61,7 +74,13 @@ async function setupTestJob(jobId, options = {}) {
 
   if (includeVideo) {
     // Copy test video to input location
-    const inputKey = keyFor(TEST_ENV, TEST_TENANT, validJobId, "input", path.basename(TEST_VIDEO));
+    const inputKey = keyFor(
+      TEST_ENV,
+      TEST_TENANT,
+      validJobId,
+      "input",
+      path.basename(TEST_VIDEO)
+    );
     const inputPath = pathFor(inputKey);
     ensureDirForFile(inputPath);
     copyFileSync(TEST_VIDEO, inputPath);
@@ -77,7 +96,13 @@ async function setupTestJob(jobId, options = {}) {
 
   if (includeCutPlan) {
     // Create cut plan
-    const planKey = keyFor(TEST_ENV, TEST_TENANT, validJobId, "plan", "cut_plan.json");
+    const planKey = keyFor(
+      TEST_ENV,
+      TEST_TENANT,
+      validJobId,
+      "plan",
+      "cut_plan.json"
+    );
     const planPath = pathFor(planKey);
     ensureDirForFile(planPath);
 
@@ -95,11 +120,6 @@ async function setupTestJob(jobId, options = {}) {
   return { manifest, jobId: validJobId };
 }
 
-async function cleanupTestJob(jobId) {
-  // Cleanup is optional - tests can reuse storage
-  // In a real scenario, you might want to clean up test artifacts
-}
-
 // Test Cases
 
 async function test1_HappyPath() {
@@ -110,8 +130,20 @@ async function test1_HappyPath() {
     const jobId = `test-happy-${uuidv4()}`;
     const { jobId: validJobId } = await setupTestJob(jobId);
 
-    const planKey = keyFor(TEST_ENV, TEST_TENANT, validJobId, "plan", "cut_plan.json");
-    const sourceVideoKey = keyFor(TEST_ENV, TEST_TENANT, validJobId, "input", path.basename(TEST_VIDEO));
+    const planKey = keyFor(
+      TEST_ENV,
+      TEST_TENANT,
+      validJobId,
+      "plan",
+      "cut_plan.json"
+    );
+    const sourceVideoKey = keyFor(
+      TEST_ENV,
+      TEST_TENANT,
+      validJobId,
+      "input",
+      path.basename(TEST_VIDEO)
+    );
 
     const event = {
       env: TEST_ENV,
@@ -136,17 +168,21 @@ async function test1_HappyPath() {
 
     // Check manifest updated
     const manifest = loadManifest(TEST_ENV, TEST_TENANT, validJobId);
-    assert(manifest.renders && manifest.renders.length > 0, "Manifest should have renders entry");
-    assert(manifest.renders[0].type === "preview", "Render type should be preview");
+    assert(
+      manifest.renders && manifest.renders.length > 0,
+      "Manifest should have renders entry"
+    );
+    assert(
+      manifest.renders[0].type === "preview",
+      "Render type should be preview"
+    );
     assert(manifest.renders[0].codec === "h264", "Codec should be h264");
     assert(manifest.renders[0].durationSec > 0, "Duration should be positive");
 
     // Verify duration is within tolerance
-    const cutPlan = JSON.parse(
-      fs.readFileSync(pathFor(planKey), "utf-8")
-    );
+    const cutPlan = JSON.parse(fs.readFileSync(pathFor(planKey), "utf-8"));
     const expectedDuration = cutPlan.cuts
-      .filter((c) => c.type === "keep")
+      .filter(c => c.type === "keep")
       .reduce((sum, c) => sum + (Number(c.end) - Number(c.start)), 0);
     const actualDuration = manifest.renders[0].durationSec;
     const fps = 30; // Default
@@ -159,7 +195,11 @@ async function test1_HappyPath() {
       `Duration mismatch: expected ${expectedDuration.toFixed(3)}s, got ${actualDuration.toFixed(3)}s (diff: ${diff.toFixed(3)}s, tolerance: ${tolerance.toFixed(3)}s)`
     );
 
-    logTestResult(testName, true, `Duration: ${actualDuration.toFixed(3)}s (expected: ${expectedDuration.toFixed(3)}s ± ${tolerance.toFixed(3)}s)`);
+    logTestResult(
+      testName,
+      true,
+      `Duration: ${actualDuration.toFixed(3)}s (expected: ${expectedDuration.toFixed(3)}s ± ${tolerance.toFixed(3)}s)`
+    );
   } catch (error) {
     logTestResult(testName, false, error.message);
     throw error;
@@ -172,10 +212,24 @@ async function test2_MissingCutPlan() {
 
   try {
     const jobId = `test-missing-plan-${uuidv4()}`;
-    const { jobId: validJobId } = await setupTestJob(jobId, { includeCutPlan: false });
+    const { jobId: validJobId } = await setupTestJob(jobId, {
+      includeCutPlan: false,
+    });
 
-    const planKey = keyFor(TEST_ENV, TEST_TENANT, validJobId, "plan", "cut_plan.json");
-    const sourceVideoKey = keyFor(TEST_ENV, TEST_TENANT, validJobId, "input", path.basename(TEST_VIDEO));
+    const planKey = keyFor(
+      TEST_ENV,
+      TEST_TENANT,
+      validJobId,
+      "plan",
+      "cut_plan.json"
+    );
+    const sourceVideoKey = keyFor(
+      TEST_ENV,
+      TEST_TENANT,
+      validJobId,
+      "input",
+      path.basename(TEST_VIDEO)
+    );
 
     const event = {
       env: TEST_ENV,
@@ -190,11 +244,21 @@ async function test2_MissingCutPlan() {
 
     try {
       await handler(event, context);
-      logTestResult(testName, false, "Should have thrown error for missing cut plan");
+      logTestResult(
+        testName,
+        false,
+        "Should have thrown error for missing cut plan"
+      );
       return;
     } catch (error) {
-      assert(error.type === "INPUT_NOT_FOUND", `Error type should be INPUT_NOT_FOUND, got ${error.type}`);
-      assert(error.message.includes("Cut plan not found"), `Error message should mention cut plan not found`);
+      assert(
+        error.type === "INPUT_NOT_FOUND",
+        `Error type should be INPUT_NOT_FOUND, got ${error.type}`
+      );
+      assert(
+        error.message.includes("Cut plan not found"),
+        `Error message should mention cut plan not found`
+      );
 
       // Check manifest updated with error
       const manifest = loadManifest(TEST_ENV, TEST_TENANT, validJobId);
@@ -239,10 +303,24 @@ async function test3_InvalidSchema() {
   for (const testCase of testCases) {
     try {
       const jobId = `test-invalid-schema-${uuidv4()}`;
-      const { jobId: validJobId } = await setupTestJob(jobId, { cutPlanData: testCase.plan });
+      const { jobId: validJobId } = await setupTestJob(jobId, {
+        cutPlanData: testCase.plan,
+      });
 
-      const planKey = keyFor(TEST_ENV, TEST_TENANT, validJobId, "plan", "cut_plan.json");
-      const sourceVideoKey = keyFor(TEST_ENV, TEST_TENANT, validJobId, "input", path.basename(TEST_VIDEO));
+      const planKey = keyFor(
+        TEST_ENV,
+        TEST_TENANT,
+        validJobId,
+        "plan",
+        "cut_plan.json"
+      );
+      const sourceVideoKey = keyFor(
+        TEST_ENV,
+        TEST_TENANT,
+        validJobId,
+        "input",
+        path.basename(TEST_VIDEO)
+      );
 
       const event = {
         env: TEST_ENV,
@@ -257,16 +335,24 @@ async function test3_InvalidSchema() {
 
       try {
         await handler(event, context);
-        logTestResult(`${testName} - ${testCase.name}`, false, "Should have thrown validation error");
+        logTestResult(
+          `${testName} - ${testCase.name}`,
+          false,
+          "Should have thrown validation error"
+        );
         return;
       } catch (error) {
         assert(
-          error.type === "SCHEMA_VALIDATION" || error.type === "INPUT_NOT_FOUND",
+          error.type === "SCHEMA_VALIDATION" ||
+            error.type === "INPUT_NOT_FOUND",
           `Error type should be SCHEMA_VALIDATION, got ${error.type}`
         );
 
         const manifest = loadManifest(TEST_ENV, TEST_TENANT, validJobId);
-        assert(manifest.status === "failed", "Manifest status should be failed");
+        assert(
+          manifest.status === "failed",
+          "Manifest status should be failed"
+        );
 
         logger.info(`  ✓ ${testCase.name}: Validation error caught correctly`);
       }
@@ -285,10 +371,24 @@ async function test4_MissingSourceVideo() {
 
   try {
     const jobId = `test-missing-video-${uuidv4()}`;
-    const { jobId: validJobId } = await setupTestJob(jobId, { includeVideo: false });
+    const { jobId: validJobId } = await setupTestJob(jobId, {
+      includeVideo: false,
+    });
 
-    const planKey = keyFor(TEST_ENV, TEST_TENANT, validJobId, "plan", "cut_plan.json");
-    const sourceVideoKey = keyFor(TEST_ENV, TEST_TENANT, validJobId, "input", "nonexistent.mp4");
+    const planKey = keyFor(
+      TEST_ENV,
+      TEST_TENANT,
+      validJobId,
+      "plan",
+      "cut_plan.json"
+    );
+    const sourceVideoKey = keyFor(
+      TEST_ENV,
+      TEST_TENANT,
+      validJobId,
+      "input",
+      "nonexistent.mp4"
+    );
 
     const event = {
       env: TEST_ENV,
@@ -303,11 +403,21 @@ async function test4_MissingSourceVideo() {
 
     try {
       await handler(event, context);
-      logTestResult(testName, false, "Should have thrown error for missing source video");
+      logTestResult(
+        testName,
+        false,
+        "Should have thrown error for missing source video"
+      );
       return;
     } catch (error) {
-      assert(error.type === "INPUT_NOT_FOUND", `Error type should be INPUT_NOT_FOUND, got ${error.type}`);
-      assert(error.message.includes("Source video not found"), `Error message should mention source video not found`);
+      assert(
+        error.type === "INPUT_NOT_FOUND",
+        `Error type should be INPUT_NOT_FOUND, got ${error.type}`
+      );
+      assert(
+        error.message.includes("Source video not found"),
+        `Error message should mention source video not found`
+      );
 
       const manifest = loadManifest(TEST_ENV, TEST_TENANT, validJobId);
       assert(manifest.status === "failed", "Manifest status should be failed");
@@ -335,10 +445,24 @@ async function test5_NoKeepSegments() {
       ],
     };
 
-    const { jobId: validJobId } = await setupTestJob(jobId, { cutPlanData: cutPlanNoKeeps });
+    const { jobId: validJobId } = await setupTestJob(jobId, {
+      cutPlanData: cutPlanNoKeeps,
+    });
 
-    const planKey = keyFor(TEST_ENV, TEST_TENANT, validJobId, "plan", "cut_plan.json");
-    const sourceVideoKey = keyFor(TEST_ENV, TEST_TENANT, validJobId, "input", path.basename(TEST_VIDEO));
+    const planKey = keyFor(
+      TEST_ENV,
+      TEST_TENANT,
+      validJobId,
+      "plan",
+      "cut_plan.json"
+    );
+    const sourceVideoKey = keyFor(
+      TEST_ENV,
+      TEST_TENANT,
+      validJobId,
+      "input",
+      path.basename(TEST_VIDEO)
+    );
 
     const event = {
       env: TEST_ENV,
@@ -353,11 +477,21 @@ async function test5_NoKeepSegments() {
 
     try {
       await handler(event, context);
-      logTestResult(testName, false, "Should have thrown error for no keep segments");
+      logTestResult(
+        testName,
+        false,
+        "Should have thrown error for no keep segments"
+      );
       return;
     } catch (error) {
-      assert(error.type === "INVALID_PLAN", `Error type should be INVALID_PLAN, got ${error.type}`);
-      assert(error.message.includes("No keep segments"), `Error message should mention no keep segments`);
+      assert(
+        error.type === "INVALID_PLAN",
+        `Error type should be INVALID_PLAN, got ${error.type}`
+      );
+      assert(
+        error.message.includes("No keep segments"),
+        `Error message should mention no keep segments`
+      );
 
       const manifest = loadManifest(TEST_ENV, TEST_TENANT, validJobId);
       assert(manifest.status === "failed", "Manifest status should be failed");
@@ -378,8 +512,20 @@ async function test6_DurationValidation() {
     const jobId = `test-duration-${uuidv4()}`;
     const { jobId: validJobId } = await setupTestJob(jobId);
 
-    const planKey = keyFor(TEST_ENV, TEST_TENANT, validJobId, "plan", "cut_plan.json");
-    const sourceVideoKey = keyFor(TEST_ENV, TEST_TENANT, validJobId, "input", path.basename(TEST_VIDEO));
+    const planKey = keyFor(
+      TEST_ENV,
+      TEST_TENANT,
+      validJobId,
+      "plan",
+      "cut_plan.json"
+    );
+    const sourceVideoKey = keyFor(
+      TEST_ENV,
+      TEST_TENANT,
+      validJobId,
+      "input",
+      path.basename(TEST_VIDEO)
+    );
 
     const event = {
       env: TEST_ENV,
@@ -392,12 +538,12 @@ async function test6_DurationValidation() {
 
     const context = { awsRequestId: `test-${Date.now()}` };
 
-    const result = await handler(event, context);
+    await handler(event, context);
 
     // Load cut plan and calculate expected duration
     const cutPlan = JSON.parse(fs.readFileSync(pathFor(planKey), "utf-8"));
     const expectedDuration = cutPlan.cuts
-      .filter((c) => c.type === "keep")
+      .filter(c => c.type === "keep")
       .reduce((sum, c) => sum + (Number(c.end) - Number(c.start)), 0);
 
     // Check manifest for actual duration
@@ -432,8 +578,20 @@ async function test7_SyncDrift() {
     const jobId = `test-sync-drift-${uuidv4()}`;
     const { jobId: validJobId } = await setupTestJob(jobId);
 
-    const planKey = keyFor(TEST_ENV, TEST_TENANT, validJobId, "plan", "cut_plan.json");
-    const sourceVideoKey = keyFor(TEST_ENV, TEST_TENANT, validJobId, "input", path.basename(TEST_VIDEO));
+    const planKey = keyFor(
+      TEST_ENV,
+      TEST_TENANT,
+      validJobId,
+      "plan",
+      "cut_plan.json"
+    );
+    const sourceVideoKey = keyFor(
+      TEST_ENV,
+      TEST_TENANT,
+      validJobId,
+      "input",
+      path.basename(TEST_VIDEO)
+    );
 
     const event = {
       env: TEST_ENV,
@@ -453,18 +611,26 @@ async function test7_SyncDrift() {
     // In a real implementation, this would check actual drift measurements
 
     assert(result.ok === true, "Handler should complete successfully");
-    
+
     // Sync drift validation is checked internally and throws error if > 50ms
     // Since we got here, drift was within tolerance
     const manifest = loadManifest(TEST_ENV, TEST_TENANT, validJobId);
     assert(manifest.renders.length > 0, "Render should be in manifest");
 
-    logTestResult(testName, true, "Sync drift validation present (placeholder implementation returns 0ms)");
+    logTestResult(
+      testName,
+      true,
+      "Sync drift validation present (placeholder implementation returns 0ms)"
+    );
   } catch (error) {
     // Check if error is SYNC_DRIFT_EXCEEDED
     if (error.type === "SYNC_DRIFT_EXCEEDED") {
       assert(error.maxDriftMs > 50, "Error should indicate drift > 50ms");
-      logTestResult(testName, true, `Sync drift exceeded threshold: ${error.maxDriftMs}ms`);
+      logTestResult(
+        testName,
+        true,
+        `Sync drift exceeded threshold: ${error.maxDriftMs}ms`
+      );
     } else {
       logTestResult(testName, false, error.message);
       throw error;
@@ -480,8 +646,20 @@ async function test8_Idempotency() {
     const jobId = `test-idempotency-${uuidv4()}`;
     const { jobId: validJobId } = await setupTestJob(jobId);
 
-    const planKey = keyFor(TEST_ENV, TEST_TENANT, validJobId, "plan", "cut_plan.json");
-    const sourceVideoKey = keyFor(TEST_ENV, TEST_TENANT, validJobId, "input", path.basename(TEST_VIDEO));
+    const planKey = keyFor(
+      TEST_ENV,
+      TEST_TENANT,
+      validJobId,
+      "plan",
+      "cut_plan.json"
+    );
+    const sourceVideoKey = keyFor(
+      TEST_ENV,
+      TEST_TENANT,
+      validJobId,
+      "input",
+      path.basename(TEST_VIDEO)
+    );
 
     const event = {
       env: TEST_ENV,
@@ -500,12 +678,11 @@ async function test8_Idempotency() {
     assert(result1.ok === true, "First run should succeed");
 
     const outputPath1 = pathFor(result1.outputKey);
-    const stats1 = fs.statSync(outputPath1);
     const manifest1 = loadManifest(TEST_ENV, TEST_TENANT, validJobId);
     const updatedAt1 = manifest1.updatedAt;
 
     // Wait a bit to ensure different timestamps
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     // Second run (same jobId)
     logger.info("  Running second render (idempotent)...");
@@ -514,13 +691,26 @@ async function test8_Idempotency() {
 
     const outputPath2 = pathFor(result2.outputKey);
     assert(outputPath1 === outputPath2, "Output path should be the same");
-    assert(fs.existsSync(outputPath2), "Output file should exist after second run");
+    assert(
+      fs.existsSync(outputPath2),
+      "Output file should exist after second run"
+    );
 
     const manifest2 = loadManifest(TEST_ENV, TEST_TENANT, validJobId);
-    assert(manifest2.renders.length >= 2, "Manifest should have multiple render entries");
-    assert(manifest2.updatedAt !== updatedAt1, "Manifest should be updated on second run");
+    assert(
+      manifest2.renders.length >= 2,
+      "Manifest should have multiple render entries"
+    );
+    assert(
+      manifest2.updatedAt !== updatedAt1,
+      "Manifest should be updated on second run"
+    );
 
-    logTestResult(testName, true, "Both runs succeeded, output overwritten, manifest updated");
+    logTestResult(
+      testName,
+      true,
+      "Both runs succeeded, output overwritten, manifest updated"
+    );
   } catch (error) {
     logTestResult(testName, false, error.message);
     throw error;
@@ -535,8 +725,20 @@ async function test9_MetadataValidation() {
     const jobId = `test-metadata-${uuidv4()}`;
     const { jobId: validJobId } = await setupTestJob(jobId);
 
-    const planKey = keyFor(TEST_ENV, TEST_TENANT, validJobId, "plan", "cut_plan.json");
-    const sourceVideoKey = keyFor(TEST_ENV, TEST_TENANT, validJobId, "input", path.basename(TEST_VIDEO));
+    const planKey = keyFor(
+      TEST_ENV,
+      TEST_TENANT,
+      validJobId,
+      "plan",
+      "cut_plan.json"
+    );
+    const sourceVideoKey = keyFor(
+      TEST_ENV,
+      TEST_TENANT,
+      validJobId,
+      "input",
+      path.basename(TEST_VIDEO)
+    );
 
     const event = {
       env: TEST_ENV,
@@ -562,7 +764,9 @@ async function test9_MetadataValidation() {
     assert(render.durationSec > 0, "Duration should be positive");
 
     // FPS should be in format like "30/1" or "30"
-    const fpsValue = render.fps.includes("/") ? render.fps.split("/")[0] : render.fps;
+    const fpsValue = render.fps.includes("/")
+      ? render.fps.split("/")[0]
+      : render.fps;
     assert(Number(fpsValue) > 0, "FPS should be a valid number");
 
     logTestResult(
@@ -579,19 +783,30 @@ async function test9_MetadataValidation() {
 async function test10_FullPipelineIntegration() {
   const testName = "Test 10: Full Pipeline Integration";
   logger.info(`\n=== ${testName} ===`);
-  logger.info("Note: This test requires full pipeline (audio-extraction → transcription → smart-cut-planner → video-render-engine)");
-  logger.info("Run with: node tools/harness/run-local-pipeline.js --input podcast-automation/test-assets/raw/sample-short.mp4 --env dev --tenant t-test --job test-full-pipeline");
+  logger.info(
+    "Note: This test requires full pipeline (audio-extraction → transcription → smart-cut-planner → video-render-engine)"
+  );
+  logger.info(
+    "Run with: node tools/harness/run-local-pipeline.js --input podcast-automation/test-assets/raw/sample-short.mp4 --env dev --tenant t-test --job test-full-pipeline"
+  );
 
   // This test is more of a documentation/verification test
   // The actual full pipeline test should be run via the harness
-  logTestResult(testName, true, "Full pipeline integration should be tested via harness (see test plan)");
+  logTestResult(
+    testName,
+    true,
+    "Full pipeline integration should be tested via harness (see test plan)"
+  );
 }
 
 // Test runner
 async function runAllTests() {
   logger.info("=".repeat(60));
-  logger.info("Video Render Engine Test Suite");
+  logger.info("Video Render Engine Unit/Functional Test Suite");
   logger.info("=".repeat(60));
+  logger.info(
+    "Note: Integration tests are in test-video-render-engine-integration.js"
+  );
 
   const tests = [
     test1_HappyPath,
@@ -626,9 +841,11 @@ async function runAllTests() {
 
   // Print detailed results
   logger.info("\nDetailed Results:");
-  testResults.forEach((result) => {
+  testResults.forEach(result => {
     const status = result.passed ? "✅" : "❌";
-    logger.info(`  ${status} ${result.testName}${result.message ? ` - ${result.message}` : ""}`);
+    logger.info(
+      `  ${status} ${result.testName}${result.message ? ` - ${result.message}` : ""}`
+    );
   });
 
   if (testsFailed > 0) {
@@ -637,8 +854,7 @@ async function runAllTests() {
 }
 
 // Run tests
-runAllTests().catch((error) => {
+runAllTests().catch(error => {
   logger.error("Fatal error running tests:", error);
   process.exit(1);
 });
-

@@ -227,6 +227,34 @@ When running tests, output files are located at:
 - ✅ Output file created at expected location
 - ✅ Generated 66 cut plan segments (47 keep, 19 cut) covering full video duration (3600.65 seconds)
 
+### ✅ Smart Cut Planner Fix Test (test-smart-cut-planner-long-video.js)
+
+- Status: PASSED (Fixed: 2025-11-06)
+- Input Transcript: `storage/dev/t-test/872d6765-2d60-4806-aa8f-b9df56f74c03/transcripts/transcript.json`
+  - Duration: 60.01 minutes (3600.6 seconds)
+  - Segments: 907 segments
+- Output Cut Plan: `storage/dev/t-test/872d6765-2d60-4806-aa8f-b9df56f74c03/plan/cut_plan.json`
+  - **Total Segments**: 66 segments
+  - **Keep Segments**: 48 segments (increased from 47)
+  - **Cut Segments**: 18 segments (decreased from 19)
+  - **Too Short Segments**: 0 (fixed from 1)
+  - **Total Keep Duration**: 59.19 minutes (3551.58 seconds) - **MUCH IMPROVED** from ~90 seconds
+  - **Processing Time**: < 1 second
+  - **Schema Validation**: ✅ Passed
+- Fix Applied:
+  - Lowered `minSegmentDurationSec` from 3.0s to 1.0s
+  - Modified `enforceSegmentDurationConstraints` to merge short keep segments across cut segments instead of marking them as cut
+  - Short segments (< 1.0s) are now preserved unless extremely short (< 0.1s)
+- Job ID: `872d6765-2d60-4806-aa8f-b9df56f74c03`
+- Test Date: 2025-11-06
+- Result: ✅ **Fix successful** - Now preserves 59+ minutes of content instead of only 90 seconds
+
+### Issues Resolved
+
+1. **Short Segment Removal Bug**: Fixed issue where keep segments shorter than `minSegmentDurationSec` (3.0s) were being marked as cut, causing valid content to be removed
+   - **Solution**: Lowered default `minSegmentDurationSec` to 1.0s and modified logic to merge short segments across cut segments instead of removing them
+   - **Impact**: Preserves 59+ minutes of content instead of only 90 seconds for long videos
+
 ### Determinism Testing
 
 **Test**: Multiple runs with identical input
