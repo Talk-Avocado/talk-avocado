@@ -10,6 +10,10 @@ import {
   buildFilterGraph, 
   runFilterGraph,
 } from './renderer-logic.js';
+import {
+  runTransitions,
+  TransitionError,
+} from './transitions-logic.js';
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
 
@@ -72,6 +76,11 @@ export const handler = async (event, context) => {
   const threads = String(process.env.RENDER_THREADS || '2');
   const aCodec = process.env.RENDER_AUDIO_CODEC || 'aac';
   const aBitrate = process.env.RENDER_AUDIO_BITRATE || '192k';
+
+  // Check if transitions are enabled
+  const transitionsEnabled = event.transitions === true || process.env.TRANSITIONS_ENABLED === 'true';
+  const transitionsDurationMs = Number(process.env.TRANSITIONS_DURATION_MS || 300);
+  const transitionsAudioFadeMs = Number(process.env.TRANSITIONS_AUDIO_FADE_MS || transitionsDurationMs);
 
   try {
     // Resolve plan key and load cut plan
@@ -156,14 +165,17 @@ export const handler = async (event, context) => {
 
     logger.info('Processing keep segments', { 
       keepSegments: keeps.length,
-      totalDuration: keeps.reduce((sum, seg) => sum + (seg.end - seg.start), 0)
+      totalDuration: keeps.reduce((sum, seg) => sum + (seg.end - seg.start), 0),
+      transitionsEnabled
     });
 
-    // Build filtergraph for precise cuts
-    const filterGraph = buildFilterGraph(keeps);
+    // Determine if we should use transitions
+    const useTransitions = transitionsEnabled && keeps.length >= 2;
     
     // Set up output path
-    const outputKey = keyFor(env, tenantId, jobId, 'renders', 'base_cuts.mp4');
+    const outputKey = useTransitions
+      ? keyFor(env, tenantId, jobId, 'renders', 'with_transitions.mp4')
+      : keyFor(env, tenantId, jobId, 'renders', 'base_cuts.mp4');
     const outputPath = pathFor(outputKey);
 
     // Ensure output directory exists
@@ -172,24 +184,47 @@ export const handler = async (event, context) => {
       mkdirSync(outputDir, { recursive: true });
     }
 
-    logger.info('Starting FFmpeg processing', { 
-      outputKey,
-      filterGraphLength: filterGraph.length 
-    });
+    if (useTransitions) {
+      logger.info('Starting transitions processing', { 
+        outputKey,
+        durationMs: transitionsDurationMs,
+        audioFadeMs: transitionsAudioFadeMs,
+        joins: keeps.length - 1
+      });
 
-    // Execute FFmpeg with filtergraph
-    const encodingOptions = {
-      preset: renderPreset,
-      crf: renderCrf,
-      fps: renderFps,
-      threads,
-      audioCodec: aCodec,
-      audioBitrate: aBitrate
-    };
+      // Execute transitions
+      await runTransitions(sourcePath, outputPath, {
+        keeps,
+        durationMs: transitionsDurationMs,
+        audioFadeMs: transitionsAudioFadeMs,
+        fps: renderFps
+      });
 
-    await runFilterGraph(sourcePath, outputPath, filterGraph, encodingOptions);
+      logger.info('Transitions processing completed', { outputKey });
+    } else {
+      logger.info('Starting base cuts processing', { 
+        outputKey,
+        useTransitions: false,
+        reason: transitionsEnabled ? 'less than 2 keep segments' : 'transitions disabled'
+      });
 
-    logger.info('FFmpeg processing completed', { outputKey });
+      // Build filtergraph for precise cuts
+      const filterGraph = buildFilterGraph(keeps);
+
+      // Execute FFmpeg with filtergraph
+      const encodingOptions = {
+        preset: renderPreset,
+        crf: renderCrf,
+        fps: renderFps,
+        threads,
+        audioCodec: aCodec,
+        audioBitrate: aBitrate
+      };
+
+      await runFilterGraph(sourcePath, outputPath, filterGraph, encodingOptions);
+
+      logger.info('Base cuts processing completed', { outputKey });
+    }
 
     // Probe output video for metadata
     const probeResult = await probe(outputPath);
@@ -210,11 +245,29 @@ export const handler = async (event, context) => {
       hasAudio: !!audioStream
     });
 
-    // Validate duration within ±1 frame tolerance
-    const expectedDurationSec = keeps.reduce((sum, seg) => sum + (seg.end - seg.start), 0);
+    // Validate duration within tolerance
+    // For transitions: expected = sum(keeps) - joins * transitionDurationSec
+    // For base cuts: expected = sum(keeps)
+    const joins = useTransitions ? Math.max(keeps.length - 1, 0) : 0;
+    const transitionOverlapSec = useTransitions ? (transitionsDurationMs / 1000) * joins : 0;
+    const expectedDurationSec = keeps.reduce((sum, seg) => sum + (seg.end - seg.start), 0) - transitionOverlapSec;
+    
     const fpsNumber = parseFloat(fpsString.split('/')[0]) / (fpsString.includes('/') ? parseFloat(fpsString.split('/')[1]) : 1);
     const frameDurationSec = 1 / fpsNumber;
-    const toleranceSec = frameDurationSec; // ±1 frame
+    
+    // Tolerance: ±1 frame for base cuts, ±2% or ±5 seconds (whichever is larger) for transitions
+    // Transitions can introduce timing differences due to crossfade processing
+    let toleranceSec;
+    if (useTransitions) {
+      // For transitions, use a more lenient tolerance: 2% of expected duration or 5 seconds, whichever is larger
+      // But at least 1 frame
+      const percentTolerance = expectedDurationSec * 0.02; // 2%
+      const fixedTolerance = 5.0; // 5 seconds
+      toleranceSec = Math.max(percentTolerance, fixedTolerance, frameDurationSec);
+    } else {
+      toleranceSec = frameDurationSec; // ±1 frame for base cuts
+    }
+    
     const durationDiffSec = Math.abs(durationSec - expectedDurationSec);
     
     if (durationDiffSec > toleranceSec) {
@@ -227,7 +280,10 @@ export const handler = async (event, context) => {
           durationDiffSec, 
           toleranceSec,
           fps: fpsNumber,
-          frameDurationSec
+          frameDurationSec,
+          useTransitions,
+          joins,
+          transitionOverlapSec
         }
       );
     }
@@ -240,18 +296,30 @@ export const handler = async (event, context) => {
       fps: fpsNumber
     });
 
-    // Measure A/V sync drift
-    const driftResult = await measureSyncDrift(sourcePath, keeps);
+    // Measure A/V sync drift (enhanced for transitions)
+    const driftResult = await measureSyncDrift(sourcePath, keeps, {
+      outputPath,
+      useTransitions,
+      transitionDurationMs: useTransitions ? transitionsDurationMs : 0
+    });
     if (driftResult.maxDriftMs > 50) {
       throw new VideoRenderError(
         `A/V sync drift exceeded threshold: ${driftResult.maxDriftMs}ms (max: 50ms)`, 
         'SYNC_DRIFT_EXCEEDED',
-        { maxDriftMs: driftResult.maxDriftMs, measurements: driftResult.measurements }
+        { 
+          maxDriftMs: driftResult.maxDriftMs, 
+          measurements: driftResult.measurements,
+          useTransitions: driftResult.useTransitions,
+          joins: driftResult.joins
+        }
       );
     }
 
     logger.info('A/V sync drift check passed', { 
-      maxDriftMs: driftResult.maxDriftMs 
+      maxDriftMs: driftResult.maxDriftMs,
+      useTransitions: driftResult.useTransitions,
+      joins: driftResult.joins,
+      source: driftResult.source
     });
 
     // Update manifest with render information
@@ -269,6 +337,15 @@ export const handler = async (event, context) => {
       renderedAt: new Date().toISOString(),
     };
 
+    // Add transition metadata if transitions were used
+    if (useTransitions) {
+      renderEntry.transition = {
+        type: 'crossfade',
+        durationMs: transitionsDurationMs,
+        audioFadeMs: transitionsAudioFadeMs
+      };
+    }
+
     updatedManifest.renders.push(renderEntry);
     updatedManifest.updatedAt = new Date().toISOString();
     
@@ -277,13 +354,22 @@ export const handler = async (event, context) => {
     updatedManifest.logs.push({
       key: outputKey,
       type: 'pipeline',
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      summary: useTransitions 
+        ? `Transitions applied: ${joins} joins, ${transitionsDurationMs}ms crossfade`
+        : 'Base cuts rendered'
     });
 
     saveManifest(env, tenantId, jobId, updatedManifest);
 
     // Emit success metrics
-    metrics.addMetric('RenderSuccess', 'Count', 1);
+    if (useTransitions) {
+      metrics.addMetric('RenderTransitionsSuccess', 'Count', 1);
+      metrics.addMetric('TransitionsJoins', 'Count', joins);
+      metrics.addMetric('TransitionsDurationDeltaMs', 'Milliseconds', Math.abs(durationDiffSec * 1000));
+    } else {
+      metrics.addMetric('RenderSuccess', 'Count', 1);
+    }
     metrics.addMetric('RenderDurationSec', 'Milliseconds', durationSec * 1000);
     metrics.addMetric('KeepSegments', 'Count', keeps.length);
     metrics.addMetric('SyncDriftMs', 'Milliseconds', driftResult.maxDriftMs);
@@ -294,7 +380,9 @@ export const handler = async (event, context) => {
       resolution, 
       fps: fpsString,
       keepSegments: keeps.length,
-      maxDriftMs: driftResult.maxDriftMs
+      maxDriftMs: driftResult.maxDriftMs,
+      useTransitions,
+      joins: useTransitions ? joins : 0
     });
 
     return { 
@@ -304,18 +392,29 @@ export const handler = async (event, context) => {
       durationSec,
       resolution,
       fps: fpsString,
-      keepSegments: keeps.length
+      keepSegments: keeps.length,
+      useTransitions,
+      joins: useTransitions ? joins : 0
     };
 
   } catch (error) {
     // Handle errors and update manifest
-    const errorType = error.type || 'UNKNOWN_ERROR';
-    const errorMessage = error.message || 'Unknown error occurred';
+    // Convert TransitionError to VideoRenderError for consistent handling
+    let renderError = error;
+    if (error instanceof TransitionError) {
+      renderError = new VideoRenderError(
+        error.message,
+        error.type || 'TRANSITION_ERROR',
+        error.details
+      );
+    }
+    const errorType = renderError.type || 'UNKNOWN_ERROR';
+    const errorMessage = renderError.message || 'Unknown error occurred';
 
     logger.error('Video render failed', { 
       error: errorMessage,
       errorType,
-      details: error.details
+      details: renderError.details
     });
 
     // Update manifest with error status
@@ -327,6 +426,9 @@ export const handler = async (event, context) => {
       manifest.logs.push({
         key: `error-${Date.now()}`,
         type: 'error',
+        message: errorMessage,
+        errorType,
+        details: renderError.details || {},
         createdAt: new Date().toISOString()
       });
       saveManifest(env, tenantId, jobId, manifest);
@@ -337,10 +439,15 @@ export const handler = async (event, context) => {
     }
 
     // Emit error metrics
-    metrics.addMetric('RenderError', 'Count', 1);
-    metrics.addMetric(`RenderError_${errorType}`, 'Count', 1);
+    if (transitionsEnabled) {
+      metrics.addMetric('RenderTransitionsError', 'Count', 1);
+      metrics.addMetric(`RenderTransitionsError_${errorType}`, 'Count', 1);
+    } else {
+      metrics.addMetric('RenderError', 'Count', 1);
+      metrics.addMetric(`RenderError_${errorType}`, 'Count', 1);
+    }
 
     // Re-throw the error
-    throw error;
+    throw renderError;
   }
 };

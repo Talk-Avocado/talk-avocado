@@ -19,7 +19,8 @@ async function main() {
       job: { type: 'string', default: 'auto' },
       input: { type: 'string' },
       goldens: { type: 'string' },
-      strict: { type: 'boolean', default: false }
+      strict: { type: 'boolean', default: false },
+      transitions: { type: 'boolean', default: false }
     }
   });
 
@@ -65,7 +66,7 @@ async function main() {
     { name: 'audio-extraction', path: '../../backend/services/audio-extraction/handler.cjs' },
     { name: 'transcription', path: '../../backend/services/transcription/handler.js' },
     { name: 'smart-cut-planner', path: '../../backend/services/smart-cut-planner/handler.js' },
-    { name: 'video-render-engine', path: '../../backend/services/video-render-engine/handler-simple.cjs' }
+    { name: 'video-render-engine', path: '../../backend/services/video-render-engine/handler.js' }
   ];
 
   for (const handler of handlers) {
@@ -96,7 +97,20 @@ async function main() {
       if (handler.name === 'video-render-engine') {
         const planKey = keyFor(env, tenantId, jobId, 'plan', 'cut_plan.json');
         const sourceVideoKey = keyFor(env, tenantId, jobId, 'input', path.basename(values.input));
-        event = { env, tenantId, jobId, planKey, sourceVideoKey };
+        event = { 
+          env, 
+          tenantId, 
+          jobId, 
+          planKey, 
+          sourceVideoKey,
+          transitions: values.transitions || false
+        };
+        
+        // Also set environment variable for transitions
+        if (values.transitions) {
+          process.env.TRANSITIONS_ENABLED = 'true';
+          logger.info(`[harness] Transitions enabled for video-render-engine`);
+        }
       }
       
       const context = { awsRequestId: `local-${Date.now()}` };

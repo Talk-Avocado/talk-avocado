@@ -33,7 +33,26 @@ export function probe(pathToFile: string): Object;
  * @param {Array} keepSegments - Array of keep segments
  * @returns {Object} Drift measurement results
  */
-export function measureSyncDrift(sourcePath: string, keepSegments: any[]): Object;
+export function measureSyncDrift(sourcePath: string, keepSegments: any[], options?: {
+  outputPath?: string;
+  useTransitions?: boolean;
+  transitionDurationMs?: number;
+}): Promise<{
+  maxDriftMs: number;
+  measurements: Array<{
+    segmentIndex: number;
+    start: number;
+    end: number;
+    driftMs: number;
+    isJoin?: boolean;
+    transitionOverlapSec?: number;
+    effectiveStart?: number;
+    effectiveEnd?: number;
+  }>;
+  source?: string;
+  useTransitions?: boolean;
+  joins?: number;
+}>;
 /**
  * Convert seconds to SS.FF format for FFmpeg
  * @param {number} seconds - Time in seconds
