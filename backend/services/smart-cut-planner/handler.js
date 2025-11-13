@@ -59,8 +59,23 @@ export const handler = async (event, context) => {
       throw new PlannerError(`Transcript invalid: missing segments`, ERROR_TYPES.TRANSCRIPT_INVALID);
     }
 
+    // Try to get audio path for audio-based silence detection (catches untranscribed "um"/"uh" sounds)
+    let audioPath = null;
+    try {
+      const manifest = loadManifest(env, tenantId, jobId);
+      if (manifest.audio && manifest.audio.key) {
+        const audioKeyPath = pathFor(manifest.audio.key);
+        if (fs.existsSync(audioKeyPath)) {
+          audioPath = audioKeyPath;
+          logger.info('Using audio file for silence detection', { audioKey: manifest.audio.key });
+        }
+      }
+    } catch (err) {
+      logger.warn('Could not load audio path from manifest for silence detection', { error: err.message });
+    }
+
     const start = Date.now();
-    const cutPlan = await planCuts(transcriptData);
+    const cutPlan = await planCuts(transcriptData, null, audioPath, logger);
     cutPlan.metadata.processingTimeMs = Date.now() - start;
 
     const valid = validator(cutPlan);

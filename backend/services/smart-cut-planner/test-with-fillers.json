@@ -1,0 +1,35 @@
+{
+  "text": "Well, um, this is a test transcript with, uh, some filler words. So, like, we want to see if the planner can detect them. Actually, you know, it should work pretty well. Right? Okay, let's see.",
+  "segments": [
+    {
+      "id": 0,
+      "start": 0.0,
+      "end": 4.5,
+      "text": "Well, um, this is a test transcript with, uh, some filler words.",
+      "words": null
+    },
+    {
+      "id": 1,
+      "start": 6.0,
+      "end": 10.0,
+      "text": "So, like, we want to see if the planner can detect them.",
+      "words": null
+    },
+    {
+      "id": 2,
+      "start": 12.0,
+      "end": 16.5,
+      "text": "Actually, you know, it should work pretty well.",
+      "words": null
+    },
+    {
+      "id": 3,
+      "start": 18.0,
+      "end": 22.0,
+      "text": "Right? Okay, let's see.",
+      "words": null
+    }
+  ]
+}
+
+

@@ -457,7 +457,7 @@ transitions-test:
 
 ## Outstanding Work - Step-by-Step Implementation Plan
 
-**Completion Status: 7/7 Steps Completed (100%)**
+**Completion Status: 7/7 Steps Completed (100%)
 
 Based on the code review, the following items have been implemented:
 
@@ -483,6 +483,7 @@ Based on the code review, the following items have been implemented:
 - ✅ Verify FFmpeg command structure matches expected format - **PASSING** (test-transitions-logic-unit.js)
 
 **Test Results:**
+
 - **Test File:** `test-transitions-logic-unit.js`
 - **Total Tests:** 10
 - **Passed:** 10
@@ -490,6 +491,7 @@ Based on the code review, the following items have been implemented:
 - **Status:** ✅ **ALL VALIDATION TESTS PASSING**
 
 **Test Coverage:**
+
 1. ✅ `buildTrimNodes` - Single segment
 2. ✅ `buildTrimNodes` - Multiple segments
 3. ✅ `buildTrimNodes` - Error handling
@@ -610,6 +612,7 @@ Based on the code review, the following items have been implemented:
    - ✅ `measureSyncDriftFromSource` - Estimates from source video (fallback) - **DONE** (lines 147-188)
 
 **Implementation Details:**
+
 - ✅ Enhanced `measureSyncDrift` function accepts options: `{ outputPath, useTransitions, transitionDurationMs }` - **DONE** (line 121)
 - ✅ Accounts for transition overlaps when calculating cumulative timeline - **DONE** (lines 221-252)
 - ✅ Measures drift at each join point with transition information - **DONE** (lines 238-247)
@@ -618,6 +621,7 @@ Based on the code review, the following items have been implemented:
 - ✅ Enhanced error reporting includes transition context - **DONE** (handler.js lines 296-301)
 
 **Features:**
+
 - ✅ Measures actual A/V sync drift from output video using ffprobe
 - ✅ Accounts for transition overlaps in timeline calculations
 - ✅ Provides detailed measurements per segment with join point identification
@@ -652,6 +656,7 @@ Based on the code review, the following items have been implemented:
    - ✅ Verify error handling works correctly - **IMPLEMENTED** (handler error handling)
 
 **Test Files:**
+
 - ✅ `test-video-render-engine-transitions.js` - 7 integration tests
 - ✅ `test-transitions-logic-unit.js` - 10 unit tests
 - **Total Tests:** 17 tests covering all validation requirements
@@ -666,6 +671,7 @@ Based on the code review, the following items have been implemented:
 4. ✅ Document transition metadata structure in manifest schema (if applicable) - **COMPLETE** (Transition metadata structure documented in MFU Step 2, lines 523-540; manifest structure documented in handler section)
 
 **Documentation Status:**
+
 - ✅ **MFU Document** - Comprehensive documentation of all functionality (this document)
 - ✅ **.env.example** - All environment variables documented with comments
 - ✅ **Test Plan Section** - Includes harness usage examples with `--transitions` flag
@@ -688,7 +694,7 @@ Based on the code review, the following items have been implemented:
 | **Step 6:** Testing and Validation | ✅ **COMPLETED** | 100% |
 | **Step 7:** Documentation Updates | ✅ **COMPLETED** | 100% (all required docs in MFU document) |
 
-**Overall Completion: 7/7 Steps (100%)**
+**Overall Completion: 7/7 Steps (100%)
 
 **Required Steps Completed:** 6/6 (100%)  
 **Optional Steps Completed:** Step 5 (A/V sync drift enhancement) - ✅ **COMPLETED**  
@@ -741,6 +747,7 @@ All core functionality has been implemented:
    - **Note**: Manifest shows "failed" but output file is valid - handler may have encountered an error during probe/validation phase
 
 **Test Validation**:
+
 - ✅ FFmpeg successfully processed 48 segments with 47 transitions
 - ✅ Output files created and complete (645.96 MB each)
 - ✅ Transitions applied using correct workflow (base_cuts.mp4 as input)
@@ -769,6 +776,7 @@ All core functionality has been implemented:
    - Expected Duration: ~59 minutes minus transition overlaps (47 × 0.3s = 14.1s reduction)
 
 **Test Scripts**:
+
 - `test-transitions-with-sample-video.js` - Test transitions with original source video
 - `test-transitions-on-rendered-video.js` - Test transitions on already-rendered `base_cuts.mp4` video
 
@@ -813,6 +821,7 @@ The tests for MFU-WP01-05 (Video Engine Transitions) require the following input
   - `TRANSITIONS_AUDIO_FADE_MS=300` - Audio fade duration in milliseconds (default: matches video duration)
 
 - **Event Parameters** (when calling handler directly):
+
   ```json
   {
     "env": "dev",
@@ -827,6 +836,7 @@ The tests for MFU-WP01-05 (Video Engine Transitions) require the following input
 #### Test Scenarios
 
 **Important**: The proper workflow for transitions is:
+
 1. **Audio Extraction** → Extract audio from source video
 2. **Transcription** → Generate transcript from audio
 3. **Smart Cut Planner** → Generate cut plan from transcript
@@ -862,7 +872,7 @@ The tests for MFU-WP01-05 (Video Engine Transitions) require the following input
 
 5. **Full Pipeline Test** (via `tools/harness/run-local-pipeline.js --transitions`):
    - **Input**: Original source video (e.g., `sample-short.mp4`)
-   - **Workflow**: 
+   - **Workflow**:
      - Audio extraction → Transcription → Smart cut planner → Video engine cuts → **Video engine transitions**
    - **Output**: `with_transitions.mp4` (produced from `base_cuts.mp4` after full pipeline)
    - **Purpose**: **End-to-end testing of the complete production workflow**
@@ -870,7 +880,8 @@ The tests for MFU-WP01-05 (Video Engine Transitions) require the following input
 
 #### Example Test Inputs
 
-**Example 1: Full Pipeline Test (Recommended)**
+**Example 1: Full Pipeline Test (Recommended)
+
 ```bash
 # Run full pipeline with transitions
 node tools/harness/run-local-pipeline.js \
@@ -879,14 +890,17 @@ node tools/harness/run-local-pipeline.js \
   --env dev \
   --tenant t-local
 ```
+
 **Workflow**:
+
 1. Audio extraction → `audio/{jobId}.mp3`
 2. Transcription → `transcripts/transcript.json`
 3. Smart cut planner → `plan/cut_plan.json`
 4. Video engine cuts → `renders/base_cuts.mp4` (input for transitions)
 5. Video engine transitions → `renders/with_transitions.mp4` (final output)
 
-**Example 2: Testing Shortcut (Direct on Original Video)**
+**Example 2: Testing Shortcut (Direct on Original Video)
+
 ```json
 {
   "sourceVideo": "podcast-automation/test-assets/raw/sample-short.mp4",
@@ -899,10 +913,12 @@ node tools/harness/run-local-pipeline.js \
   }
 }
 ```
+
 **Result**: 1 transition applied between segments (10s total - 0.3s overlap = 9.7s output)
 **Note**: This skips the pipeline and tests transitions directly on the original video (for faster testing only)
 
-**Example 3: Long Video Test (48 keep segments)**
+**Example 3: Long Video Test (48 keep segments)
+
 ```json
 {
   "sourceVideo": "storage/dev/t-test/872d6765-2d60-4806-aa8f-b9df56f74c03/renders/base_cuts.mp4",
@@ -917,6 +933,7 @@ node tools/harness/run-local-pipeline.js \
   }
 }
 ```
+
 **Result**: 47 transitions applied (one between each consecutive pair of segments)
 
 ### Outstanding Work

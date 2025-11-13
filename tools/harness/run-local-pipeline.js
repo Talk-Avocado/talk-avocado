@@ -66,7 +66,8 @@ async function main() {
     { name: 'audio-extraction', path: '../../backend/services/audio-extraction/handler.cjs' },
     { name: 'transcription', path: '../../backend/services/transcription/handler.js' },
     { name: 'smart-cut-planner', path: '../../backend/services/smart-cut-planner/handler.js' },
-    { name: 'video-render-engine', path: '../../backend/services/video-render-engine/handler.js' }
+    { name: 'video-render-engine', path: '../../backend/services/video-render-engine/handler.js' },
+    { name: 'subtitles-post-edit', path: '../../backend/services/subtitles-post-edit/handler.js' }
   ];
 
   for (const handler of handlers) {
@@ -111,6 +112,21 @@ async function main() {
           process.env.TRANSITIONS_ENABLED = 'true';
           logger.info(`[harness] Transitions enabled for video-render-engine`);
         }
+      }
+      
+      // Subtitles post-edit needs transcriptKey, planKey, and renderKey
+      if (handler.name === 'subtitles-post-edit') {
+        const transcriptKey = keyFor(env, tenantId, jobId, 'transcripts', 'transcript.json');
+        const planKey = keyFor(env, tenantId, jobId, 'plan', 'cut_plan.json');
+        // renderKey will be auto-detected by handler (prefers with_transitions.mp4, falls back to base_cuts.mp4)
+        event = { 
+          env, 
+          tenantId, 
+          jobId, 
+          transcriptKey,
+          planKey
+          // renderKey is optional - handler will auto-detect
+        };
       }
       
       const context = { awsRequestId: `local-${Date.now()}` };

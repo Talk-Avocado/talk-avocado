@@ -172,62 +172,74 @@ export const handler = async (event, context) => {
     // Determine if we should use transitions
     const useTransitions = transitionsEnabled && keeps.length >= 2;
     
-    // Set up output path
-    const outputKey = useTransitions
+    // ALWAYS generate base_cuts.mp4 (version without transitions) for testing/reviewing
+    const baseCutsKey = keyFor(env, tenantId, jobId, 'renders', 'base_cuts.mp4');
+    const baseCutsPath = pathFor(baseCutsKey);
+    
+    // If transitions enabled, also generate with_transitions.mp4
+    const transitionsKey = useTransitions 
       ? keyFor(env, tenantId, jobId, 'renders', 'with_transitions.mp4')
-      : keyFor(env, tenantId, jobId, 'renders', 'base_cuts.mp4');
-    const outputPath = pathFor(outputKey);
+      : null;
+    const transitionsPath = transitionsKey ? pathFor(transitionsKey) : null;
 
     // Ensure output directory exists
-    const outputDir = dirname(outputPath);
+    const outputDir = dirname(baseCutsPath);
     if (!existsSync(outputDir)) {
       mkdirSync(outputDir, { recursive: true });
     }
 
-    if (useTransitions) {
+    // ALWAYS generate base cuts version (without transitions) for easier testing/reviewing
+    logger.info('Starting base cuts processing', { 
+      outputKey: baseCutsKey,
+      useTransitions: false
+    });
+
+    const filterGraph = buildFilterGraph(keeps);
+    const encodingOptions = {
+      preset: renderPreset,
+      crf: renderCrf,
+      fps: renderFps,
+      threads,
+      audioCodec: aCodec,
+      audioBitrate: aBitrate
+    };
+
+    await runFilterGraph(sourcePath, baseCutsPath, filterGraph, encodingOptions);
+    logger.info('Base cuts processing completed', { outputKey: baseCutsKey });
+
+    // Probe base cuts for metadata
+    const baseCutsProbe = await probe(baseCutsPath);
+    const baseCutsVideoStream = (baseCutsProbe.streams || []).find(s => s.codec_type === 'video');
+    const baseCutsDurationSec = Number(baseCutsProbe.format?.duration || baseCutsVideoStream?.duration || 0);
+
+    // If transitions are enabled, also generate the transitions version
+    let transitionsDurationSec = null;
+    if (useTransitions && transitionsPath) {
       logger.info('Starting transitions processing', { 
-        outputKey,
+        outputKey: transitionsKey,
         durationMs: transitionsDurationMs,
         audioFadeMs: transitionsAudioFadeMs,
         joins: keeps.length - 1
       });
 
-      // Execute transitions
-      await runTransitions(sourcePath, outputPath, {
+      await runTransitions(sourcePath, transitionsPath, {
         keeps,
         durationMs: transitionsDurationMs,
         audioFadeMs: transitionsAudioFadeMs,
         fps: renderFps
       });
 
-      logger.info('Transitions processing completed', { outputKey });
-    } else {
-      logger.info('Starting base cuts processing', { 
-        outputKey,
-        useTransitions: false,
-        reason: transitionsEnabled ? 'less than 2 keep segments' : 'transitions disabled'
-      });
+      logger.info('Transitions processing completed', { outputKey: transitionsKey });
 
-      // Build filtergraph for precise cuts
-      const filterGraph = buildFilterGraph(keeps);
-
-      // Execute FFmpeg with filtergraph
-      const encodingOptions = {
-        preset: renderPreset,
-        crf: renderCrf,
-        fps: renderFps,
-        threads,
-        audioCodec: aCodec,
-        audioBitrate: aBitrate
-      };
-
-      await runFilterGraph(sourcePath, outputPath, filterGraph, encodingOptions);
-
-      logger.info('Base cuts processing completed', { outputKey });
+      // Probe transitions version for metadata
+      const transitionsProbe = await probe(transitionsPath);
+      transitionsDurationSec = Number(transitionsProbe.format?.duration || 0);
     }
 
-    // Probe output video for metadata
-    const probeResult = await probe(outputPath);
+    // Use transitions version as primary if available, otherwise base cuts
+    const primaryOutputPath = transitionsPath || baseCutsPath;
+    const primaryOutputKey = transitionsKey || baseCutsKey;
+    const probeResult = await probe(primaryOutputPath);
     const videoStream = (probeResult.streams || []).find(s => s.codec_type === 'video');
     const audioStream = (probeResult.streams || []).find(s => s.codec_type === 'audio');
     
@@ -296,12 +308,25 @@ export const handler = async (event, context) => {
       fps: fpsNumber
     });
 
-    // Measure A/V sync drift (enhanced for transitions)
-    const driftResult = await measureSyncDrift(sourcePath, keeps, {
-      outputPath,
-      useTransitions,
-      transitionDurationMs: useTransitions ? transitionsDurationMs : 0
+    // Measure A/V sync drift for base cuts version
+    const baseCutsDriftResult = await measureSyncDrift(sourcePath, keeps, {
+      outputPath: baseCutsPath,
+      useTransitions: false,
+      transitionDurationMs: 0
     });
+
+    // Measure A/V sync drift for transitions version if it exists
+    let transitionsDriftResult = null;
+    if (useTransitions && transitionsPath) {
+      transitionsDriftResult = await measureSyncDrift(sourcePath, keeps, {
+        outputPath: transitionsPath,
+        useTransitions: true,
+        transitionDurationMs: transitionsDurationMs
+      });
+    }
+
+    // Use transitions drift result as primary if available, otherwise base cuts
+    const driftResult = transitionsDriftResult || baseCutsDriftResult;
     if (driftResult.maxDriftMs > 50) {
       throw new VideoRenderError(
         `A/V sync drift exceeded threshold: ${driftResult.maxDriftMs}ms (max: 50ms)`, 
@@ -322,76 +347,110 @@ export const handler = async (event, context) => {
       source: driftResult.source
     });
 
-    // Update manifest with render information
+    // Update manifest with render information for both versions
     const updatedManifest = loadManifest(env, tenantId, jobId);
     updatedManifest.renders = updatedManifest.renders || [];
     
-    const renderEntry = {
-      key: outputKey,
+    // Add base cuts version to manifest
+    const baseCutsVideoStreamForManifest = (baseCutsProbe.streams || []).find(s => s.codec_type === 'video');
+    const baseCutsResolution = baseCutsVideoStreamForManifest ? `${baseCutsVideoStreamForManifest.width}x${baseCutsVideoStreamForManifest.height}` : undefined;
+    const baseCutsRawFps = baseCutsVideoStreamForManifest?.r_frame_rate || renderFps;
+    const baseCutsFpsString = baseCutsRawFps.includes('/') ? baseCutsRawFps : `${baseCutsRawFps}/1`;
+
+    const baseCutsEntry = {
+      key: baseCutsKey,
       type: 'preview',
       codec: 'h264',
-      durationSec,
-      resolution,
-      fps: fpsString,
-      notes: `preset=${renderPreset},crf=${renderCrf}`,
+      durationSec: baseCutsDurationSec,
+      resolution: baseCutsResolution,
+      fps: baseCutsFpsString,
+      notes: `preset=${renderPreset},crf=${renderCrf},no_transitions`,
       renderedAt: new Date().toISOString(),
     };
+    updatedManifest.renders.push(baseCutsEntry);
 
-    // Add transition metadata if transitions were used
-    if (useTransitions) {
-      renderEntry.transition = {
-        type: 'crossfade',
-        durationMs: transitionsDurationMs,
-        audioFadeMs: transitionsAudioFadeMs
+    // Add transitions version to manifest if it exists
+    if (useTransitions && transitionsKey && transitionsDurationSec !== null) {
+      const transitionsProbe = await probe(transitionsPath);
+      const transitionsVideoStream = (transitionsProbe.streams || []).find(s => s.codec_type === 'video');
+      const transitionsResolution = transitionsVideoStream ? `${transitionsVideoStream.width}x${transitionsVideoStream.height}` : undefined;
+      const transitionsRawFps = transitionsVideoStream?.r_frame_rate || renderFps;
+      const transitionsFpsString = transitionsRawFps.includes('/') ? transitionsRawFps : `${transitionsRawFps}/1`;
+
+      const transitionsEntry = {
+        key: transitionsKey,
+        type: 'preview',
+        codec: 'h264',
+        durationSec: transitionsDurationSec,
+        resolution: transitionsResolution,
+        fps: transitionsFpsString,
+        notes: `preset=${renderPreset},crf=${renderCrf},with_transitions`,
+        renderedAt: new Date().toISOString(),
+        transition: {
+          type: 'crossfade',
+          durationMs: transitionsDurationMs,
+          audioFadeMs: transitionsAudioFadeMs
+        }
       };
+      updatedManifest.renders.push(transitionsEntry);
     }
 
-    updatedManifest.renders.push(renderEntry);
     updatedManifest.updatedAt = new Date().toISOString();
     
-    // Add render log entry
+    // Add render log entries
     updatedManifest.logs = updatedManifest.logs || [];
     updatedManifest.logs.push({
-      key: outputKey,
+      key: baseCutsKey,
       type: 'pipeline',
       createdAt: new Date().toISOString(),
-      summary: useTransitions 
-        ? `Transitions applied: ${joins} joins, ${transitionsDurationMs}ms crossfade`
-        : 'Base cuts rendered'
+      summary: 'Base cuts rendered (no transitions)'
     });
+    
+    if (useTransitions && transitionsKey) {
+      const joins = Math.max(keeps.length - 1, 0);
+      updatedManifest.logs.push({
+        key: transitionsKey,
+        type: 'pipeline',
+        createdAt: new Date().toISOString(),
+        summary: `Transitions applied: ${joins} joins, ${transitionsDurationMs}ms crossfade`
+      });
+    }
 
     saveManifest(env, tenantId, jobId, updatedManifest);
 
     // Emit success metrics
-    if (useTransitions) {
+    metrics.addMetric('RenderSuccess', 'Count', 1);
+    metrics.addMetric('RenderDurationSec', 'Milliseconds', baseCutsDurationSec * 1000);
+    metrics.addMetric('KeepSegments', 'Count', keeps.length);
+    metrics.addMetric('SyncDriftMs', 'Milliseconds', baseCutsDriftResult.maxDriftMs);
+
+    if (useTransitions && transitionsKey) {
       metrics.addMetric('RenderTransitionsSuccess', 'Count', 1);
       metrics.addMetric('TransitionsJoins', 'Count', joins);
-      metrics.addMetric('TransitionsDurationDeltaMs', 'Milliseconds', Math.abs(durationDiffSec * 1000));
-    } else {
-      metrics.addMetric('RenderSuccess', 'Count', 1);
+      if (transitionsDriftResult) {
+        metrics.addMetric('TransitionsSyncDriftMs', 'Milliseconds', transitionsDriftResult.maxDriftMs);
+      }
     }
-    metrics.addMetric('RenderDurationSec', 'Milliseconds', durationSec * 1000);
-    metrics.addMetric('KeepSegments', 'Count', keeps.length);
-    metrics.addMetric('SyncDriftMs', 'Milliseconds', driftResult.maxDriftMs);
 
     logger.info('Video render completed successfully', { 
-      outputKey, 
-      durationSec, 
-      resolution, 
-      fps: fpsString,
+      baseCutsKey,
+      baseCutsDurationSec,
+      transitionsKey: transitionsKey || 'none',
+      transitionsDurationSec: transitionsDurationSec || 'none',
       keepSegments: keeps.length,
-      maxDriftMs: driftResult.maxDriftMs,
+      baseCutsMaxDriftMs: baseCutsDriftResult.maxDriftMs,
+      transitionsMaxDriftMs: transitionsDriftResult?.maxDriftMs || 'N/A',
       useTransitions,
       joins: useTransitions ? joins : 0
     });
 
     return { 
       ok: true, 
-      outputKey, 
+      baseCutsKey,
+      transitionsKey: transitionsKey || null,
       correlationId,
-      durationSec,
-      resolution,
-      fps: fpsString,
+      baseCutsDurationSec,
+      transitionsDurationSec: transitionsDurationSec || null,
       keepSegments: keeps.length,
       useTransitions,
       joins: useTransitions ? joins : 0

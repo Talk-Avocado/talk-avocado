@@ -318,7 +318,14 @@ function transcribeChunk(chunkPath, whisperCmd, model, language, device, outputD
       '--output_dir', outputDir,
       '--device', device,
       '--word_timestamps', 'True', // Enable word-level timestamps for accurate filler word detection
-      '--verbose', 'False'
+      '--verbose', 'False',
+      // Parameters to improve filler word detection:
+      '--no_speech_threshold', String(process.env.WHISPER_NO_SPEECH_THRESHOLD || '0.3'), // Lower threshold (default 0.6) to catch more low-volume sounds like "um"
+      '--compression_ratio_threshold', String(process.env.WHISPER_COMPRESSION_RATIO_THRESHOLD || '2.4'), // Lower threshold (default 2.4) to catch more repetitive sounds
+      '--temperature', String(process.env.WHISPER_TEMPERATURE || '0.0'), // Lower temperature for more deterministic transcription
+      '--beam_size', String(process.env.WHISPER_BEAM_SIZE || '5'), // Larger beam size for better accuracy
+      '--condition_on_previous_text', 'False', // Don't condition on previous text to catch filler words that don't fit context
+      '--initial_prompt', process.env.WHISPER_INITIAL_PROMPT || 'um, uh, ah, oh, like, well, so, actually, basically, right, okay, you know, i mean' // Guide Whisper to include common filler words
     ];
 
     // Execute whisper (output is written to file, stdout is not used)
@@ -543,6 +550,12 @@ function getAudioDuration(audioPath) {
 const handler = async (event, context) => {
   const { env, tenantId, jobId, audioKey: providedAudioKey } = event;
   const correlationId = event.correlationId || context.awsRequestId;
+
+  // Fix OpenMP issue: Set KMP_DUPLICATE_LIB_OK to allow multiple OpenMP libraries
+  // This prevents "OMP: Error #15: Initializing libiomp5md.dll, but found libiomp5md.dll already initialized"
+  if (!process.env.KMP_DUPLICATE_LIB_OK) {
+    process.env.KMP_DUPLICATE_LIB_OK = 'TRUE';
+  }
 
   const { logger, metrics } = initObservability({
     serviceName: 'Transcription',
@@ -843,7 +856,14 @@ const handler = async (event, context) => {
           '--output_dir', outputDir,
           '--device', device,
           '--word_timestamps', 'True', // Enable word-level timestamps for accurate filler word detection
-          '--verbose', 'False'
+          '--verbose', 'False',
+          // Parameters to improve filler word detection:
+          '--no_speech_threshold', String(process.env.WHISPER_NO_SPEECH_THRESHOLD || '0.3'), // Lower threshold (default 0.6) to catch more low-volume sounds like "um"
+          '--compression_ratio_threshold', String(process.env.WHISPER_COMPRESSION_RATIO_THRESHOLD || '2.4'), // Lower threshold (default 2.4) to catch more repetitive sounds
+          '--temperature', String(process.env.WHISPER_TEMPERATURE || '0.0'), // Lower temperature for more deterministic transcription
+          '--beam_size', String(process.env.WHISPER_BEAM_SIZE || '5'), // Larger beam size for better accuracy
+          '--condition_on_previous_text', 'False', // Don't condition on previous text to catch filler words that don't fit context
+          '--initial_prompt', process.env.WHISPER_INITIAL_PROMPT || 'um, uh, ah, oh, like, well, so, actually, basically, right, okay, you know, i mean' // Guide Whisper to include common filler words
         ];
 
         const whisperOutput = execFileSync('whisper-ctranslate2', whisperArgs, {
