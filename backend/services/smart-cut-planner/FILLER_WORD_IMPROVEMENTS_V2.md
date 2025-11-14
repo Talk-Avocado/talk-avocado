@@ -151,3 +151,5 @@ function isFillerSo(word, words, wordIndex, segment) {
 The context-aware detection is working correctly (filtering out legitimate "so" as conjunction), but the word protection filter needs further tuning to reach the 80%+ removal rate target. The improvements provide a good foundation, but additional work is needed to be more aggressive with filler word removal while still protecting actual speech content.
 
 
+
+
